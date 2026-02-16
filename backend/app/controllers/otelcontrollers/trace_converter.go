@@ -52,7 +52,7 @@ func convertTraces(projectId uuid.UUID, req *coltracepb.ExportTraceServiceReques
 					traceId = otelTraceIDToUUID(span.TraceId)
 
 					if !isRoot {
-						if foundTraceId, ok := spanToTraceId[spanIdStr]; ok {
+						if foundTraceId, ok := spanToTraceId[string(span.ParentSpanId)]; ok {
 							traceId = foundTraceId
 						}
 					}
