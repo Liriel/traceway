@@ -48,6 +48,7 @@
 
 	onMount(() => {
 		initTheme();
+		(window as any).captureException = captureException;
 
 		if (authState.isAuthenticated) {
 			projectsState.loadProjects();

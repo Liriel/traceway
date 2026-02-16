@@ -12,7 +12,7 @@
 		BookOpen
 	} from '@lucide/svelte';
 	import { themeState } from '$lib/state/theme.svelte';
-	import { projectsState, isFrontendFramework } from '$lib/state/projects.svelte';
+	import { projectsState, isFrontendFramework, isCloudflareFramework } from '$lib/state/projects.svelte';
 	import { LayoutDashboard } from '@lucide/svelte';
 	import { page } from '$app/state';
 	import { createRowClickHandler } from '$lib/utils/navigation';
@@ -27,6 +27,7 @@
 	}
 
 	const hiddenForFrontend = new Set(['Dashboard', 'Endpoints', 'Tasks', 'Metrics']);
+	const hiddenForCloudflare = new Set(['Metrics']);
 
 	const allSidebarItems: SidebarItem[] = [
 		{ Icon: LayoutDashboard, href: '/', title: 'Dashboard', stickyParams: [] },
@@ -45,7 +46,9 @@
 	const sidebarItems = $derived(
 		projectsState.currentProject && isFrontendFramework(projectsState.currentProject.framework)
 			? allSidebarItems.filter((item) => !hiddenForFrontend.has(item.title))
-			: allSidebarItems
+			: projectsState.currentProject && isCloudflareFramework(projectsState.currentProject.framework)
+				? allSidebarItems.filter((item) => !hiddenForCloudflare.has(item.title))
+				: allSidebarItems
 	);
 
 	const allSidebarItemsBottom: SidebarItem[] = [
