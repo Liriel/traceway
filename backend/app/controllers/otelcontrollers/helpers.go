@@ -1,46 +1,52 @@
 package otelcontrollers
 
 import (
+	"encoding/base64"
 	"encoding/hex"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 )
 
-// otelTraceIDToUUID converts a 16-byte OTEL trace ID to a UUID (direct byte mapping).
+// otelTraceIDToUUID converts a 16-byte OTEL trace ID to a UUID.
+// OTLP JSON uses hex encoding for trace_id, but protojson base64-decodes it,
+// producing 24 bytes instead of 16. We roundtrip through base64 to recover the hex string.
 func otelTraceIDToUUID(traceID []byte) uuid.UUID {
-	if len(traceID) != 16 {
-		return uuid.Nil
+	if len(traceID) == 16 {
+		var u uuid.UUID
+		copy(u[:], traceID)
+		return u
 	}
-	var u uuid.UUID
-	copy(u[:], traceID)
-	return u
-}
-
-func rayIDToUUID(rayID string) uuid.UUID {
-	if idx := strings.IndexByte(rayID, '-'); idx != -1 {
-		rayID = rayID[:idx]
+	if len(traceID) == 24 {
+		hexStr := base64.StdEncoding.EncodeToString(traceID)
+		if decoded, err := hex.DecodeString(hexStr); err == nil && len(decoded) == 16 {
+			var u uuid.UUID
+			copy(u[:], decoded)
+			return u
+		}
 	}
-	b, err := hex.DecodeString(rayID)
-	if err != nil || len(b) == 0 {
-		return uuid.New()
-	}
-	var u uuid.UUID
-	copy(u[16-len(b):], b)
-	return u
+	return uuid.Nil
 }
 
 // otelSpanIDToUUID converts an 8-byte OTEL span ID to a UUID by zero-padding the first 8 bytes.
+// Same base64/hex roundtrip as otelTraceIDToUUID for 12-byte inputs.
 func otelSpanIDToUUID(spanID []byte) uuid.UUID {
-	if len(spanID) != 8 {
-		return uuid.Nil
+	if len(spanID) == 8 {
+		var u uuid.UUID
+		copy(u[8:], spanID)
+		return u
 	}
-	var u uuid.UUID
-	copy(u[8:], spanID)
-	return u
+	if len(spanID) == 12 {
+		hexStr := base64.StdEncoding.EncodeToString(spanID)
+		if decoded, err := hex.DecodeString(hexStr); err == nil && len(decoded) == 8 {
+			var u uuid.UUID
+			copy(u[8:], decoded)
+			return u
+		}
+	}
+	return uuid.Nil
 }
 
 func nanoToTime(nanos uint64) time.Time {

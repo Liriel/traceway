@@ -19,6 +19,7 @@ func convertTraces(projectId uuid.UUID, req *coltracepb.ExportTraceServiceReques
 	spans []models.Span,
 	exceptions []models.ExceptionStackTrace,
 ) {
+
 	for _, rs := range req.ResourceSpans {
 		resourceAttrs := rs.GetResource().GetAttributes()
 		serverName := getStringAttribute(resourceAttrs, "service.name")
@@ -37,29 +38,19 @@ func convertTraces(projectId uuid.UUID, req *coltracepb.ExportTraceServiceReques
 				spanAttrs := span.Attributes
 				allAttrs := extractAttributes(spanAttrs)
 
-				rayId := getStringAttribute(spanAttrs, "cloudflare.ray_id")
-				if rayId == "" {
-					rayId = getStringAttribute(resourceAttrs, "cloudflare.ray_id")
-				}
-
 				isRoot := len(span.ParentSpanId) == 0
 
 				spanIdStr := string(span.SpanId)
-				var traceId uuid.UUID
-				if rayId != "" {
-					traceId = rayIDToUUID(rayId)
-				} else {
-					traceId = otelTraceIDToUUID(span.TraceId)
+				traceId := otelTraceIDToUUID(span.TraceId)
 
-					if !isRoot {
-						if foundTraceId, ok := spanToTraceId[string(span.ParentSpanId)]; ok {
-							traceId = foundTraceId
-						}
+				if !isRoot {
+					if foundTraceId, ok := spanToTraceId[string(span.ParentSpanId)]; ok {
+						traceId = foundTraceId
 					}
+				}
 
-					if traceId == uuid.Nil {
-						traceId = uuid.New()
-					}
+				if traceId == uuid.Nil {
+					traceId = uuid.New()
 				}
 
 				spanToTraceId[spanIdStr] = traceId
