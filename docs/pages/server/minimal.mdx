@@ -24,6 +24,7 @@ docker run -d --name traceway \
   -e POSTGRES_PASSWORD="your-password" \
   -e POSTGRES_SSLMODE="disable" \
   -e JWT_SECRET="your-jwt-secret-min-32-characters-long" \
+  -e APP_BASE_URL="https://traceway.example.com" \
   traceway:minimal
 ```
 
@@ -45,6 +46,7 @@ After starting, open `http://localhost/register` to create your first account.
 | `POSTGRES_PASSWORD` | PostgreSQL password | `password` |
 | `POSTGRES_SSLMODE` | PostgreSQL SSL mode | `disable` |
 | `JWT_SECRET` | JWT signing secret (min 32 chars) | `your-secret-here` |
+| `APP_BASE_URL` | Public URL of your instance. Used for SDK setup instructions and email links. | `https://traceway.example.com` |
 
 ## Access Points
 
