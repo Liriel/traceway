@@ -132,6 +132,10 @@ func buildEndpoint(
 		statusCode = int16(code)
 	}
 
+	if statusCode == 404 {
+		endpoint = "UNMATCHED"
+	}
+
 	bodySize := int32(0)
 	if size, ok := getIntAttribute(attrs, "http.response.body.size"); ok {
 		bodySize = int32(size)

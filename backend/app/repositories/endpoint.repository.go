@@ -145,7 +145,7 @@ func (e *endpointRepository) FindGroupedByEndpoint(ctx context.Context, projectI
 				toFloat64(p99_duration) - toFloat64(offset_ms) * 1000000 > 8000000000, 0.75,
 				toFloat64(p99_duration) - toFloat64(offset_ms) * 1000000 > 6000000000, 0.50,
 				toFloat64(p99_duration) - toFloat64(offset_ms) * 1000000 > 3000000000, 0.25, 0.0),
-			if(total_count > 10,
+			if(endpoint != 'UNMATCHED' AND total_count > 10,
 				multiIf(
 					client_error_count / total_count > 0.50, 0.75,
 					client_error_count / total_count > 0.25, 0.50, 0.0),
@@ -216,7 +216,7 @@ func (e *endpointRepository) FindGroupedByEndpoint(ctx context.Context, projectI
 		s.P95Duration = time.Duration(p95)
 		s.P99Duration = time.Duration(p99)
 		s.AvgDuration = time.Duration(avg)
-		s.ImpactReason = computeImpactReason(s.Count, satisfiedCount, toleratingCount, badCount, clientErrorCount, p99, offsetMs)
+		s.ImpactReason = computeImpactReason(s.Endpoint, s.Count, satisfiedCount, toleratingCount, badCount, clientErrorCount, p99, offsetMs)
 		stats = append(stats, s)
 	}
 
@@ -488,7 +488,7 @@ func (e *endpointRepository) FindWorstEndpoints(ctx context.Context, projectId u
 				toFloat64(p99_duration) - toFloat64(offset_ms) * 1000000 > 8000000000, 0.75,
 				toFloat64(p99_duration) - toFloat64(offset_ms) * 1000000 > 6000000000, 0.50,
 				toFloat64(p99_duration) - toFloat64(offset_ms) * 1000000 > 3000000000, 0.25, 0.0),
-			if(total_count > 10,
+			if(endpoint != 'UNMATCHED' AND total_count > 10,
 				multiIf(
 					client_error_count / total_count > 0.50, 0.75,
 					client_error_count / total_count > 0.25, 0.50, 0.0),
@@ -556,7 +556,7 @@ func (e *endpointRepository) FindWorstEndpoints(ctx context.Context, projectId u
 		s.P95Duration = time.Duration(p95)
 		s.P99Duration = time.Duration(p99)
 		s.AvgDuration = time.Duration(avg)
-		s.ImpactReason = computeImpactReason(s.Count, satisfiedCount, toleratingCount, badCount, clientErrorCount, p99, offsetMs)
+		s.ImpactReason = computeImpactReason(s.Endpoint, s.Count, satisfiedCount, toleratingCount, badCount, clientErrorCount, p99, offsetMs)
 		stats = append(stats, s)
 	}
 

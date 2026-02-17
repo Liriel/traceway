@@ -81,6 +81,9 @@ func (e clientController) Report(c *gin.Context) {
 			} else {
 				e := ct.ToEndpoint(request.AppVersion, request.ServerName)
 				e.ProjectId = projectId
+				if e.StatusCode == 404 {
+					e.Endpoint = "UNMATCHED"
+				}
 				endpointsToInsert = append(endpointsToInsert, e)
 			}
 

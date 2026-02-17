@@ -7,6 +7,7 @@ import (
 )
 
 func computeImpactReason(
+	endpoint string,
 	total, satisfiedCount, toleratingCount, badCount, clientErrorCount uint64,
 	p99Ns float64,
 	offsetMs uint32,
@@ -47,9 +48,9 @@ func computeImpactReason(
 		p99Score = 0.25
 	}
 
-	// 4. Client Error Floor (only when count > 10)
+	// 4. Client Error Floor (only when count > 10, skip for UNMATCHED)
 	var clientErrorScore float64
-	if total > 10 {
+	if endpoint != "UNMATCHED" && total > 10 {
 		clientRate := clientF / totalF
 		switch {
 		case clientRate > 0.50:
