@@ -33,8 +33,7 @@ func (s sourceMapController) Upload(c *gin.Context) {
 
 	version := c.Request.FormValue("version")
 	if version == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "version is required"})
-		return
+		version = "unversioned"
 	}
 
 	files := c.Request.MultipartForm.File["files"]

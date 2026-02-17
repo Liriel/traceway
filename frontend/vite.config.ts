@@ -57,6 +57,9 @@ export default defineConfig(({ mode }) => {
 			__TRACEWAY_URL__: JSON.stringify(env.TRACEWAY_URL || ''),
 			__TURNSTILE_SITE_KEY__: JSON.stringify(env.PUBLIC_TURNSTILE_SITE_KEY || '')
 		},
+		build: {
+			sourcemap: 'hidden'
+		},
 		resolve: {
 			dedupe: ['d3-scale', 'd3-array', 'lucide-svelte', 'svelte']
 		},

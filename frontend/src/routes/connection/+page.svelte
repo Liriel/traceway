@@ -9,6 +9,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Copy, Check, KeyRound } from 'lucide-svelte';
 	import { projectsState, type ProjectWithToken, isJsFramework, isOtelFramework, isCloudflareFramework } from '$lib/state/projects.svelte';
+	import { authState } from '$lib/state/auth.svelte';
 	import { LoadingCircle } from '$lib/components/ui/loading-circle';
 	import FrameworkIcon from '$lib/components/framework-icon.svelte';
 	import Highlight from 'svelte-highlight';
@@ -76,6 +77,9 @@
 	);
 
 	const isJs = $derived(projectWithToken ? isJsFramework(projectWithToken.framework) : false);
+	const isReadonly = $derived(
+		authState.getRoleForOrganization(projectsState.currentProject?.organizationId ?? 0) === 'readonly'
+	);
 	const sourceMapToken = $derived(projectWithToken?.sourceMapToken ?? null);
 
 	const uploadCommand = $derived(
@@ -350,7 +354,7 @@
 				</div>
 			</CardContent>
 		</Card>
-		{#if isJs}
+		{#if isJs && !isReadonly}
 			<Card>
 				<CardHeader>
 					<CardTitle class="flex items-center gap-2">

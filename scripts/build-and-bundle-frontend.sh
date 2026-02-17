@@ -57,6 +57,9 @@ else
     echo "Building without Traceway self-monitoring"
 fi
 
+# Ask for sourcemap upload token
+read -p "Enter sourcemap upload token or leave empty to skip upload: " SOURCEMAP_TOKEN_INPUT
+
 # Build frontend
 npm install
 npm run build
@@ -65,5 +68,16 @@ npm run build
 rm -rf "$ROOT_DIR/backend/static/dist"
 mkdir -p "$ROOT_DIR/backend/static/dist"
 cp -r "$ROOT_DIR/frontend/build/"* "$ROOT_DIR/backend/static/dist/"
+
+if [ -n "$SOURCEMAP_TOKEN_INPUT" ]; then
+    APP_VERSION=${NEW_VERSION:-$CURRENT_VERSION}
+    echo "Uploading sourcemaps for version $APP_VERSION..."
+    npx @tracewayapp/sourcemap-upload \
+        --url https://cloud.tracewayapp.com \
+        --token "$SOURCEMAP_TOKEN_INPUT" \
+        --version "$APP_VERSION" \
+        --directory "$ROOT_DIR/frontend/build"
+    echo "Sourcemaps uploaded successfully"
+fi
 
 echo "Frontend built and bundled into backend/static/dist/"
