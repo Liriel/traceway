@@ -57,13 +57,13 @@ func (e metricRecordController) FindHomepageStats(c *gin.Context) {
 
 	// ram usage last 24h vs previous 24h
 	span = traceway.StartSpan(c, "loading ram usage")
-	ramNow, err := repositories.MetricRecordRepository.GetAverageBetween(c, projectId, models.MetricNameMemoryUsage, oneDayAgo, now)
+	ramNow, err := repositories.MetricPointRepository.GetAverageBetween(c, projectId, models.MetricNameMemoryUsage, oneDayAgo, now)
 	if err != nil {
 		span.End()
 		c.AbortWithError(500, traceway.NewStackTraceErrorf("error loading ramNow: %w", err))
 		return
 	}
-	ramPrev, err := repositories.MetricRecordRepository.GetAverageBetween(c, projectId, models.MetricNameMemoryUsage, twoDaysAgo, oneDayAgo)
+	ramPrev, err := repositories.MetricPointRepository.GetAverageBetween(c, projectId, models.MetricNameMemoryUsage, twoDaysAgo, oneDayAgo)
 	span.End()
 	if err != nil {
 		c.AbortWithError(500, traceway.NewStackTraceErrorf("error loading ramPrev: %w", err))
@@ -72,13 +72,13 @@ func (e metricRecordController) FindHomepageStats(c *gin.Context) {
 
 	// memory usage last 24h vs previous 24h
 	span = traceway.StartSpan(c, "loading cpu usage")
-	cpuNow, err := repositories.MetricRecordRepository.GetAverageBetween(c, projectId, models.MetricNameCpuUsage, oneDayAgo, now)
+	cpuNow, err := repositories.MetricPointRepository.GetAverageBetween(c, projectId, models.MetricNameCpuUsage, oneDayAgo, now)
 	if err != nil {
 		span.End()
 		c.AbortWithError(500, traceway.NewStackTraceErrorf("error loading cpuNow: %w", err))
 		return
 	}
-	cpuPrev, err := repositories.MetricRecordRepository.GetAverageBetween(c, projectId, models.MetricNameCpuUsage, twoDaysAgo, oneDayAgo)
+	cpuPrev, err := repositories.MetricPointRepository.GetAverageBetween(c, projectId, models.MetricNameCpuUsage, twoDaysAgo, oneDayAgo)
 	span.End()
 	if err != nil {
 		c.AbortWithError(500, traceway.NewStackTraceErrorf("error loading cpuPrev: %w", err))

@@ -1,30 +1,19 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { browser } from '$app/environment';
 	import { Button } from '$lib/components/ui/button';
-	import { RefreshCw, Code, Info } from 'lucide-svelte';
-	import * as Alert from '$lib/components/ui/alert';
-	import ServerFilter from '$lib/components/dashboard/server-filter.svelte';
-	import MetricsTabContent from '$lib/components/dashboard/metrics-tab-content.svelte';
+	import { Input } from '$lib/components/ui/input';
+	import { LoadingCircle } from '$lib/components/ui/loading-circle';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import * as Select from '$lib/components/ui/select';
 	import * as Tabs from '$lib/components/ui/tabs';
-	import type {
-		DashboardMetric,
-		ServerMetricTrend,
-		MetricTrendPoint,
-		MetricsTab,
-		ApplicationMetricsData,
-		StatsMetricsData,
-		ServerMetricsData
-	} from '$lib/types/dashboard';
+	import WidgetGrid from '$lib/components/dashboard/widget-grid.svelte';
+	import WidgetConfigPanel from '$lib/components/dashboard/widget-config-panel.svelte';
 	import { api } from '$lib/api';
-	import { projectsState, isJsFramework } from '$lib/state/projects.svelte';
+	import { projectsState } from '$lib/state/projects.svelte';
 	import { getTimezone } from '$lib/state/timezone.svelte';
 	import { toUTCISO, calendarDateTimeToLuxon, formatDateTime } from '$lib/utils/formatters';
 	import { TimeRangePicker } from '$lib/components/ui/time-range-picker';
-	import { CalendarDate } from '@internationalized/date';
-	import { getServerColorMap } from '$lib/utils/server-colors';
 	import {
-		presetMinutes,
 		getTimeRangeFromPreset,
 		dateToCalendarDate,
 		dateToTimeString,
@@ -32,125 +21,110 @@
 		getResolvedTimeRange,
 		updateUrl
 	} from '$lib/utils/url-params';
+	import { CalendarDate } from '@internationalized/date';
+	import { Trash2, Plus, RefreshCw, CircleAlert } from 'lucide-svelte';
+	import * as Alert from '$lib/components/ui/alert';
+	import { toast } from 'svelte-sonner';
+	import type { DiscoveredMetric } from '$lib/types/dashboard';
 
 	const timezone = $derived(getTimezone());
 
-	const hideApplicationTab = $derived(
-		projectsState.currentProject ? isJsFramework(projectsState.currentProject.framework) : false
-	);
+	type Widget = {
+		id: number;
+		title: string;
+		widgetType: string;
+		config: any;
+		position: number;
+	};
 
-	// Tab state
-	let activeTab = $state<MetricsTab>('application');
+	type WidgetGroup = {
+		id: number;
+		name: string;
+		description: string;
+		isDefault: boolean;
+		createdAt: string;
+	};
 
-	// Per-tab data (null = not loaded yet)
-	let applicationData = $state<ApplicationMetricsData | null>(null);
-	let statsData = $state<StatsMetricsData | null>(null);
-	let serverData = $state<ServerMetricsData | null>(null);
+	type WidgetGroupWithWidgets = WidgetGroup & {
+		widgets: Widget[];
+	};
 
-	// Per-tab loading states
-	let loadingApplication = $state(false);
-	let loadingStats = $state(false);
-	let loadingServer = $state(false);
+	let widgetGroups = $state<WidgetGroup[]>([]);
+	let loading = $state(true);
+	let activeTabId = $state<string>('');
+	let activeGroup = $state<WidgetGroupWithWidgets | null>(null);
+	let loadingGroup = $state(false);
 
-	// Per-tab error states
-	let errorApplication = $state('');
-	let errorStats = $state('');
-	let errorServer = $state('');
+	let showCreateDialog = $state(false);
+	let newName = $state('');
+	let creating = $state(false);
+	let createError = $state('');
 
-	// Server filtering state (client-side only)
-	let selectedServers = $state<string[]>([]);
+	let showDeleteDialog = $state(false);
+	let deleting = $state(false);
+	let deleteError = $state('');
 
-	// Merge available servers from all endpoints
-	const availableServers = $derived(() => {
-		const servers = new Set<string>();
-		applicationData?.availableServers?.forEach((s) => servers.add(s));
-		serverData?.availableServers?.forEach((s) => servers.add(s));
-		return Array.from(servers).sort();
-	});
+	let showWidgetConfig = $state(false);
+	let editingWidget = $state<Widget | null>(null);
+	let availableMetrics = $state<DiscoveredMetric[]>([]);
+	let widgetConfigError = $state('');
 
-	// Compute server color map for consistent colors across all charts
-	const serverColorMap = $derived(getServerColorMap(availableServers()));
+	let showDeleteWidgetDialog = $state(false);
+	let deletingWidget = $state<Widget | null>(null);
+	let deletingWidgetLoading = $state(false);
+	let deleteWidgetError = $state('');
 
-	// Parse extended URL params (includes servers and tab)
-	function parseMetricsUrlParams(): {
-		preset: string | null;
-		from: Date | null;
-		to: Date | null;
-		servers: string[];
-		tab: MetricsTab;
-	} {
-		if (!browser) return { preset: '24h', from: null, to: null, servers: [], tab: 'application' };
+	let lastUpdated = $state<Date | null>(null);
 
-		const params = new URLSearchParams(window.location.search);
-		const serversParam = params.get('servers');
-		const tabParam = params.get('tab') as MetricsTab | null;
+	let tabsListEl = $state<HTMLElement | null>(null);
+	let hasOverflow = $state(false);
 
-		const servers = serversParam ? serversParam.split(',').filter((s) => s.length > 0) : [];
-		const defaultTab: MetricsTab = hideApplicationTab ? 'stats' : 'application';
-		const tab: MetricsTab =
-			tabParam && ['application', 'stats', 'server'].includes(tabParam)
-				? tabParam === 'application' && hideApplicationTab
-					? 'stats'
-					: tabParam
-				: defaultTab;
-
-		const timeParams = parseTimeRangeFromUrl(timezone);
-		return { ...timeParams, servers, tab };
-	}
-
-	// Initialize from URL or defaults
-	const initialUrlParams = parseMetricsUrlParams();
+	const initialUrlParams = parseTimeRangeFromUrl(timezone);
 	const initialRange = getResolvedTimeRange(initialUrlParams, timezone);
 
-	let selectedPreset = $state<string | null>(initialUrlParams.preset);
+	let selectedPreset = $state<string | null>(initialUrlParams.preset ?? '24h');
 	let fromDate = $state<CalendarDate>(dateToCalendarDate(initialRange.from, timezone));
 	let toDate = $state<CalendarDate>(dateToCalendarDate(initialRange.to, timezone));
 	let fromTime = $state(dateToTimeString(initialRange.from, timezone));
 	let toTime = $state(dateToTimeString(initialRange.to, timezone));
 	let sharedTimeDomain = $state<[Date, Date] | null>(null);
 
-	// Initialize tab from URL
-	activeTab = initialUrlParams.tab;
+	const lastUpdatedFormatted = $derived(
+		lastUpdated ? formatDateTime(lastUpdated, { timezone, format: 'time' }) : ''
+	);
 
-	// Update URL with current state
-	function updateMetricsUrl(pushToHistory = true) {
-		if (!browser) return;
-
-		const params: Record<string, string | null | undefined> = {
-			tab: activeTab
-		};
-
+	function reloadGroupWidgets() {
 		if (selectedPreset) {
-			params.preset = selectedPreset;
-		} else {
-			params.from = getFromDateTimeUTC();
-			params.to = getToDateTimeUTC();
+			const range = getTimeRangeFromPreset(selectedPreset, timezone);
+			fromDate = dateToCalendarDate(range.from, timezone);
+			toDate = dateToCalendarDate(range.to, timezone);
+			fromTime = dateToTimeString(range.from, timezone);
+			toTime = dateToTimeString(range.to, timezone);
 		}
-
-		if (selectedServers.length > 0 && selectedServers.length < availableServers().length) {
-			params.servers = selectedServers.join(',');
-		}
-
-		updateUrl(params, { pushToHistory });
+		sharedTimeDomain = [new Date(getFromDateTimeUTC()), new Date(getToDateTimeUTC())];
+		if (activeTabId) loadGroupWidgets(activeTabId);
 	}
 
-	// Handle browser back/forward navigation
-	function handlePopState() {
-		const urlParams = parseMetricsUrlParams();
-		const range = getResolvedTimeRange(urlParams, timezone);
-
-		selectedPreset = urlParams.preset;
-		fromDate = dateToCalendarDate(range.from, timezone);
-		fromTime = dateToTimeString(range.from, timezone);
-		toDate = dateToCalendarDate(range.to, timezone);
-		toTime = dateToTimeString(range.to, timezone);
-		selectedServers = urlParams.servers;
-		activeTab = urlParams.tab;
-
-		// Clear cached data and reload active tab
-		clearAllData();
-		loadActiveTab(false);
+	function checkOverflow() {
+		if (tabsListEl) {
+			hasOverflow = tabsListEl.scrollWidth > tabsListEl.clientWidth;
+		}
 	}
+
+	$effect(() => {
+		if (!tabsListEl) return;
+		const observer = new ResizeObserver(() => checkOverflow());
+		observer.observe(tabsListEl);
+		checkOverflow();
+		return () => observer.disconnect();
+	});
+
+	$effect(() => {
+		widgetGroups;
+		if (tabsListEl) {
+			requestAnimationFrame(() => checkOverflow());
+		}
+	});
 
 	function getFromDateTimeUTC(): string {
 		const [hour, minute] = (fromTime || '00:00').split(':').map(Number);
@@ -170,173 +144,108 @@
 		return toUTCISO(dt);
 	}
 
-	// Clear all cached data
-	function clearAllData() {
-		applicationData = null;
-		statsData = null;
-		serverData = null;
-	}
-
-	// Transform API response timestamps to Date objects
-	function transformMetrics(metrics: any[]): DashboardMetric[] {
-		if (!metrics || !Array.isArray(metrics)) return [];
-		return metrics.map((m: any) => ({
-			id: m.id,
-			name: m.name,
-			value: m.value,
-			unit: m.unit,
-			trend: (m.trend || []).map((t: any) => ({
-				timestamp: new Date(t.timestamp),
-				value: t.value
-			})),
-			status: m.status,
-			servers: m.servers?.map(
-				(s: any): ServerMetricTrend => ({
-					serverName: s.serverName,
-					value: s.value,
-					trend: (s.trend || []).map(
-						(t: any): MetricTrendPoint => ({
-							timestamp: new Date(t.timestamp),
-							value: t.value
-						})
-					)
-				})
-			)
-		}));
-	}
-
-	// Load Application metrics
-	async function loadApplicationMetrics() {
-		loadingApplication = true;
-		errorApplication = '';
-
+	async function loadWidgetGroups() {
+		loading = true;
 		try {
-			const queryParams = `fromDate=${getFromDateTimeUTC()}&toDate=${getToDateTimeUTC()}`;
-			const response = await api.get(`/metrics/application?${queryParams}`, {
+			const response = await api.get('/widget-groups', {
 				projectId: projectsState.currentProjectId ?? undefined
 			});
-
-			applicationData = {
-				metrics: transformMetrics(response.metrics),
-				availableServers: response.availableServers || [],
-				lastUpdated: response.lastUpdated ? new Date(response.lastUpdated) : new Date()
-			};
-		} catch (e: any) {
-			errorApplication = e.message || 'Failed to load application metrics';
-			console.error(e);
+			widgetGroups = response.widgetGroups || [];
+			if (widgetGroups.length > 0 && !activeTabId) {
+				activeTabId = String(widgetGroups[0].id);
+			}
+		} catch (e) {
+			console.error('Failed to load widget groups:', e);
 		} finally {
-			loadingApplication = false;
+			loading = false;
 		}
 	}
 
-	// Load Stats metrics
-	async function loadStatsMetrics() {
-		loadingStats = true;
-		errorStats = '';
-
+	async function loadGroupWidgets(groupId: string) {
+		loadingGroup = true;
 		try {
-			const queryParams = `fromDate=${getFromDateTimeUTC()}&toDate=${getToDateTimeUTC()}`;
-			const response = await api.get(`/metrics/stats?${queryParams}`, {
+			const result = await api.get(`/widget-groups/${groupId}`, {
 				projectId: projectsState.currentProjectId ?? undefined
 			});
-
-			statsData = {
-				metrics: transformMetrics(response.metrics),
-				lastUpdated: response.lastUpdated ? new Date(response.lastUpdated) : new Date()
-			};
-		} catch (e: any) {
-			errorStats = e.message || 'Failed to load stats metrics';
-			console.error(e);
+			activeGroup = result;
+			lastUpdated = new Date();
+		} catch (e) {
+			console.error('Failed to load widget group:', e);
+			activeGroup = null;
 		} finally {
-			loadingStats = false;
+			loadingGroup = false;
 		}
 	}
 
-	// Load Server metrics
-	async function loadServerMetrics() {
-		loadingServer = true;
-		errorServer = '';
+	$effect(() => {
+		if (activeTabId) {
+			loadGroupWidgets(activeTabId);
+		}
+	});
 
+	$effect(() => {
+		if (!showWidgetConfig) {
+			widgetConfigError = '';
+		}
+	});
+
+	function handleTabChange(tab: string) {
+		activeTabId = tab;
+		showWidgetConfig = false;
+		editingWidget = null;
+	}
+
+	async function createWidgetGroup() {
+		creating = true;
+		createError = '';
 		try {
-			const queryParams = `fromDate=${getFromDateTimeUTC()}&toDate=${getToDateTimeUTC()}`;
-			const response = await api.get(`/metrics/server?${queryParams}`, {
+			const group = await api.post(
+				'/widget-groups',
+				{ name: newName },
+				{ projectId: projectsState.currentProjectId ?? undefined }
+			);
+			toast.success('Successfully created a new Widget Group', { position: 'top-center' });
+			showCreateDialog = false;
+			newName = '';
+			await loadWidgetGroups();
+			activeTabId = String(group.id);
+		} catch (e: any) {
+			if (e?.status === 422) {
+				createError = e.message;
+			} else {
+				console.error('Failed to create widget group:', e);
+			}
+		} finally {
+			creating = false;
+		}
+	}
+
+	async function deleteWidgetGroup() {
+		if (!activeGroup) return;
+		deleting = true;
+		deleteError = '';
+		try {
+			await api.delete(`/widget-groups/${activeGroup.id}`, {
 				projectId: projectsState.currentProjectId ?? undefined
 			});
-
-			serverData = {
-				metrics: transformMetrics(response.metrics),
-				availableServers: response.availableServers || [],
-				lastUpdated: response.lastUpdated ? new Date(response.lastUpdated) : new Date()
-			};
+			showDeleteDialog = false;
+			activeTabId = '';
+			activeGroup = null;
+			await loadWidgetGroups();
+			if (widgetGroups.length > 0) {
+				activeTabId = String(widgetGroups[0].id);
+			}
 		} catch (e: any) {
-			errorServer = e.message || 'Failed to load server metrics';
-			console.error(e);
+			if (e?.status === 422) {
+				deleteError = e.message;
+			} else {
+				console.error('Failed to delete widget group:', e);
+			}
 		} finally {
-			loadingServer = false;
+			deleting = false;
 		}
 	}
 
-	// Load only the active tab's data (lazy loading)
-	function loadActiveTab(pushToHistory = true) {
-		if (selectedPreset) {
-			const range = getTimeRangeFromPreset(selectedPreset, timezone);
-			fromDate = dateToCalendarDate(range.from, timezone);
-			toDate = dateToCalendarDate(range.to, timezone);
-			fromTime = dateToTimeString(range.from, timezone);
-			toTime = dateToTimeString(range.to, timezone);
-		}
-
-		if (pushToHistory) updateMetricsUrl(true);
-
-		// Update shared time domain
-		sharedTimeDomain = [new Date(getFromDateTimeUTC()), new Date(getToDateTimeUTC())];
-
-		switch (activeTab) {
-			case 'application':
-				if (!applicationData) loadApplicationMetrics();
-				break;
-			case 'stats':
-				if (!statsData) loadStatsMetrics();
-				if (!serverData) loadServerMetrics();
-				break;
-			case 'server':
-				if (!serverData) loadServerMetrics();
-				break;
-		}
-	}
-
-	// Force reload (for refresh button & time range change)
-	function reloadActiveTab() {
-		if (selectedPreset) {
-			const range = getTimeRangeFromPreset(selectedPreset, timezone);
-			fromDate = dateToCalendarDate(range.from, timezone);
-			toDate = dateToCalendarDate(range.to, timezone);
-			fromTime = dateToTimeString(range.from, timezone);
-			toTime = dateToTimeString(range.to, timezone);
-		}
-
-		updateMetricsUrl(true);
-		sharedTimeDomain = [new Date(getFromDateTimeUTC()), new Date(getToDateTimeUTC())];
-
-		// Clear all cached data when time range changes
-		clearAllData();
-
-		// Load the active tab
-		switch (activeTab) {
-			case 'application':
-				loadApplicationMetrics();
-				break;
-			case 'stats':
-				loadStatsMetrics();
-				loadServerMetrics();
-				break;
-			case 'server':
-				loadServerMetrics();
-				break;
-		}
-	}
-
-	// Handle time range change
 	function handleTimeRangeChange(
 		from: { date: CalendarDate; time: string },
 		to: { date: CalendarDate; time: string },
@@ -347,75 +256,145 @@
 		toDate = to.date;
 		toTime = to.time;
 		selectedPreset = preset;
-		reloadActiveTab();
+
+		if (selectedPreset) {
+			const range = getTimeRangeFromPreset(selectedPreset, timezone);
+			fromDate = dateToCalendarDate(range.from, timezone);
+			toDate = dateToCalendarDate(range.to, timezone);
+			fromTime = dateToTimeString(range.from, timezone);
+			toTime = dateToTimeString(range.to, timezone);
+		}
+
+		sharedTimeDomain = [new Date(getFromDateTimeUTC()), new Date(getToDateTimeUTC())];
+		updateUrl({ preset: selectedPreset ?? undefined });
 	}
 
-	// Handle tab change - lazy load if data not loaded
-	function handleTabChange(tab: string) {
-		activeTab = tab as MetricsTab;
-		loadActiveTab(false);
-		updateMetricsUrl(false);
-	}
-
-	// Client-side server filtering - NO API call needed
-	function handleServerSelectionChange(servers: string[]) {
-		selectedServers = servers;
-		updateMetricsUrl(false);
-	}
-
-	// Handle drag-to-zoom selection from chart overlay
 	function handleChartRangeSelect(from: Date, to: Date) {
 		selectedPreset = null;
 		fromDate = new CalendarDate(from.getFullYear(), from.getMonth() + 1, from.getDate());
 		fromTime = `${String(from.getHours()).padStart(2, '0')}:${String(from.getMinutes()).padStart(2, '0')}`;
 		toDate = new CalendarDate(to.getFullYear(), to.getMonth() + 1, to.getDate());
 		toTime = `${String(to.getHours()).padStart(2, '0')}:${String(to.getMinutes()).padStart(2, '0')}`;
-		reloadActiveTab();
+		sharedTimeDomain = [from, to];
 	}
 
-	// Get last updated time for current tab
-	const lastUpdated = $derived(() => {
-		switch (activeTab) {
-			case 'application':
-				return applicationData?.lastUpdated;
-			case 'stats':
-				return statsData?.lastUpdated;
-			case 'server':
-				return serverData?.lastUpdated;
-			default:
-				return undefined;
+	async function loadMetrics() {
+		try {
+			const discoverResponse = await api.get(
+				`/metrics/discover?from=${getFromDateTimeUTC()}&to=${getToDateTimeUTC()}`,
+				{ projectId: projectsState.currentProjectId ?? undefined }
+			);
+			availableMetrics = discoverResponse.metrics || [];
+		} catch {
+			// ignore
 		}
-	});
+	}
 
-	const lastUpdatedFormatted = $derived(
-		lastUpdated() ? formatDateTime(lastUpdated()!, { timezone, format: 'time' }) : ''
+	function openAddWidget() {
+		editingWidget = null;
+		showWidgetConfig = true;
+		loadMetrics();
+	}
+
+	function openEditWidget(widget: Widget) {
+		editingWidget = widget;
+		showWidgetConfig = true;
+		loadMetrics();
+	}
+
+	function openDeleteWidgetDialog(widget: Widget) {
+		deletingWidget = widget;
+		showDeleteWidgetDialog = true;
+	}
+
+	async function confirmDeleteWidget() {
+		if (!activeGroup || !deletingWidget?.id) return;
+		deletingWidgetLoading = true;
+		deleteWidgetError = '';
+		try {
+			await api.delete(`/widget-groups/${activeGroup.id}/widgets/${deletingWidget.id}`, {
+				projectId: projectsState.currentProjectId ?? undefined
+			});
+			showDeleteWidgetDialog = false;
+			deletingWidget = null;
+			await loadGroupWidgets(activeTabId);
+		} catch (e: any) {
+			if (e?.status === 422) {
+				deleteWidgetError = e.message;
+			} else {
+				console.error('Failed to delete widget:', e);
+			}
+		} finally {
+			deletingWidgetLoading = false;
+		}
+	}
+
+	async function handleMoveWidget(widgetId: number, offset: number) {
+		if (!activeGroup) return;
+		try {
+			await api.put(
+				`/widget-groups/${activeGroup.id}/widgets/${widgetId}/move`,
+				{ offset },
+				{ projectId: projectsState.currentProjectId ?? undefined }
+			);
+			await loadGroupWidgets(activeTabId);
+			toast.success('Successfully moved the Widget', { position: 'top-center' });
+		} catch (e) {
+			console.error('Failed to move widget:', e);
+		}
+	}
+
+	async function handleWidgetSave(data: { title: string; widgetType: string; config: any }) {
+		if (!activeGroup) return;
+
+		widgetConfigError = '';
+		try {
+			if (editingWidget?.id) {
+				await api.put(`/widget-groups/${activeGroup.id}/widgets/${editingWidget.id}`, data, {
+					projectId: projectsState.currentProjectId ?? undefined
+				});
+				toast.success('Successfully updated the Widget', { position: 'top-center' });
+			} else {
+				await api.post(`/widget-groups/${activeGroup.id}/widgets`, data, {
+					projectId: projectsState.currentProjectId ?? undefined
+				});
+				toast.success('Successfully added the Widget', { position: 'top-center' });
+			}
+			showWidgetConfig = false;
+			editingWidget = null;
+			await loadGroupWidgets(activeTabId);
+		} catch (e: any) {
+			if (e?.status === 422) {
+				widgetConfigError = e.message;
+			} else {
+				console.error('Failed to save widget:', e);
+			}
+		}
+	}
+
+	const activeIsDefault = $derived(
+		widgetGroups.find((g) => String(g.id) === activeTabId)?.isDefault ?? false
 	);
 
-	// Check if current tab is loading
-	const isCurrentTabLoading = $derived(() => {
-		switch (activeTab) {
-			case 'application':
-				return loadingApplication;
-			case 'stats':
-				return loadingStats;
-			case 'server':
-				return loadingServer;
-			default:
-				return false;
-		}
-	});
+	const activeTabName = $derived(
+		widgetGroups.find((g) => String(g.id) === activeTabId)?.name ?? ''
+	);
 
 	onMount(() => {
-		// Only load the active tab on mount (lazy loading)
-		loadActiveTab(false);
+		loadWidgetGroups();
 
-		window.addEventListener('popstate', handlePopState);
-		return () => window.removeEventListener('popstate', handlePopState);
+		if (selectedPreset) {
+			const range = getTimeRangeFromPreset(selectedPreset, timezone);
+			fromDate = dateToCalendarDate(range.from, timezone);
+			toDate = dateToCalendarDate(range.to, timezone);
+			fromTime = dateToTimeString(range.from, timezone);
+			toTime = dateToTimeString(range.to, timezone);
+		}
+		sharedTimeDomain = [new Date(getFromDateTimeUTC()), new Date(getToDateTimeUTC())];
 	});
 </script>
 
 <div class="space-y-4">
-	<!-- Header -->
 	<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 		<h2 class="text-2xl font-bold tracking-tight">Metrics</h2>
 		<div class="flex items-center gap-2">
@@ -427,121 +406,207 @@
 				bind:preset={selectedPreset}
 				onApply={handleTimeRangeChange}
 			/>
+			{#if !activeIsDefault && activeTabId}
+				<Button variant="destructive" size="sm" onclick={() => (showDeleteDialog = true)}>
+					<Trash2 class="mr-1 h-4 w-4" />
+					Delete
+				</Button>
+			{/if}
 		</div>
 	</div>
 
-	<!-- Tabs -->
-	<Tabs.Root bind:value={activeTab} onValueChange={handleTabChange}>
-		<div class="flex flex-wrap items-center justify-between gap-2">
-			<div class="flex flex-wrap items-center gap-2">
-				<Tabs.List>
-					{#if !hideApplicationTab}
-						<Tabs.Trigger value="application">Application</Tabs.Trigger>
-					{/if}
-					<Tabs.Trigger value="stats">Stats</Tabs.Trigger>
-					<Tabs.Trigger value="server">CPU / Mem</Tabs.Trigger>
-					<Tabs.Trigger value="custom">Custom</Tabs.Trigger>
-				</Tabs.List>
-
-				{#if availableServers().length > 1}
-					<ServerFilter
-						availableServers={availableServers()}
-						bind:selectedServers
-						onSelectionChange={handleServerSelectionChange}
-						{serverColorMap}
-					/>
+	{#if loading}
+		<div class="flex items-center justify-center py-20">
+			<LoadingCircle size="xlg" />
+		</div>
+	{:else if widgetGroups.length === 0}
+		<div class="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
+			<p class="mb-4">No widget groups yet. Create one to get started.</p>
+			<Button onclick={() => (showCreateDialog = true)}>
+				<Plus class="mr-1 h-4 w-4" />
+				Create your first widget group
+			</Button>
+		</div>
+	{:else}
+		<Tabs.Root value={activeTabId} onValueChange={handleTabChange}>
+			<div class="flex items-center gap-2">
+				{#if hasOverflow}
+					<Select.Root
+						type="single"
+						value={activeTabId}
+						onValueChange={(v) => {
+							if (v) handleTabChange(v);
+						}}
+					>
+						<Select.Trigger size="sm">{activeTabName}</Select.Trigger>
+						<Select.Content>
+							{#each widgetGroups as group (group.id)}
+								<Select.Item value={String(group.id)}>{group.name}</Select.Item>
+							{/each}
+						</Select.Content>
+					</Select.Root>
+				{/if}
+				<div
+					class="flex min-w-0 items-center overflow-hidden"
+					class:invisible={hasOverflow}
+					class:h-0={hasOverflow}
+					bind:this={tabsListEl}
+				>
+					<Tabs.List>
+						{#each widgetGroups as group (group.id)}
+							<Tabs.Trigger value={String(group.id)}>{group.name}</Tabs.Trigger>
+						{/each}
+					</Tabs.List>
+				</div>
+				<button
+					class="inline-flex items-center justify-center rounded-md px-2 py-1 text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
+					onclick={() => (showCreateDialog = true)}
+				>
+					<Plus class="h-4 w-4" />
+				</button>
+				{#if lastUpdated}
+					<div class="ml-auto flex items-center gap-1">
+						<span class="text-sm whitespace-nowrap text-muted-foreground">
+							Updated: {lastUpdatedFormatted}
+						</span>
+						<Button variant="ghost" size="sm" onclick={reloadGroupWidgets} disabled={loadingGroup}>
+							<RefreshCw class="h-4 w-4 {loadingGroup ? 'animate-spin' : ''}" />
+						</Button>
+					</div>
 				{/if}
 			</div>
 
-			{#if lastUpdated()}
-				<div class="flex items-center gap-1">
-					<span class="text-sm whitespace-nowrap text-muted-foreground">
-						Updated: {lastUpdatedFormatted}
-					</span>
-
-					<Button
-						variant="ghost"
-						size="sm"
-						onclick={() => reloadActiveTab()}
-						disabled={isCurrentTabLoading()}
-					>
-						<RefreshCw class="h-4 w-4 {isCurrentTabLoading() ? 'animate-spin' : ''}" />
-					</Button>
-				</div>
-			{/if}
-		</div>
-
-		<!-- Application Tab -->
-		<Tabs.Content value="application">
-			<MetricsTabContent
-				metrics={applicationData?.metrics ?? null}
-				loading={loadingApplication}
-				error={errorApplication}
-				errorTitle="Failed to Load Application Metrics"
-				onRetry={() => loadApplicationMetrics()}
-				timeDomain={sharedTimeDomain}
-				onRangeSelect={handleChartRangeSelect}
-				{serverColorMap}
-				{selectedServers}
-				availableServers={availableServers()}
-			/>
-		</Tabs.Content>
-
-		<!-- Stats Tab -->
-		<Tabs.Content value="stats">
-			{#if availableServers().length > 1}
-				<Alert.Root
-					class="mt-2 mb-2 border-none"
-					style="background: color-mix(in srgb, var(--sidebar-accent) 8%, transparent);"
-				>
-					<Info class="h-4 w-4" style="color: var(--sidebar-accent);" />
-					<Alert.Description style="color: var(--sidebar-accent);">
-						Stats are aggregated across all servers. Switch to CPU / Mem for per-server breakdowns.
-					</Alert.Description>
-				</Alert.Root>
-			{/if}
-			<MetricsTabContent
-				metrics={statsData?.metrics ?? null}
-				loading={loadingStats}
-				error={errorStats}
-				errorTitle="Failed to Load Stats Metrics"
-				onRetry={() => loadStatsMetrics()}
-				timeDomain={sharedTimeDomain}
-				onRangeSelect={handleChartRangeSelect}
-				{serverColorMap}
-				{selectedServers}
-				availableServers={availableServers()}
-			/>
-		</Tabs.Content>
-
-		<!-- Server Tab -->
-		<Tabs.Content value="server">
-			<MetricsTabContent
-				metrics={serverData?.metrics ?? null}
-				loading={loadingServer}
-				error={errorServer}
-				errorTitle="Failed to Load Server Metrics"
-				onRetry={() => loadServerMetrics()}
-				timeDomain={sharedTimeDomain}
-				onRangeSelect={handleChartRangeSelect}
-				{serverColorMap}
-				{selectedServers}
-				availableServers={availableServers()}
-			/>
-		</Tabs.Content>
-
-		<!-- Custom Tab -->
-		<Tabs.Content value="custom">
-			<div class="flex flex-col items-center justify-center py-8 text-center">
-				<div class="mb-4 rounded-full bg-muted p-3">
-					<Code class="h-6 w-6 text-muted-foreground" />
-				</div>
-				<h3 class="mb-2 text-lg font-semibold">Custom Metrics not supported</h3>
-				<p class="mb-4 max-w-md text-sm text-muted-foreground">
-					Custom Metrics are not currently supported, but we're working on it and hope to have them
-					supported soon.
-				</p>
-			</div>
-		</Tabs.Content>
-	</Tabs.Root>
+			{#each widgetGroups as group (group.id)}
+				<Tabs.Content value={String(group.id)}>
+					{#if loadingGroup && activeTabId === String(group.id)}
+						<div class="flex items-center justify-center py-20">
+							<LoadingCircle size="xlg" />
+						</div>
+					{:else if activeGroup && activeTabId === String(group.id)}
+						<WidgetGrid
+							widgets={activeGroup.widgets ?? []}
+							fromDateUTC={getFromDateTimeUTC()}
+							toDateUTC={getToDateTimeUTC()}
+							timeDomain={sharedTimeDomain}
+							onEditWidget={openEditWidget}
+							onDeleteWidget={openDeleteWidgetDialog}
+							onMoveWidget={handleMoveWidget}
+							onAddWidget={openAddWidget}
+							onRangeSelect={handleChartRangeSelect}
+						/>
+					{/if}
+				</Tabs.Content>
+			{/each}
+		</Tabs.Root>
+	{/if}
 </div>
+
+<WidgetConfigPanel
+	bind:open={showWidgetConfig}
+	widget={editingWidget}
+	{availableMetrics}
+	error={widgetConfigError}
+	onSave={handleWidgetSave}
+	onCancel={() => {
+		showWidgetConfig = false;
+		editingWidget = null;
+		widgetConfigError = '';
+	}}
+/>
+
+<AlertDialog.Root
+	bind:open={showCreateDialog}
+	onOpenChange={(o) => {
+		if (!o) createError = '';
+	}}
+>
+	<AlertDialog.Content interactOutsideBehavior="close">
+		<AlertDialog.Header>
+			<AlertDialog.Title>New Widget Group</AlertDialog.Title>
+		</AlertDialog.Header>
+		{#if createError}
+			<Alert.Root variant="destructive" class="bg-red-50 border-red-200">
+				<CircleAlert class="h-4 w-4 text-red-700" />
+				<Alert.Title class="text-red-800">Error</Alert.Title>
+				<Alert.Description class="text-red-700">{createError}</Alert.Description>
+			</Alert.Root>
+		{/if}
+		<div class="space-y-4">
+			<div>
+				<label class="text-sm font-medium" for="new-group-name">Name</label>
+				<Input id="new-group-name" bind:value={newName} placeholder="My Group" maxlength={12} />
+			</div>
+		</div>
+		<AlertDialog.Footer>
+			<Button variant="outline" onclick={() => (showCreateDialog = false)}>Cancel</Button>
+			<Button onclick={createWidgetGroup} disabled={creating}>
+				{#if creating}Creating...{:else}<Plus class="mr-1 h-4 w-4" /> New Widget Group{/if}
+			</Button>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
+
+<AlertDialog.Root
+	bind:open={showDeleteDialog}
+	onOpenChange={(o) => {
+		if (!o) deleteError = '';
+	}}
+>
+	<AlertDialog.Content interactOutsideBehavior="close">
+		<AlertDialog.Header>
+			<AlertDialog.Title>Delete Widget Group</AlertDialog.Title>
+			<AlertDialog.Description>
+				Are you sure you want to delete "{activeGroup?.name}"? This will remove all widgets in this
+				group. This action cannot be undone.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		{#if deleteError}
+			<Alert.Root variant="destructive" class="bg-red-50 border-red-200">
+				<CircleAlert class="h-4 w-4 text-red-700" />
+				<Alert.Title class="text-red-800">Error</Alert.Title>
+				<Alert.Description class="text-red-700">{deleteError}</Alert.Description>
+			</Alert.Root>
+		{/if}
+		<AlertDialog.Footer>
+			<Button variant="outline" onclick={() => (showDeleteDialog = false)} disabled={deleting}
+				>Cancel</Button
+			>
+			<Button variant="destructive" onclick={deleteWidgetGroup} disabled={deleting}>
+				{deleting ? 'Deleting...' : 'Delete'}
+			</Button>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
+
+<AlertDialog.Root
+	bind:open={showDeleteWidgetDialog}
+	onOpenChange={(o) => {
+		if (!o) deleteWidgetError = '';
+	}}
+>
+	<AlertDialog.Content interactOutsideBehavior="close">
+		<AlertDialog.Header>
+			<AlertDialog.Title>Delete Widget</AlertDialog.Title>
+			<AlertDialog.Description>
+				Are you sure you want to delete "{deletingWidget?.title}"? This action cannot be undone.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		{#if deleteWidgetError}
+			<Alert.Root variant="destructive" class="bg-red-50 border-red-200">
+				<CircleAlert class="h-4 w-4 text-red-700" />
+				<Alert.Title class="text-red-800">Error</Alert.Title>
+				<Alert.Description class="text-red-700">{deleteWidgetError}</Alert.Description>
+			</Alert.Root>
+		{/if}
+		<AlertDialog.Footer>
+			<Button
+				variant="outline"
+				onclick={() => (showDeleteWidgetDialog = false)}
+				disabled={deletingWidgetLoading}>Cancel</Button
+			>
+			<Button variant="destructive" onclick={confirmDeleteWidget} disabled={deletingWidgetLoading}>
+				{deletingWidgetLoading ? 'Deleting...' : 'Delete'}
+			</Button>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

@@ -50,3 +50,41 @@ export type ServerMetricsData = {
 	availableServers: string[];
 	lastUpdated: Date;
 };
+
+// New metrics query API types
+export type DiscoveredMetric = {
+	name: string;
+	tagKeys: string[];
+	metricType?: string;
+	unit?: string;
+};
+
+export type MetricQueryItem = {
+	name: string;
+	aggregation: string;
+	tagFilters?: Record<string, string>;
+	groupBy?: string;
+};
+
+export type MetricQueryRequest = {
+	queries: MetricQueryItem[];
+	from: string;
+	to: string;
+	intervalMinutes?: number;
+};
+
+export type TimeSeriesPoint = {
+	Timestamp: string;
+	Value: number;
+};
+
+export type MetricQueryResult = {
+	name: string;
+	series: Record<string, TimeSeriesPoint[]>;
+};
+
+export type MetricQueryResponse = {
+	results: MetricQueryResult[];
+};
+
+export type ExplorerMetricsTab = 'application' | 'stats' | 'server' | 'explorer';

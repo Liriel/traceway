@@ -8,15 +8,12 @@ import (
 	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
 )
 
-func convertMetrics(projectId uuid.UUID, req *colmetricspb.ExportMetricsServiceRequest, serverName string) []models.MetricRecord {
-	var records []models.MetricRecord
+func convertMetricPoints(projectId uuid.UUID, req *colmetricspb.ExportMetricsServiceRequest) []models.MetricPoint {
+	var points []models.MetricPoint
 
 	for _, rm := range req.ResourceMetrics {
 		resAttrs := rm.GetResource().GetAttributes()
 		sn := getStringAttribute(resAttrs, "service.name")
-		if sn == "" {
-			sn = serverName
-		}
 
 		for _, sm := range rm.ScopeMetrics {
 			for _, metric := range sm.Metrics {
@@ -24,37 +21,41 @@ func convertMetrics(projectId uuid.UUID, req *colmetricspb.ExportMetricsServiceR
 
 				switch data := metric.Data.(type) {
 				case *metricspb.Metric_Gauge:
-					records = appendNumberDataPoints(records, projectId, name, sn, data.Gauge.GetDataPoints())
+					points = appendNumberDataPoints(points, projectId, name, sn, data.Gauge.GetDataPoints())
 				case *metricspb.Metric_Sum:
-					records = appendNumberDataPoints(records, projectId, name, sn, data.Sum.GetDataPoints())
+					points = appendNumberDataPoints(points, projectId, name, sn, data.Sum.GetDataPoints())
 				case *metricspb.Metric_Histogram:
 					for _, dp := range data.Histogram.GetDataPoints() {
 						ts := nanoToTime(dp.TimeUnixNano)
+						tags := make(map[string]string)
+						if sn != "" {
+							tags["server_name"] = sn
+						}
 						if dp.Count > 0 && dp.Sum != nil {
-							records = append(records, models.MetricRecord{
+							points = append(points, models.MetricPoint{
 								ProjectId:  projectId,
 								Name:       name + ".avg",
 								Value:      *dp.Sum / float64(dp.Count),
+								Tags:       tags,
 								RecordedAt: ts,
-								ServerName: sn,
 							})
 						}
-						records = append(records, models.MetricRecord{
+						points = append(points, models.MetricPoint{
 							ProjectId:  projectId,
 							Name:       name + ".count",
 							Value:      float64(dp.Count),
+							Tags:       tags,
 							RecordedAt: ts,
-							ServerName: sn,
 						})
 					}
 				}
 			}
 		}
 	}
-	return records
+	return points
 }
 
-func appendNumberDataPoints(records []models.MetricRecord, projectId uuid.UUID, name, serverName string, dps []*metricspb.NumberDataPoint) []models.MetricRecord {
+func appendNumberDataPoints(points []models.MetricPoint, projectId uuid.UUID, name, serverName string, dps []*metricspb.NumberDataPoint) []models.MetricPoint {
 	for _, dp := range dps {
 		var value float64
 		switch v := dp.Value.(type) {
@@ -63,13 +64,17 @@ func appendNumberDataPoints(records []models.MetricRecord, projectId uuid.UUID, 
 		case *metricspb.NumberDataPoint_AsInt:
 			value = float64(v.AsInt)
 		}
-		records = append(records, models.MetricRecord{
+		tags := make(map[string]string)
+		if serverName != "" {
+			tags["server_name"] = serverName
+		}
+		points = append(points, models.MetricPoint{
 			ProjectId:  projectId,
 			Name:       name,
 			Value:      value,
+			Tags:       tags,
 			RecordedAt: nanoToTime(dp.TimeUnixNano),
-			ServerName: serverName,
 		})
 	}
-	return records
+	return points
 }

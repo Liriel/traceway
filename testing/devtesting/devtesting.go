@@ -210,6 +210,25 @@ func testGin() {
 		traceway.PrintCollectionFrameMetrics()
 	})
 
+	router.GET("/test-metrics", func(ctx *gin.Context) {
+		queueSize := 50 + rand.IntN(450)
+		traceway.CaptureMetricWithTags("app.queue_size", float64(queueSize), map[string]string{
+			"queue":    []string{"emails", "notifications", "exports"}[rand.IntN(3)],
+			"priority": []string{"high", "low"}[rand.IntN(2)],
+		})
+
+		latency := 5.0 + rand.Float64()*195.0
+		traceway.CaptureMetricWithTags("app.cache_latency_ms", latency, map[string]string{
+			"cache":     []string{"redis", "memcached"}[rand.IntN(2)],
+			"operation": []string{"get", "set", "delete"}[rand.IntN(3)],
+		})
+
+		ctx.JSON(200, gin.H{
+			"queue_size":       queueSize,
+			"cache_latency_ms": latency,
+		})
+	})
+
 	router.GET("/test-cerror-simple", func(ctx *gin.Context) {
 		ctx.Error(errors.New("simple error without stack"))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "simple error"})

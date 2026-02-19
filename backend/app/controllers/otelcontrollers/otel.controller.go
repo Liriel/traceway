@@ -99,11 +99,12 @@ func (o otelController) ExportMetrics(c *gin.Context) {
 		return
 	}
 
-	records := convertMetrics(projectId, req, "")
-
-	if err := repositories.MetricRecordRepository.InsertAsync(c, records); err != nil {
-		c.AbortWithError(500, traceway.NewStackTraceErrorf("error inserting OTEL metrics: %w", err))
-		return
+	points := convertMetricPoints(projectId, req)
+	if len(points) > 0 {
+		if err := repositories.MetricPointRepository.InsertAsync(c, points); err != nil {
+			c.AbortWithError(500, traceway.NewStackTraceErrorf("error inserting OTEL metric points: %w", err))
+			return
+		}
 	}
 
 	writeMetricsResponse(c)

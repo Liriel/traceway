@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { scaleUtc, scaleLinear, type NumberValue } from 'd3-scale';
-	import { line } from 'd3-shape';
+	import { line, area } from 'd3-shape';
 	import { min, max } from 'd3-array';
 	import { formatDateTime } from '$lib/utils/formatters';
 	import { getTimezone } from '$lib/state/timezone.svelte';
@@ -33,6 +33,7 @@
 		serverColorMap = {},
 		unit = '',
 		formatValue,
+		areaFill = false,
 		sharedHoverTime = null,
 		isSourceChart = false,
 		onHoverTimeChange
@@ -48,6 +49,7 @@
 		serverColorMap?: Record<string, string>;
 		unit?: string;
 		formatValue?: (value: number) => string;
+		areaFill?: boolean;
 		sharedHoverTime?: Date | null;
 		isSourceChart?: boolean;
 		onHoverTimeChange?: (time: Date | null) => void;
@@ -139,6 +141,17 @@
 			.y(d => yScale(d.value));
 
 		return lineGen(seriesData) || '';
+	}
+
+	function generateAreaPath(seriesData: DataPoint[]): string {
+		if (seriesData.length === 0) return '';
+
+		const areaGen = area<DataPoint>()
+			.x(d => xScale(d.timestamp))
+			.y0(chartHeight)
+			.y1(d => yScale(d.value));
+
+		return areaGen(seriesData) || '';
 	}
 
 	const hasData = $derived(allData.length > 0);
@@ -476,6 +489,20 @@
 						{#if s.data.length > 0}
 							{@const segments = getLineSegments(s.data)}
 							{@const isolated = getIsolatedPoints(s.data)}
+
+							<!-- Draw area fills (when areaFill is enabled) -->
+							{#if areaFill}
+								{#each segments as segment}
+									{#if segment.length > 1}
+										<path
+											d={generateAreaPath(segment)}
+											fill={s.color}
+											fill-opacity="0.15"
+											stroke="none"
+										/>
+									{/if}
+								{/each}
+							{/if}
 
 							<!-- Draw line segments (only segments with 2+ points) -->
 							{#each segments as segment}

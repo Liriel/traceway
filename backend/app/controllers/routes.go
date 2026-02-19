@@ -51,6 +51,25 @@ func RegisterControllers(router *gin.RouterGroup) {
 	router.GET("/metrics/stats", middleware.UseAppAuth, middleware.RequireProjectAccess, MetricsController.GetStatsMetrics)
 	router.GET("/metrics/server", middleware.UseAppAuth, middleware.RequireProjectAccess, MetricsController.GetServerMetrics)
 
+	// New metrics query API
+	router.POST("/metrics/query", middleware.UseAppAuth, middleware.RequireProjectAccess, MetricQueryController.Query)
+	router.GET("/metrics/discover", middleware.UseAppAuth, middleware.RequireProjectAccess, MetricQueryController.Discover)
+	router.GET("/metrics/discover/tags", middleware.UseAppAuth, middleware.RequireProjectAccess, MetricQueryController.DiscoverTags)
+	router.PUT("/metrics/registry", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, MetricQueryController.UpdateRegistry)
+
+	// Widget groups
+	router.GET("/widget-groups", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.Transactional, WidgetGroupController.List)
+	router.POST("/widget-groups", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, middleware.Transactional, WidgetGroupController.Create)
+	router.GET("/widget-groups/:id", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.Transactional, WidgetGroupController.GetWithWidgets)
+	router.PUT("/widget-groups/:id", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, middleware.Transactional, WidgetGroupController.Update)
+	router.DELETE("/widget-groups/:id", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, middleware.Transactional, WidgetGroupController.Delete)
+
+	// Widgets (within widget groups)
+	router.POST("/widget-groups/:id/widgets", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, middleware.Transactional, WidgetController.Add)
+	router.PUT("/widget-groups/:id/widgets/:wid", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, middleware.Transactional, WidgetController.Update)
+	router.PUT("/widget-groups/:id/widgets/:wid/move", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, middleware.Transactional, WidgetController.Move)
+	router.DELETE("/widget-groups/:id/widgets/:wid", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, middleware.Transactional, WidgetController.Delete)
+
 	// Endpoints (projectId in body)
 	router.POST("/endpoints", middleware.UseAppAuth, middleware.RequireProjectAccess, EndpointController.FindAllEndpoints)
 	router.POST("/endpoints/grouped", middleware.UseAppAuth, middleware.RequireProjectAccess, EndpointController.FindGroupedByEndpoint)

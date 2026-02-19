@@ -544,7 +544,7 @@
 </div>
 
 <AlertDialog.Root bind:open={showSlowDialog}>
-	<AlertDialog.Content>
+	<AlertDialog.Content interactOutsideBehavior="close">
 		<AlertDialog.Header>
 			<AlertDialog.Title>Expected Performance</AlertDialog.Title>
 			<AlertDialog.Description>
