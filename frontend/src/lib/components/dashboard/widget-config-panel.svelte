@@ -1,0 +1,207 @@
+<script lang="ts">
+	import { Button } from '$lib/components/ui/button';
+	import { Input } from '$lib/components/ui/input';
+	import * as Select from '$lib/components/ui/select';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import TagFilter from './tag-filter.svelte';
+	import { api } from '$lib/api';
+	import { projectsState } from '$lib/state/projects.svelte';
+	import { Plus, Check, CircleAlert } from 'lucide-svelte';
+	import * as Alert from '$lib/components/ui/alert';
+	import type { DiscoveredMetric } from '$lib/types/dashboard';
+
+	type WidgetSource = {
+		type: 'metric';
+		name: string;
+		aggregation: string;
+		tagFilters?: Record<string, string>;
+		groupBy?: string;
+	};
+
+	let {
+		open = $bindable(false),
+		widget = null,
+		availableMetrics = [],
+		error = '',
+		onSave,
+		onCancel
+	} = $props<{
+		open: boolean;
+		widget: { id?: number; title: string; widgetType: string; config: any } | null;
+		availableMetrics: DiscoveredMetric[];
+		error?: string;
+		onSave: (data: { title: string; widgetType: string; config: any }) => void;
+		onCancel: () => void;
+	}>();
+
+	let title = $state(widget?.title ?? '');
+	let widgetType = $state(widget?.widgetType ?? 'line_chart');
+	let sources = $state<WidgetSource[]>(
+		widget?.config?.sources ?? [{ type: 'metric', name: '', aggregation: 'avg' }]
+	);
+
+	$effect(() => {
+		if (open) {
+			title = widget?.title ?? '';
+			widgetType = widget?.widgetType ?? 'line_chart';
+			sources = widget?.config?.sources
+				? [...widget.config.sources]
+				: [{ type: 'metric', name: '', aggregation: 'avg' }];
+		}
+	});
+
+	function getMetricTagKeys(metricName: string): string[] {
+		const m = availableMetrics.find((m: DiscoveredMetric) => m.name === metricName);
+		return m?.tagKeys ?? [];
+	}
+
+	async function loadTagValues(metricName: string, key: string): Promise<string[]> {
+		try {
+			const response = await api.get(
+				`/metrics/discover/tags?name=${encodeURIComponent(metricName)}&key=${encodeURIComponent(key)}`,
+				{ projectId: projectsState.currentProjectId ?? undefined }
+			);
+			return response.values || [];
+		} catch {
+			return [];
+		}
+	}
+
+	function handleSave() {
+		const validSources = sources.filter((s: WidgetSource) => s.name);
+		const displayTitle = title.trim() || validSources[0]?.name || '';
+		const config: Record<string, any> = { sources: validSources };
+		onSave({
+			title: displayTitle,
+			widgetType,
+			config
+		});
+	}
+
+	function handleClose() {
+		open = false;
+		onCancel();
+	}
+</script>
+
+<AlertDialog.Root bind:open>
+	<AlertDialog.Content class="max-w-xl" interactOutsideBehavior="close">
+		<AlertDialog.Header>
+			<AlertDialog.Title>{widget?.id ? 'Edit Widget' : 'Add Widget'}</AlertDialog.Title>
+		</AlertDialog.Header>
+		{#if error}
+			<Alert.Root variant="destructive" class="bg-red-50 border-red-200">
+				<CircleAlert class="h-4 w-4 text-red-700" />
+				<Alert.Title class="text-red-800">Error</Alert.Title>
+				<Alert.Description class="text-red-700">{error}</Alert.Description>
+			</Alert.Root>
+		{/if}
+		<div class="space-y-4">
+			<div>
+				<label class="text-sm font-medium" for="widget-title">Title (optional)</label>
+				<Input id="widget-title" bind:value={title} placeholder="Defaults to metric name" />
+			</div>
+
+			<div>
+				<label class="text-sm font-medium">Widget Type</label>
+				<Select.Root
+					type="single"
+					value={widgetType}
+					onValueChange={(v) => {
+						if (v) widgetType = v;
+					}}
+				>
+					<Select.Trigger>
+						{({ line_chart: 'Line Chart', area_chart: 'Area Chart', bar_chart: 'Bar Chart', single_value: 'Single Value', table: 'Table' } as Record<string, string>)[widgetType] ?? widgetType}
+					</Select.Trigger>
+					<Select.Content>
+						<Select.Item value="line_chart">Line Chart</Select.Item>
+						<Select.Item value="area_chart">Area Chart</Select.Item>
+						<Select.Item value="bar_chart">Bar Chart</Select.Item>
+						<Select.Item value="single_value">Single Value</Select.Item>
+						<Select.Item value="table">Table</Select.Item>
+					</Select.Content>
+				</Select.Root>
+			</div>
+
+			{#each sources as source, i}
+				<div class="space-y-2 rounded-md border p-3">
+					<div class="flex items-center gap-2">
+						<Select.Root
+							type="single"
+							value={source.name}
+							onValueChange={(v) => {
+								if (v) sources[i].name = v;
+							}}
+						>
+							<Select.Trigger class="flex-1">{source.name || 'Select metric'}</Select.Trigger>
+							<Select.Content>
+								{#each availableMetrics as m}
+									<Select.Item value={m.name}>{m.name}</Select.Item>
+								{/each}
+							</Select.Content>
+						</Select.Root>
+
+						<Select.Root
+							type="single"
+							value={source.aggregation}
+							onValueChange={(v) => {
+								if (v) sources[i].aggregation = v;
+							}}
+						>
+							<Select.Trigger class="w-20">{source.aggregation}</Select.Trigger>
+							<Select.Content>
+								<Select.Item value="avg">avg</Select.Item>
+								<Select.Item value="min">min</Select.Item>
+								<Select.Item value="max">max</Select.Item>
+								<Select.Item value="sum">sum</Select.Item>
+								<Select.Item value="count">count</Select.Item>
+							</Select.Content>
+						</Select.Root>
+					</div>
+
+					{#if source.name && getMetricTagKeys(source.name).length > 0}
+						<div class="space-y-1">
+							<span class="text-xs text-muted-foreground">Tag Filters</span>
+							<TagFilter
+								tagKeys={getMetricTagKeys(source.name)}
+								activeFilters={source.tagFilters ?? {}}
+								onFilterChange={(filters) => {
+									sources[i].tagFilters = Object.keys(filters).length > 0 ? filters : undefined;
+								}}
+								onLoadTagValues={(key) => loadTagValues(source.name, key)}
+							/>
+						</div>
+
+						<div>
+							<span class="text-xs text-muted-foreground">Group By</span>
+							<Select.Root
+								type="single"
+								value={source.groupBy ?? ''}
+								onValueChange={(v) => {
+									sources[i].groupBy = v || undefined;
+								}}
+							>
+								<Select.Trigger class="h-7 w-[160px] text-xs"
+									>{source.groupBy || 'None'}</Select.Trigger
+								>
+								<Select.Content>
+									<Select.Item value="">None</Select.Item>
+									{#each getMetricTagKeys(source.name) as key}
+										<Select.Item value={key}>{key}</Select.Item>
+									{/each}
+								</Select.Content>
+							</Select.Root>
+						</div>
+					{/if}
+				</div>
+			{/each}
+		</div>
+		<AlertDialog.Footer>
+			<Button variant="outline" onclick={handleClose}>Cancel</Button>
+			<Button onclick={handleSave}>
+				{#if widget?.id}<Check class="mr-1 h-4 w-4" /> Update Widget{:else}<Plus class="mr-1 h-4 w-4" /> Add Widget{/if}
+			</Button>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

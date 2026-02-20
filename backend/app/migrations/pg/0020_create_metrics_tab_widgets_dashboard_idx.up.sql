@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS idx_widget_group_widgets_widget_group_id ON widget_group_widgets(widget_group_id);

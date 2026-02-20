@@ -6,12 +6,19 @@ import (
 	"github.com/google/uuid"
 )
 
-type MetricRecord struct {
-	ProjectId  uuid.UUID `json:"projectId" ch:"project_id"`
-	Name       string    `json:"name" ch:"name"`
-	Value      float64   `json:"value" ch:"value"`
-	RecordedAt time.Time `json:"recordedAt" ch:"recorded_at"`
-	ServerName string    `json:"serverName" ch:"server_name"`
+type MetricPoint struct {
+	ProjectId  uuid.UUID         `json:"projectId" ch:"project_id"`
+	Name       string            `json:"name" ch:"name"`
+	Value      float64           `json:"value" ch:"value"`
+	Tags       map[string]string `json:"tags" ch:"tags"`
+	RecordedAt time.Time         `json:"recordedAt" ch:"recorded_at"`
+}
+
+type DiscoveredMetric struct {
+	Name       string   `json:"name"`
+	TagKeys    []string `json:"tagKeys"`
+	MetricType string   `json:"metricType,omitempty"`
+	Unit       string   `json:"unit,omitempty"`
 }
 
 const (

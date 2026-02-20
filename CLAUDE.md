@@ -14,6 +14,8 @@ Traceway is an error tracking and monitoring platform consisting of:
 ## Code Style
 
 - **No pointless comments**: Do not add comments that simply describe what the code does. The code should be self-explanatory. Only add comments when explaining non-obvious "why" decisions.
+- **No `py-4` in dialog form content**: Do not add `py-4` on the content wrapper inside `AlertDialog` or `Dialog` components — it creates too much blank space between the form and the action buttons.
+- **Dialog button labels & toasts**: For form dialogs, use descriptive button labels with icons instead of generic "Create"/"Update". Create actions: `<Plus icon> {Action} {Entity}` (e.g., "+ New Widget Group"). Update actions: `<Check icon> Update {Entity}`. After successful create/update, show a `toast.success('Successfully {action} the {Entity}', { position: 'top-center' })`. The button should only be `disabled` during the loading state — never disable it to enforce validation; let the backend return 422 and show the error in the dialog instead.
 
 ---
 
@@ -101,6 +103,8 @@ func (c *AuthController) Register(ctx *gin.Context) {
 **Auto-commit/rollback behavior:**
 - Commits on status codes: 200, 201, 303
 - Rolls back on all other status codes or panics
+
+**Preference:** For CRUD controller methods, always prefer using `middleware.Transactional` in the route + `middleware.GetTx(ctx)` in the controller over `pgdb.ExecuteTransaction`. The middleware approach keeps controllers flat, avoids nested closures, and follows the established pattern.
 
 #### Repository Pattern
 Repositories accept `*sql.Tx` to participate in transactions:

@@ -45,17 +45,25 @@ func (c *ClientExceptionStackTrace) ToExceptionStackTrace(exceptionHash, appVers
 }
 
 type ClientMetricRecord struct {
-	Name       string    `json:"name"`
-	Value      float64   `json:"value"`
-	RecordedAt time.Time `json:"recordedAt"`
+	Name       string            `json:"name"`
+	Value      float64           `json:"value"`
+	RecordedAt time.Time         `json:"recordedAt"`
+	Tags       map[string]string `json:"tags,omitempty"`
 }
 
-func (c *ClientMetricRecord) ToMetricRecord(serverName string) models.MetricRecord {
-	return models.MetricRecord{
+func (c *ClientMetricRecord) ToMetricPoint(serverName string) models.MetricPoint {
+	tags := make(map[string]string, len(c.Tags)+1)
+	for k, v := range c.Tags {
+		tags[k] = v
+	}
+	if serverName != "" {
+		tags["server_name"] = serverName
+	}
+	return models.MetricPoint{
 		Name:       c.Name,
 		Value:      c.Value,
+		Tags:       tags,
 		RecordedAt: c.RecordedAt,
-		ServerName: serverName,
 	}
 }
 

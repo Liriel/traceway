@@ -54,6 +54,13 @@ async function request(method: string, endpoint: string, data?: unknown, options
         throw new Error('Forbidden');
     }
 
+    if (response.status === 422) {
+        const body = await response.json().catch(() => ({}));
+        const error = new Error(body.error || 'Validation failed') as Error & { status: number };
+        error.status = 422;
+        throw error;
+    }
+
     if (!response.ok) {
         const error = new Error(`API Error: ${response.statusText}`) as Error & { status: number };
         error.status = response.status;
