@@ -1,0 +1,45 @@
+# Embedded Mode
+
+Traceway supports running ClickHouse **in-process** using [chdb](https://github.com/chdb-io/chdb) — no external ClickHouse server required.
+
+This is useful for:
+
+- **Local development** — get started without installing ClickHouse
+- **Testing** — spin up an isolated instance per test run
+- **Single-node deploys** — run everything in one binary
+
+## Install libchdb
+
+The embedded driver requires `libchdb` to be installed on the system. Run the official installer (supports macOS and Linux):
+
+```bash
+curl -sL https://lib.chdb.io | bash
+```
+
+## Building with the tag
+
+The embedded ClickHouse driver is behind a build tag so it doesn't affect normal builds. Pass `-tags chdb` to include it:
+
+```bash
+go build -tags chdb ./...
+```
+
+To run directly during development:
+
+```bash
+go run -tags chdb .
+```
+
+Without the tag, the binary compiles normally and attempting to use embedded mode returns a clear error.
+
+## How it works
+
+The `chdb` build tag controls whether the `chdb-go` driver is compiled into the binary. When the tag is present, `embedded.go` is included — it imports the chdb driver and provides the `initEmbedded()` implementation. When the tag is absent, a stub returns an error if embedded mode is requested.
+
+To use embedded mode at runtime, set the `CLICKHOUSE_TYPE` environment variable:
+
+```bash
+CLICKHOUSE_TYPE=embedded go run -tags chdb .
+```
+
+Optionally set `CLICKHOUSE_PATH` to persist data to a directory. Without it, chdb uses an in-memory session.

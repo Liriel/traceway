@@ -1,11 +1,13 @@
+//go:build chdb
+
 package chdb
 
 import (
+	"backend/app/config"
 	"context"
 	"database/sql"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 	"time"
 
@@ -15,14 +17,12 @@ import (
 	"github.com/google/uuid"
 )
 
-var EmbeddedDB *sql.DB
-
 type embeddedConn struct {
 	db *sql.DB
 }
 
 func initEmbedded() error {
-	path := os.Getenv("CLICKHOUSE_PATH")
+	path := config.Config.ClickhousePath
 	dsn := ""
 	if path != "" {
 		dsn = "session=" + path
@@ -38,7 +38,7 @@ func initEmbedded() error {
 }
 
 func (c *embeddedConn) Query(ctx context.Context, query string, args ...any) (driver.Rows, error) {
-	rows, err := c.db.QueryContext(ctx, query, args...)
+	rows, err := c.db.QueryContext(ctx, query, sanitizeArgs(args)...)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func (c *embeddedConn) Query(ctx context.Context, query string, args ...any) (dr
 }
 
 func (c *embeddedConn) QueryRow(ctx context.Context, query string, args ...any) driver.Row {
-	row := c.db.QueryRowContext(ctx, query, args...)
+	row := c.db.QueryRowContext(ctx, query, sanitizeArgs(args)...)
 	return &embeddedRow{row: row}
 }
 
@@ -55,8 +55,21 @@ func (c *embeddedConn) PrepareBatch(ctx context.Context, query string, opts ...d
 }
 
 func (c *embeddedConn) Exec(ctx context.Context, query string, args ...any) error {
-	_, err := c.db.ExecContext(ctx, query, args...)
+	_, err := c.db.ExecContext(ctx, query, sanitizeArgs(args)...)
 	return err
+}
+
+func sanitizeArgs(args []any) []any {
+	out := make([]any, len(args))
+	for i, arg := range args {
+		switch v := arg.(type) {
+		case time.Time:
+			out[i] = v.UTC().Format("2006-01-02 15:04:05")
+		default:
+			out[i] = arg
+		}
+	}
+	return out
 }
 
 // --- Rows adapter ---

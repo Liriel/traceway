@@ -1,10 +1,10 @@
 package db
 
 import (
+	"backend/app/config"
 	"database/sql"
 	"fmt"
 	"log"
-	"os"
 
 	_ "github.com/lib/pq"
 	"github.com/tracewayapp/go-lightning/lit"
@@ -19,20 +19,22 @@ func IsSQLite() bool {
 }
 
 func Init() error {
-	dbType := os.Getenv("DB_TYPE")
-	if dbType == "sqlite" {
+	cfg := config.Config
+	if cfg.DBType == "sqlite" {
 		return initSQLite()
 	}
 	return initPostgres()
 }
 
 func initPostgres() error {
-	host := os.Getenv("POSTGRES_HOST")
-	port := os.Getenv("POSTGRES_PORT")
-	database := os.Getenv("POSTGRES_DATABASE")
-	username := os.Getenv("POSTGRES_USERNAME")
-	password := os.Getenv("POSTGRES_PASSWORD")
-	sslMode := os.Getenv("POSTGRES_SSLMODE")
+	cfg := config.Config
+
+	host := cfg.PostgresHost
+	port := cfg.PostgresPort
+	database := cfg.PostgresDatabase
+	username := cfg.PostgresUsername
+	password := cfg.PostgresPassword
+	sslMode := cfg.PostgresSSLMode
 
 	if sslMode == "" {
 		sslMode = "disable"
@@ -65,7 +67,7 @@ func initPostgres() error {
 }
 
 func initSQLite() error {
-	path := os.Getenv("SQLITE_PATH")
+	path := config.Config.SQLitePath
 	if path == "" {
 		path = "./traceway.db"
 	}

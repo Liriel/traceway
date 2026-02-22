@@ -1,10 +1,11 @@
 package chdb
 
 import (
+	"backend/app/config"
 	"context"
 	"crypto/tls"
+	"database/sql"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -20,23 +21,24 @@ type ChConn interface {
 }
 
 var Conn ChConn
+var EmbeddedDB *sql.DB
 
 func Init() error {
-	chType := os.Getenv("CLICKHOUSE_TYPE")
-	if chType == "embedded" {
+	if config.Config.ClickhouseType == "embedded" {
 		return initEmbedded()
 	}
 	return initExternal()
 }
 
 func initExternal() error {
+	cfg := config.Config
 	tlsConfig := &tls.Config{}
 
-	clickhouseServer := os.Getenv("CLICKHOUSE_SERVER")
-	clickhouseDatabase := os.Getenv("CLICKHOUSE_DATABASE")
-	clickhouseUsername := os.Getenv("CLICKHOUSE_USERNAME")
-	clickhousePassword := os.Getenv("CLICKHOUSE_PASSWORD")
-	clickhouseTls := os.Getenv("CLICKHOUSE_TLS")
+	clickhouseServer := cfg.ClickhouseServer
+	clickhouseDatabase := cfg.ClickhouseDatabase
+	clickhouseUsername := cfg.ClickhouseUsername
+	clickhousePassword := cfg.ClickhousePassword
+	clickhouseTls := cfg.ClickhouseTLS
 
 	if clickhouseTls == "false" {
 		tlsConfig = nil

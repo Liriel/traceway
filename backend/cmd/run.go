@@ -3,11 +3,12 @@ package cmd
 import (
 	"backend/app/cache"
 	"backend/app/chdb"
+	"backend/app/config"
 	"backend/app/controllers"
+	"backend/app/db"
 	"backend/app/middleware"
 	"backend/app/migrations"
 	"backend/app/models"
-	"backend/app/db"
 	"backend/app/services"
 	"backend/app/storage"
 	"backend/static"
@@ -16,7 +17,6 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -28,8 +28,39 @@ import (
 
 var PostStartupHooks []func(ctx context.Context)
 
-func Run() {
-	godotenv.Load()
+func Run(opts ...Option) {
+	var cfg *config.Cfg
+	var o *options
+
+	if len(opts) == 0 {
+		godotenv.Load()
+		cfg = config.LoadFromEnv()
+	} else {
+		o = &options{sqlitePath: ":memory:"}
+		for _, opt := range opts {
+			opt(o)
+		}
+		port := o.port
+		if port == 0 {
+			port = 8082
+		}
+		cfg = &config.Cfg{
+			JWTSecret:      "traceway-dev-secret-key-min-32-chars!",
+			DBType:         "sqlite",
+			SQLitePath:     o.sqlitePath,
+			ClickhouseType: "embedded",
+			ClickhousePath: o.clickhousePath,
+			StorageType:    "local",
+			StoragePath:    "./storage",
+			APIOnly:        "false",
+			Ports:          fmt.Sprintf("%d", port),
+		}
+		if o.serverURL == "" {
+			o.serverURL = fmt.Sprintf("http://localhost:%d", port)
+		}
+		cfg.AppBaseURL = o.serverURL
+	}
+	config.Init(cfg)
 
 	if err := services.InitJWT(); err != nil {
 		panic(fmt.Errorf("failed to initialize JWT: %w", err))
@@ -51,10 +82,15 @@ func Run() {
 		panic(fmt.Errorf("failed to initialize storage: %w", err))
 	}
 
-	dbType := os.Getenv("DB_TYPE")
-	err = migrations.Run(dbType)
+	err = migrations.Run(cfg.DBType)
 	if err != nil {
 		panic(fmt.Errorf("migrations run failed: %w", err))
+	}
+
+	if o != nil {
+		if err := seed(o); err != nil {
+			panic(fmt.Errorf("seeding failed: %w", err))
+		}
 	}
 
 	ctx := context.Background()
@@ -71,6 +107,7 @@ func Run() {
 	middleware.InitUseSourceMapAuth()
 
 	services.InitEmail()
+	services.InitTurnstile()
 
 	for _, hook := range PostStartupHooks {
 		hook(ctx)
@@ -78,7 +115,7 @@ func Run() {
 
 	router := gin.Default()
 
-	if monitoringTracewayUrl := os.Getenv("MONITORING_TRACEWAY_URL"); monitoringTracewayUrl != "" {
+	if monitoringTracewayUrl := cfg.MonitoringTracewayURL; monitoringTracewayUrl != "" {
 		router.Use(tracewaygin.New(
 			monitoringTracewayUrl,
 			tracewaygin.WithOnErrorRecording(tracewaygin.RecordingQuery|tracewaygin.RecordingBody|tracewaygin.RecordingHeader|tracewaygin.RecordingUrl),
@@ -96,7 +133,7 @@ func Run() {
 		ctx.JSON(200, gin.H{"version": "0.0.1"})
 	})
 
-	apiOnly := os.Getenv("API_ONLY") == "true"
+	apiOnly := cfg.APIOnly == "true"
 
 	if apiOnly {
 		router.NoRoute(func(c *gin.Context) {
@@ -119,7 +156,7 @@ func Run() {
 		router.NoRoute(createSPAHandler(staticFS))
 	}
 
-	ports := os.Getenv("PORTS")
+	ports := cfg.Ports
 	if ports == "" {
 		ports = "80,8082"
 	}

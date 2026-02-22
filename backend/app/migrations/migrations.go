@@ -2,13 +2,13 @@ package migrations
 
 import (
 	"backend/app/chdb"
+	"backend/app/config"
 	"backend/app/db"
 	"database/sql"
 	"embed"
 	"fmt"
 	"log"
 	"net/url"
-	"os"
 	"sort"
 	"strings"
 
@@ -257,25 +257,20 @@ func runMigrationsEmbeddedClickhouse(chDB *sql.DB) error {
 }
 
 func Run(dbType string) error {
+	cfg := config.Config
+
 	// Run ClickHouse migrations
-	chType := os.Getenv("CLICKHOUSE_TYPE")
-	if chType == "embedded" {
+	if cfg.ClickhouseType == "embedded" {
 		if err := runMigrationsEmbeddedClickhouse(chdb.EmbeddedDB); err != nil {
 			return fmt.Errorf("embedded clickhouse migrations failed: %w", err)
 		}
 	} else {
-		clickhouseServer := os.Getenv("CLICKHOUSE_SERVER")
-		clickhouseDatabase := os.Getenv("CLICKHOUSE_DATABASE")
-		clickhouseUsername := os.Getenv("CLICKHOUSE_USERNAME")
-		clickhousePassword := os.Getenv("CLICKHOUSE_PASSWORD")
-		clickhouseTls := os.Getenv("CLICKHOUSE_TLS")
-
 		tlsConfig := "&secure=true"
-		if clickhouseTls == "false" {
+		if cfg.ClickhouseTLS == "false" {
 			tlsConfig = ""
 		}
 
-		err := runMigrationsClickhouse(fmt.Sprintf(`clickhouse://%s?username=%s&password=%s&database=%s%s`, clickhouseServer, url.QueryEscape(clickhouseUsername), url.QueryEscape(clickhousePassword), clickhouseDatabase, tlsConfig))
+		err := runMigrationsClickhouse(fmt.Sprintf(`clickhouse://%s?username=%s&password=%s&database=%s%s`, cfg.ClickhouseServer, url.QueryEscape(cfg.ClickhouseUsername), url.QueryEscape(cfg.ClickhousePassword), cfg.ClickhouseDatabase, tlsConfig))
 		if err != nil {
 			return fmt.Errorf("clickhouse migrations failed: %w", err)
 		}
@@ -294,12 +289,8 @@ func Run(dbType string) error {
 	}
 
 	// Run PostgreSQL migrations
-	pgHost := os.Getenv("POSTGRES_HOST")
-	pgPort := os.Getenv("POSTGRES_PORT")
-	pgDatabase := os.Getenv("POSTGRES_DATABASE")
-	pgUsername := os.Getenv("POSTGRES_USERNAME")
-	pgPassword := os.Getenv("POSTGRES_PASSWORD")
-	pgSSLMode := os.Getenv("POSTGRES_SSLMODE")
+	pgPort := cfg.PostgresPort
+	pgSSLMode := cfg.PostgresSSLMode
 
 	if pgSSLMode == "" {
 		pgSSLMode = "disable"
@@ -309,7 +300,7 @@ func Run(dbType string) error {
 	}
 
 	pgConnStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
-		url.QueryEscape(pgUsername), url.QueryEscape(pgPassword), pgHost, pgPort, pgDatabase, pgSSLMode)
+		url.QueryEscape(cfg.PostgresUsername), url.QueryEscape(cfg.PostgresPassword), cfg.PostgresHost, pgPort, cfg.PostgresDatabase, pgSSLMode)
 
 	if err := runMigrationsPostgres(pgConnStr); err != nil {
 		return fmt.Errorf("postgres migrations failed: %w", err)
