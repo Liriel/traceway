@@ -116,7 +116,13 @@ func Run(opts ...Option) {
 		hook(ctx)
 	}
 
-	router := gin.Default()
+	var router *gin.Engine
+	if o != nil && o.disableLogging {
+		router = gin.New()
+		router.Use(gin.Recovery())
+	} else {
+		router = gin.Default()
+	}
 
 	if monitoringTracewayUrl := cfg.MonitoringTracewayURL; monitoringTracewayUrl != "" {
 		router.Use(tracewaygin.New(
