@@ -30,8 +30,8 @@ unset TRACEWAY_URL
 npm install
 npm run build
 
-rm -rf "$ROOT_DIR/backend/static/dist"
-mkdir -p "$ROOT_DIR/backend/static/dist"
-cp -r "$ROOT_DIR/frontend/build/"* "$ROOT_DIR/backend/static/dist/"
+rm -rf "$ROOT_DIR/backend/static/frontend"
+mkdir -p "$ROOT_DIR/backend/static/frontend"
+cp -r "$ROOT_DIR/frontend/build/"* "$ROOT_DIR/backend/static/frontend/"
 
-echo "Frontend built and bundled into backend/static/dist/"
+echo "Frontend built and bundled into backend/static/frontend/"
