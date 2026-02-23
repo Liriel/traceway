@@ -7,10 +7,12 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.32.7
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.7
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.96.0
+	github.com/chdb-io/chdb-go v1.11.0
 	github.com/coreos/go-systemd/v22 v22.6.0
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/lib/pq v1.10.9
-	github.com/tracewayapp/go-lightning/lit v0.0.0-20260121181925-c304b0bdd0dc
+	github.com/tracewayapp/go-lightning/lit v1.0.0
+	github.com/tracewayapp/lit v1.0.1
 	go.tracewayapp.com v1.0.1
 	go.tracewayapp.com/tracewaygin v0.4.3
 	modernc.org/sqlite v1.18.1
@@ -18,7 +20,6 @@ require (
 
 require (
 	github.com/c-bata/go-prompt v0.2.6 // indirect
-	github.com/chdb-io/chdb-go v1.11.0 // indirect
 	github.com/ebitengine/purego v0.8.4 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.2 // indirect
 	github.com/huandu/go-sqlbuilder v1.27.3 // indirect
@@ -119,9 +120,3 @@ require (
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/text v0.32.0 // indirect
 )
-
-replace go.tracewayapp.com => /Users/dusanstanojevic/Documents/workspace/go-client
-
-replace go.tracewayapp.com/tracewaygin => /Users/dusanstanojevic/Documents/workspace/go-client/tracewaygin
-
-replace github.com/tracewayapp/go-lightning/lit => /Users/dusanstanojevic/Documents/workspace/go-lightning
