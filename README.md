@@ -20,6 +20,9 @@
 
 - **Issue Tracking** — Automatic exception grouping with stack traces and contextual tags
 - **Endpoint Performance** — P50, P95, P99 latency percentiles with Apdex scoring
+- **Predefined SLOs** — Impact score combining Apdex, error rate, P99, and request volume
+- **Session Replay** — Replay user sessions to see exactly what happened before an error
+- **Embedded Tracing for Go** — Run Traceway inside your Go process with zero infrastructure
 - **System Metrics** — CPU, memory, goroutines, and GC monitoring
 - **Distributed Tracing** — Full request traces with span breakdowns
 - **Background Tasks** — Track and monitor async job performance
