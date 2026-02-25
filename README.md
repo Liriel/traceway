@@ -18,6 +18,8 @@
 
 ## Features
 
+- **OpenTelemetry Compatible** — Replaces the whole stack, does not need the OTel collector or an additional DB.
+- **Embeded Golang Mode** — Can run directly in your Go app. Great for local development and testing.
 - **Issue Tracking** — Automatic exception grouping with stack traces and contextual tags
 - **Endpoint Performance** — P50, P95, P99 latency percentiles with Apdex scoring
 - **Predefined SLOs** — Impact score combining Apdex, error rate, P99, and request volume
