@@ -2,6 +2,7 @@
 	import type { Span } from '$lib/types/spans';
 	import ScrollArea from '../ui/scroll-area/scroll-area.svelte';
 	import SpanRow from './span-row.svelte';
+	import { preciseTimeMs } from '$lib/utils/formatters';
 
 	type Props = {
 		spans: Span[];
@@ -13,11 +14,11 @@
 
 	const traceStart = $derived(
 		spans.length === 0
-			? new Date(traceStartTime).getTime()
+			? preciseTimeMs(traceStartTime)
 			: spans.reduce((earliest, s) => {
-					const sTime = new Date(s.startTime).getTime();
+					const sTime = preciseTimeMs(s.startTime);
 					return sTime < earliest ? sTime : earliest;
-				}, new Date(spans[0].startTime).getTime())
+				}, preciseTimeMs(spans[0].startTime))
 	);
 	const durationMs = $derived(traceDuration / 1_000_000);
 

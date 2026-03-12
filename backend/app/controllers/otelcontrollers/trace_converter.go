@@ -66,18 +66,27 @@ func convertTraces(projectId uuid.UUID, req *coltracepb.ExportTraceServiceReques
 							traceId, projectId, span, spanAttrs, allAttrs,
 							startTime, duration, serverName, appVersion,
 						))
-					} else {
+					} else if span.Kind == tracepb.Span_SPAN_KIND_CONSUMER {
 						tasks = append(tasks, buildTask(
 							traceId, projectId, span, allAttrs,
-							startTime, duration, serverName, appVersion,
+							startTime, endTime, duration, serverName, appVersion,
 						))
+					} else {
+						continue
 					}
 				} else {
+					spanName := span.Name
+					if dbQuery := getStringAttribute(spanAttrs, "db.query.text"); dbQuery != "" {
+						spanName = dbQuery
+					} else if dbStatement := getStringAttribute(spanAttrs, "db.statement"); dbStatement != "" {
+						spanName = dbStatement
+					}
+
 					spans = append(spans, models.Span{
 						Id:         spanId,
 						TraceId:    traceId,
 						ProjectId:  projectId,
-						Name:       span.Name,
+						Name:       spanName,
 						StartTime:  startTime,
 						Duration:   duration,
 						RecordedAt: startTime,
@@ -189,7 +198,7 @@ func buildTask(
 	id, projectId uuid.UUID,
 	span *tracepb.Span,
 	allAttrs map[string]string,
-	startTime time.Time,
+	startTime, endTime time.Time,
 	duration time.Duration,
 	serverName, appVersion string,
 ) models.Task {
@@ -198,7 +207,7 @@ func buildTask(
 		ProjectId:  projectId,
 		TaskName:   span.Name,
 		Duration:   duration,
-		RecordedAt: startTime,
+		RecordedAt: endTime,
 		Attributes: allAttrs,
 		AppVersion: appVersion,
 		ServerName: serverName,

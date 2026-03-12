@@ -51,8 +51,16 @@ OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer YOUR_PROJECT_TOKEN
 
 ### 6. Run
 
+Start the web server:
+
 ```bash
 php -S localhost:8080 public/index.php
+```
+
+In a **separate terminal**, start the Messenger worker to process background jobs:
+
+```bash
+php bin/console messenger:consume async -vv
 ```
 
 ## Endpoints
@@ -76,6 +84,17 @@ php -S localhost:8080 public/index.php
 | GET | `/test-cerror-nested` | Error from nested function calls |
 | POST | `/test-recording/{param}` | JSON body parsing, throws if name != "good" |
 
+### Task Controller (Symfony Messenger)
+
+| Method | Path | Message | Handler Task Name |
+|--------|------|---------|-------------------|
+| GET | `/test-task` | `DataProcessorMessage` | `traceway data processor` — child span, 10 events, exception (mirrors Go reference) |
+| GET | `/test-task-simple` | `EmailSendMessage` | `email.send` — minimal task with attributes |
+| GET | `/test-task-db` | `UserDataSyncMessage` | `user.data.sync` — task with auto-instrumented PDO query |
+| GET | `/test-task-error` | `PaymentProcessorMessage` | `payment.processor` — child spans with exception + STATUS_ERROR |
+
+These endpoints dispatch real Symfony Messenger jobs to the `async` transport (Doctrine/SQLite). A separate `messenger:consume` worker picks them up and processes them in the background. Each handler creates a detached root span (`setParent(false)`) with `KIND_CONSUMER`, so they appear on the **Tasks** page in Traceway (not Endpoints).
+
 ### Users Controller (CRUD)
 
 | Method | Path | Description |
@@ -96,6 +115,12 @@ curl http://localhost:8080/test-ok
 curl http://localhost:8080/test-exception
 curl http://localhost:8080/test-spans
 curl http://localhost:8080/test-metrics
+
+# Dispatch background jobs (requires messenger:consume worker running)
+curl http://localhost:8080/test-task
+curl http://localhost:8080/test-task-simple
+curl http://localhost:8080/test-task-db
+curl http://localhost:8080/test-task-error
 
 # User CRUD
 curl -X POST http://localhost:8080/users \

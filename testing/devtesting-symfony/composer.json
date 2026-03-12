@@ -14,7 +14,10 @@
         "open-telemetry/opentelemetry-auto-pdo": "^0.0",
         "php-http/guzzle7-adapter": "^1.0",
         "google/protobuf": "^4.0",
-        "symfony/string": "^7.0"
+        "symfony/string": "^7.0",
+        "symfony/messenger": "^8.0",
+        "symfony/doctrine-messenger": "^8.0",
+        "doctrine/doctrine-bundle": "^3.2"
     },
     "autoload": {
         "psr-4": {

@@ -1,6 +1,19 @@
 import { DateTime } from 'luxon';
 import { getTimezone } from '$lib/state/timezone.svelte';
 
+export function preciseTimeMs(isoString: string): number {
+	const match = isoString.match(
+		/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?Z$/
+	);
+	if (!match) return new Date(isoString).getTime();
+
+	const [, year, month, day, hour, minute, second, frac] = match;
+	const baseMs = Date.UTC(+year, +month - 1, +day, +hour, +minute, +second);
+	if (!frac) return baseMs;
+
+	return baseMs + parseFloat('0.' + frac) * 1000;
+}
+
 export function formatDuration(nanoseconds: number): string {
 	const ms = nanoseconds / 1_000_000;
 	if (ms < 1) {

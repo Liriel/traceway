@@ -1,0 +1,19 @@
+framework:
+    messenger:
+        buses:
+            messenger.bus.default:
+                middleware:
+                    - 'App\Messenger\TracingMiddleware'
+
+        transports:
+            async:
+                dsn: 'doctrine://default'
+                options:
+                    table_name: messenger_messages
+                    auto_setup: true
+
+        routing:
+            'App\Message\DataProcessorMessage': async
+            'App\Message\EmailSendMessage': async
+            'App\Message\UserDataSyncMessage': async
+            'App\Message\PaymentProcessorMessage': async

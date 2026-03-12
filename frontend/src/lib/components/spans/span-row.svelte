@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Span } from '$lib/types/spans';
 	import { cn } from '$lib/utils';
-	import { formatDuration } from '$lib/utils/formatters';
+	import { formatDuration, preciseTimeMs } from '$lib/utils/formatters';
 	import * as Popover from '$lib/components/ui/popover';
 	import Copy from 'lucide-svelte/icons/copy';
 	import Check from 'lucide-svelte/icons/check';
@@ -33,7 +33,7 @@
 		spanCellHandleMouseLeave
 	}: Props = $props();
 
-	const spanStartMs = $derived(new Date(span.startTime).getTime() - traceStart);
+	const spanStartMs = $derived(preciseTimeMs(span.startTime) - traceStart);
 	const spanDurationMs = $derived(span.duration / 1_000_000);
 	const traceDurationMs = $derived(traceDuration / 1_000_000);
 
