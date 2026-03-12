@@ -214,7 +214,7 @@ OTEL_TRACES_EXPORTER=otlp
 OTEL_METRICS_EXPORTER=otlp
 OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
 OTEL_EXPORTER_OTLP_ENDPOINT=${backendUrl}/api/otel
-OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer ${token || 'YOUR_TOKEN'}`;
+OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token || 'YOUR_TOKEN'}"`;
 
 		case 'cloudflare':
 			return '';
