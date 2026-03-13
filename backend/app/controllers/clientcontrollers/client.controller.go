@@ -190,14 +190,21 @@ func (e clientController) Report(c *gin.Context) {
 		return
 	}
 
+	var exceptionHashes []string
+	for _, est := range exceptionStackTraceToInsert {
+		exceptionHashes = append(exceptionHashes, est.ExceptionHash)
+	}
+
 	if project, exists := c.Get(middleware.ProjectContextKey); exists {
 		if p, ok := project.(*models.Project); ok && p.OrganizationId != nil {
 			hooks.BroadcastReport(hooks.ReportEvent{
-				OrganizationId: *p.OrganizationId,
-				EndpointCount:  len(endpointsToInsert),
-				ErrorCount:     len(exceptionStackTraceToInsert),
-				TaskCount:      len(tasksToInsert),
-				RecordingCount: len(recordingsWork),
+				OrganizationId:  *p.OrganizationId,
+				ProjectId:       projectId,
+				EndpointCount:   len(endpointsToInsert),
+				ErrorCount:      len(exceptionStackTraceToInsert),
+				TaskCount:       len(tasksToInsert),
+				RecordingCount:  len(recordingsWork),
+				ExceptionHashes: exceptionHashes,
 			})
 		}
 	}

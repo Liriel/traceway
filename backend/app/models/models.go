@@ -26,6 +26,10 @@ func Init(driver lit.Driver) {
 	lit.RegisterModelWithNaming[MetricRegistry](driver, metricRegistryNaming{})
 	lit.RegisterModel[WidgetGroup](driver)
 	lit.RegisterModel[WidgetGroupWidget](driver)
+	lit.RegisterModel[NotificationChannel](driver)
+	lit.RegisterModel[NotificationRule](driver)
+	lit.RegisterModel[NotificationHistory](driver)
+	lit.RegisterModel[NotificationRuleWithChannel](driver)
 
 	for _, register := range ExtensionModelRegistrations {
 		register(driver)
