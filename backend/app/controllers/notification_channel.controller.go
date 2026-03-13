@@ -55,7 +55,7 @@ func (ctrl *notificationChannelController) Create(ctx *gin.Context) {
 
 	var req createChannelRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
@@ -122,13 +122,13 @@ func (ctrl *notificationChannelController) Update(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid channel id"})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid channel id"})
 		return
 	}
 
 	var req createChannelRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
@@ -190,7 +190,7 @@ func (ctrl *notificationChannelController) Delete(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid channel id"})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid channel id"})
 		return
 	}
 
@@ -223,7 +223,7 @@ func (ctrl *notificationChannelController) Test(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid channel id"})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid channel id"})
 		return
 	}
 

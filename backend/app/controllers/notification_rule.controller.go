@@ -57,7 +57,7 @@ type createRuleRequest struct {
 	Name            string          `json:"name"`
 	RuleType        string          `json:"ruleType"`
 	Config          json.RawMessage `json:"config"`
-	CooldownMinutes int            `json:"cooldownMinutes"`
+	CooldownMinutes int             `json:"cooldownMinutes"`
 }
 
 func (ctrl *notificationRuleController) Create(ctx *gin.Context) {
@@ -69,7 +69,7 @@ func (ctrl *notificationRuleController) Create(ctx *gin.Context) {
 
 	var req createRuleRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
@@ -146,13 +146,13 @@ func (ctrl *notificationRuleController) Update(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid rule id"})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid rule id"})
 		return
 	}
 
 	var req createRuleRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
@@ -222,7 +222,7 @@ func (ctrl *notificationRuleController) Delete(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid rule id"})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid rule id"})
 		return
 	}
 
@@ -255,7 +255,7 @@ func (ctrl *notificationRuleController) Toggle(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid rule id"})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid rule id"})
 		return
 	}
 
@@ -294,13 +294,13 @@ func (ctrl *notificationRuleController) Snooze(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid rule id"})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid rule id"})
 		return
 	}
 
 	var req snoozeRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 

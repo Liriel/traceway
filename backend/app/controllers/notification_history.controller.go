@@ -28,7 +28,7 @@ func (ctrl *notificationHistoryController) List(ctx *gin.Context) {
 
 	var request NotificationHistorySearchRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
 
