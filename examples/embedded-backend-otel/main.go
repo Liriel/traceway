@@ -68,7 +68,7 @@ func main() {
 	fmt.Printf("  App:        http://localhost:%d/hello/world\n", appPort)
 	fmt.Printf("  Error:      http://localhost:%d/hello/error\n", appPort)
 	fmt.Println("  Dashboard:  http://localhost:8082")
-	fmt.Println("  Login:      admin@localhost / admin")
+	fmt.Println("  Login:      admin@localhost.com / admin")
 	fmt.Println("===========================================")
 	fmt.Println()
 

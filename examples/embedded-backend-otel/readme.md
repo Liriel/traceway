@@ -20,4 +20,4 @@ Then try:
 - `http://localhost:8080/hello/world` — successful request with a `db.lookup` span
 - `http://localhost:8080/hello/error` — request that records an error with stack trace
 
-Open the dashboard at `http://localhost:8082` and log in with `admin@localhost` / `admin` to see the traces.
+Open the dashboard at `http://localhost:8082` and log in with `admin@localhost.com` / `admin` to see the traces.
