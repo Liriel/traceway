@@ -15,36 +15,45 @@ import (
 func setupTestDB(t *testing.T) {
 	t.Helper()
 
-	sqliteDB, err := sql.Open("sqlite", ":memory:")
+	mainDB, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
-		t.Fatalf("failed to open in-memory sqlite: %v", err)
+		t.Fatalf("failed to open in-memory sqlite (main): %v", err)
 	}
-
-	if _, err := sqliteDB.Exec("PRAGMA foreign_keys = ON"); err != nil {
+	mainDB.SetMaxOpenConns(1)
+	if _, err := mainDB.Exec("PRAGMA foreign_keys = ON"); err != nil {
 		t.Fatalf("failed to enable foreign keys: %v", err)
 	}
-	if _, err := sqliteDB.Exec("PRAGMA journal_mode = WAL"); err != nil {
+	if _, err := mainDB.Exec("PRAGMA journal_mode = WAL"); err != nil {
 		t.Fatalf("failed to set WAL mode: %v", err)
 	}
 
-	sqliteDB.SetMaxOpenConns(1)
+	telemetryDB, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("failed to open in-memory sqlite (telemetry): %v", err)
+	}
+	telemetryDB.SetMaxOpenConns(1)
+	if _, err := telemetryDB.Exec("PRAGMA journal_mode = WAL"); err != nil {
+		t.Fatalf("failed to set WAL mode (telemetry): %v", err)
+	}
 
-	db.DB = sqliteDB
+	db.DB = mainDB
+	db.TelemetryDB = telemetryDB
 	db.Driver = lit.SQLite
 
 	models.Init(db.Driver)
 
-	if err := runTestMigrations(sqliteDB); err != nil {
-		t.Fatalf("failed to run migrations: %v", err)
+	if err := runTelemetryMigrations(telemetryDB); err != nil {
+		t.Fatalf("failed to run telemetry migrations: %v", err)
 	}
 
 	t.Cleanup(func() {
-		sqliteDB.Close()
+		mainDB.Close()
+		telemetryDB.Close()
 	})
 }
 
-func runTestMigrations(sqliteDB *sql.DB) error {
-	telemetryDDL := `
+func runTelemetryMigrations(telemetryDB *sql.DB) error {
+	ddl := `
 CREATE TABLE IF NOT EXISTS endpoints (
     id TEXT NOT NULL,
     project_id TEXT NOT NULL,
@@ -56,7 +65,8 @@ CREATE TABLE IF NOT EXISTS endpoints (
     client_ip TEXT NOT NULL DEFAULT '',
     attributes TEXT NOT NULL DEFAULT '{}',
     app_version TEXT NOT NULL DEFAULT '',
-    server_name TEXT NOT NULL DEFAULT ''
+    server_name TEXT NOT NULL DEFAULT '',
+    distributed_trace_id TEXT DEFAULT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_endpoints_project_recorded ON endpoints(project_id, recorded_at);
 CREATE INDEX IF NOT EXISTS idx_endpoints_project_endpoint ON endpoints(project_id, endpoint);
@@ -70,7 +80,8 @@ CREATE TABLE IF NOT EXISTS tasks (
     client_ip TEXT NOT NULL DEFAULT '',
     attributes TEXT NOT NULL DEFAULT '{}',
     app_version TEXT NOT NULL DEFAULT '',
-    server_name TEXT NOT NULL DEFAULT ''
+    server_name TEXT NOT NULL DEFAULT '',
+    distributed_trace_id TEXT DEFAULT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_tasks_project_recorded ON tasks(project_id, recorded_at);
 
@@ -85,7 +96,8 @@ CREATE TABLE IF NOT EXISTS exception_stack_traces (
     attributes TEXT NOT NULL DEFAULT '{}',
     app_version TEXT NOT NULL DEFAULT '',
     server_name TEXT NOT NULL DEFAULT '',
-    is_message INTEGER NOT NULL DEFAULT 0
+    is_message INTEGER NOT NULL DEFAULT 0,
+    distributed_trace_id TEXT DEFAULT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_exceptions_project_recorded ON exception_stack_traces(project_id, recorded_at);
 CREATE INDEX IF NOT EXISTS idx_exceptions_project_hash ON exception_stack_traces(project_id, exception_hash);
@@ -151,9 +163,9 @@ CREATE TABLE IF NOT EXISTS fired_notifications (
 );
 `
 
-	statements := splitStatements(telemetryDDL)
+	statements := splitStatements(ddl)
 	for _, stmt := range statements {
-		if _, err := sqliteDB.Exec(stmt); err != nil {
+		if _, err := telemetryDB.Exec(stmt); err != nil {
 			return err
 		}
 	}
