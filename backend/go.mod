@@ -11,8 +11,8 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/lib/pq v1.10.9
 	github.com/tracewayapp/lit/v2 v2.0.2
-	go.tracewayapp.com v1.0.1
-	go.tracewayapp.com/tracewaygin v0.4.3
+	go.tracewayapp.com v1.0.2
+	go.tracewayapp.com/tracewaygin v1.0.2
 	modernc.org/sqlite v1.18.1
 )
 
