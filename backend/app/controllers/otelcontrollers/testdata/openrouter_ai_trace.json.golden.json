@@ -1,0 +1,30 @@
+{
+  "endpointCount": 0,
+  "endpoints": [],
+  "taskCount": 0,
+  "spanCount": 0,
+  "spans": [],
+  "exceptionCount": 0,
+  "exceptions": [],
+  "aiTraceCount": 1,
+  "aiTraces": [
+    {
+      "traceName": "Test Trace - OpenRouter Observability",
+      "model": "openai/gpt-4-turbo",
+      "provider": "openai",
+      "operation": "chat",
+      "inputTokens": 50,
+      "outputTokens": 100,
+      "totalTokens": 150,
+      "cachedTokens": 20,
+      "reasoningTokens": 10,
+      "inputCost": 0.005,
+      "outputCost": 0.015,
+      "totalCost": 0.02,
+      "finishReason": "stop",
+      "statusCode": 1
+    }
+  ],
+  "conversationCount": 1,
+  "allSpansLinked": true
+}

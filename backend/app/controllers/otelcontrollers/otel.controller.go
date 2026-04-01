@@ -3,6 +3,7 @@ package otelcontrollers
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -13,6 +14,7 @@ import (
 	"github.com/tracewayapp/traceway/backend/app/services"
 	"github.com/tracewayapp/traceway/backend/app/storage"
 	traceway "go.tracewayapp.com"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 type otelController struct{}
@@ -20,11 +22,13 @@ type otelController struct{}
 var OtelController = otelController{}
 
 func (o otelController) ExportTraces(c *gin.Context) {
+	fmt.Println("A00")
 	projectId, err := middleware.GetProjectId(c)
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("UseClientAuth middleware must be applied: %w", err))
 		return
 	}
+	fmt.Println("A0")
 	if project, exists := c.Get(middleware.ProjectContextKey); exists {
 		if p, ok := project.(*models.Project); ok && p.OrganizationId != nil {
 			if !hooks.CanReport(*p.OrganizationId) {
@@ -33,11 +37,17 @@ func (o otelController) ExportTraces(c *gin.Context) {
 			}
 		}
 	}
+	fmt.Println("A1")
 
 	req, err := decodeTraceRequest(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	fmt.Println("WTF??")
+	if jsonBytes, err := protojson.Marshal(req); err == nil {
+		log.Printf("[OTEL TRACES] Payload: %s", string(jsonBytes))
 	}
 
 	endpoints, tasks, spans, exceptions, aiTraces, aiConversations := convertTraces(projectId, req)
@@ -89,14 +99,6 @@ func (o otelController) ExportTraces(c *gin.Context) {
 		exceptionHashes = append(exceptionHashes, ex.ExceptionHash)
 	}
 
-	var aiTraceInfos []hooks.AiTraceInfo
-	for _, at := range aiTraces {
-		aiTraceInfos = append(aiTraceInfos, hooks.AiTraceInfo{
-			TraceName: at.TraceName,
-			TotalCost: at.TotalCost,
-		})
-	}
-
 	if project, exists := c.Get(middleware.ProjectContextKey); exists {
 		if p, ok := project.(*models.Project); ok && p.OrganizationId != nil {
 			hooks.BroadcastReport(hooks.ReportEvent{
@@ -106,7 +108,6 @@ func (o otelController) ExportTraces(c *gin.Context) {
 				ErrorCount:      len(exceptions),
 				TaskCount:       len(tasks),
 				ExceptionHashes: exceptionHashes,
-				AiTraces:        aiTraceInfos,
 			})
 		}
 	}

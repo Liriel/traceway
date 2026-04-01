@@ -1,0 +1,127 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {"key": "service.name", "value": {"stringValue": "panelshot"}},
+          {"key": "service.version", "value": {"stringValue": "0.1.0"}}
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {"name": "@opentelemetry/instrumentation-net", "version": "0.58.0"},
+          "spans": [
+            {
+              "traceId": "80f4fa0ed0d7273a63572540b8053ad9",
+              "spanId": "d3091afa9e646793",
+              "parentSpanId": "2ac07369848d8539",
+              "flags": 257,
+              "name": "tcp.connect",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1774995633007000000",
+              "endTimeUnixNano": "1774995633008332125",
+              "attributes": [
+                {"key": "net.transport", "value": {"stringValue": "ip_tcp"}},
+                {"key": "net.peer.name", "value": {"stringValue": "postgres"}},
+                {"key": "net.peer.port", "value": {"intValue": "5432"}}
+              ],
+              "status": {}
+            }
+          ]
+        },
+        {
+          "scope": {"name": "better-auth", "version": "1.5.6"},
+          "spans": [
+            {
+              "traceId": "80f4fa0ed0d7273a63572540b8053ad9",
+              "spanId": "2ac07369848d8539",
+              "parentSpanId": "aca958ef32ba7c4c",
+              "flags": 257,
+              "name": "db findOne user",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1774995633005000000",
+              "endTimeUnixNano": "1774995633021000333",
+              "attributes": [
+                {"key": "db.operation.name", "value": {"stringValue": "findOne"}},
+                {"key": "db.collection.name", "value": {"stringValue": "user"}}
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "80f4fa0ed0d7273a63572540b8053ad9",
+              "spanId": "c26fc11ea2e2d7fd",
+              "parentSpanId": "aca958ef32ba7c4c",
+              "flags": 257,
+              "name": "db findMany account",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1774995633022000000",
+              "endTimeUnixNano": "1774995633023763458",
+              "attributes": [
+                {"key": "db.operation.name", "value": {"stringValue": "findMany"}},
+                {"key": "db.collection.name", "value": {"stringValue": "account"}}
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "80f4fa0ed0d7273a63572540b8053ad9",
+              "spanId": "aca958ef32ba7c4c",
+              "parentSpanId": "4aac2608cd549092",
+              "flags": 257,
+              "name": "handler /sign-in/email",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1774995633003000000",
+              "endTimeUnixNano": "1774995633178519542",
+              "attributes": [
+                {"key": "http.route", "value": {"stringValue": "/sign-in/email"}},
+                {"key": "better_auth.operation_id", "value": {"stringValue": "signInEmail"}}
+              ],
+              "events": [
+                {
+                  "timeUnixNano": "1774995633178497834",
+                  "name": "exception",
+                  "attributes": [
+                    {"key": "exception.type", "value": {"stringValue": "APIError"}},
+                    {"key": "exception.message", "value": {"stringValue": "Invalid email or password"}},
+                    {"key": "exception.stacktrace", "value": {"stringValue": "APIError: Invalid email or password"}}
+                  ]
+                }
+              ],
+              "status": {"message": "Invalid email or password", "code": "STATUS_CODE_ERROR"}
+            },
+            {
+              "traceId": "80f4fa0ed0d7273a63572540b8053ad9",
+              "spanId": "37b95aae03f5332d",
+              "parentSpanId": "4aac2608cd549092",
+              "flags": 257,
+              "name": "hook after /sign-in/email plugin:bearer",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1774995633179000000",
+              "endTimeUnixNano": "1774995633179168291",
+              "attributes": [
+                {"key": "better_auth.hook.type", "value": {"stringValue": "after"}},
+                {"key": "http.route", "value": {"stringValue": "/sign-in/email"}},
+                {"key": "better_auth.context", "value": {"stringValue": "plugin:bearer"}},
+                {"key": "better_auth.operation_id", "value": {"stringValue": "signInEmail"}}
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "80f4fa0ed0d7273a63572540b8053ad9",
+              "spanId": "4aac2608cd549092",
+              "flags": 257,
+              "name": "POST /sign-in/email",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1774995633002000000",
+              "endTimeUnixNano": "1774995633178560208",
+              "attributes": [
+                {"key": "http.route", "value": {"stringValue": "/sign-in/email"}},
+                {"key": "better_auth.operation_id", "value": {"stringValue": "signInEmail"}}
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

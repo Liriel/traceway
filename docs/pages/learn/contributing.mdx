@@ -122,6 +122,24 @@ This builds a Docker image with both databases, applies all migrations, and runs
   Without `TEST_CLICKHOUSE_SERVER` set, the pgch tests skip cleanly.
 </Callout>
 
+### OTEL trace converter tests
+
+These test the OTLP trace parsing logic using snapshot/golden-file testing. No database required — `convertTraces()` is a pure function.
+
+```bash
+cd backend
+go test -v -count=1 ./app/controllers/otelcontrollers/
+```
+
+Real OTEL JSON payloads are stored in `testdata/` as fixtures. The tests parse them through the converter and compare the output against `.golden.json` files. If you intentionally change the converter, regenerate the golden files:
+
+```bash
+cd backend
+go test -v -count=1 -args -update ./app/controllers/otelcontrollers/
+```
+
+Then review the diff in the `.golden.json` files to confirm the changes are expected before committing.
+
 ### Frontend checks
 
 ```bash
@@ -213,13 +231,19 @@ go build -tags pgch ./...   # ClickHouse + PostgreSQL
 go test -v -count=1 ./app/repositories/
 ```
 
-3. **Run the pgch Docker tests** if you changed any repository code:
+3. **Run the OTEL converter tests** if you changed any OTEL parsing code:
+
+```bash
+go test -v -count=1 ./app/controllers/otelcontrollers/
+```
+
+4. **Run the pgch Docker tests** if you changed any repository code:
 
 ```bash
 ./scripts/test-backend-pgch.sh
 ```
 
-4. **Check the frontend** if you changed any frontend code:
+5. **Check the frontend** if you changed any frontend code:
 
 ```bash
 cd frontend

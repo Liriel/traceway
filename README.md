@@ -124,6 +124,12 @@ cd backend && go test -v -count=1 ./app/repositories/
 
 # ClickHouse + PostgreSQL tests (requires Docker)
 ./scripts/test-backend-pgch.sh
+
+# OTEL trace converter tests (no DB required)
+cd backend && go test -v -count=1 ./app/controllers/otelcontrollers/
+
+# Update OTEL golden files after intentional converter changes
+cd backend && go test -v -count=1 -args -update ./app/controllers/otelcontrollers/
 ```
 
 ## Documentation

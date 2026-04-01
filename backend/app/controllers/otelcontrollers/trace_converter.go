@@ -40,99 +40,123 @@ func convertTraces(projectId uuid.UUID, req *coltracepb.ExportTraceServiceReques
 			}
 		}
 
-		spanToTraceId := map[string]uuid.UUID{}
+		// First pass: collect all spans and build parent→child relationships
+		type spanEntry struct {
+			span      *tracepb.Span
+			scopeName string
+		}
+		var allSpans []spanEntry
+		parentMap := map[string]string{} // childSpanId → parentSpanId
 		for _, ss := range rs.ScopeSpans {
 			for _, span := range ss.Spans {
-				spanAttrs := span.Attributes
-				allAttrs := extractAttributes(spanAttrs)
+				allSpans = append(allSpans, spanEntry{span: span, scopeName: ss.GetScope().GetName()})
+				if len(span.ParentSpanId) > 0 {
+					parentMap[string(span.SpanId)] = string(span.ParentSpanId)
+				}
+			}
+		}
 
-				isRoot := len(span.ParentSpanId) == 0
+		// Build spanToTraceId by walking up to the root for each span
+		spanToTraceId := map[string]uuid.UUID{}
+		var resolveTraceId func(spanIdStr string) uuid.UUID
+		resolveTraceId = func(spanIdStr string) uuid.UUID {
+			if tid, ok := spanToTraceId[spanIdStr]; ok {
+				return tid
+			}
+			if parentId, hasParent := parentMap[spanIdStr]; hasParent {
+				tid := resolveTraceId(parentId)
+				spanToTraceId[spanIdStr] = tid
+				return tid
+			}
+			// This is a root span
+			tid := uuid.New()
+			spanToTraceId[spanIdStr] = tid
+			return tid
+		}
+		for _, entry := range allSpans {
+			resolveTraceId(string(entry.span.SpanId))
+		}
 
-				spanIdStr := string(span.SpanId)
-				var traceId uuid.UUID
+		// Second pass: process spans and create records
+		for _, entry := range allSpans {
+			span := entry.span
+			spanAttrs := span.Attributes
+			allAttrs := extractAttributes(spanAttrs)
 
-				if isRoot {
-					traceId = uuid.New()
-				} else if foundTraceId, ok := spanToTraceId[string(span.ParentSpanId)]; ok {
-					traceId = foundTraceId
+			isRoot := len(span.ParentSpanId) == 0
+			traceId := spanToTraceId[string(span.SpanId)]
+
+			spanId := otelSpanIDToUUID(span.SpanId)
+			startTime := nanoToTime(span.StartTimeUnixNano)
+			endTime := nanoToTime(span.EndTimeUnixNano)
+			duration := endTime.Sub(startTime)
+
+			var distributedTraceId *uuid.UUID
+			if dtid := getStringAttribute(spanAttrs, "traceway.distributed_trace_id"); dtid != "" {
+				if parsed, err := uuid.Parse(dtid); err == nil {
+					distributedTraceId = &parsed
+				}
+			}
+
+			if isRoot {
+				if (span.Kind == tracepb.Span_SPAN_KIND_SERVER || span.Kind == tracepb.Span_SPAN_KIND_INTERNAL) && hasHTTPAttributes(spanAttrs) {
+					ep := buildEndpoint(
+						traceId, projectId, span, spanAttrs, allAttrs,
+						startTime, duration, serverName, appVersion,
+					)
+					ep.DistributedTraceId = distributedTraceId
+					endpoints = append(endpoints, ep)
+				} else if span.Kind == tracepb.Span_SPAN_KIND_CONSUMER {
+					t := buildTask(
+						traceId, projectId, span, allAttrs,
+						startTime, endTime, duration, serverName, appVersion,
+					)
+					t.DistributedTraceId = distributedTraceId
+					tasks = append(tasks, t)
+				} else if hasGenAiAttributes(spanAttrs) {
+					aiTrace := buildAiTrace(
+						traceId, projectId, span, spanAttrs, allAttrs,
+						startTime, duration, serverName, appVersion,
+					)
+					aiTraces = append(aiTraces, aiTrace)
+					if conv := extractConversation(spanAttrs, projectId, traceId); conv != nil {
+						aiConversations = append(aiConversations, *conv)
+					}
 				} else {
-					traceId = uuid.New()
+					continue
+				}
+			} else {
+				spanName := span.Name
+				if dbQuery := getStringAttribute(spanAttrs, "db.query.text"); dbQuery != "" {
+					spanName = dbQuery
+				} else if dbStatement := getStringAttribute(spanAttrs, "db.statement"); dbStatement != "" {
+					spanName = dbStatement
 				}
 
-				spanToTraceId[spanIdStr] = traceId
+				spans = append(spans, models.Span{
+					Id:         spanId,
+					TraceId:    traceId,
+					ProjectId:  projectId,
+					Name:       spanName,
+					StartTime:  startTime,
+					Duration:   duration,
+					RecordedAt: startTime,
+				})
+			}
 
-				spanId := otelSpanIDToUUID(span.SpanId)
-				startTime := nanoToTime(span.StartTimeUnixNano)
-				endTime := nanoToTime(span.EndTimeUnixNano)
-				duration := endTime.Sub(startTime)
+			traceType := "task"
+			if isRoot && (span.Kind == tracepb.Span_SPAN_KIND_SERVER || span.Kind == tracepb.Span_SPAN_KIND_INTERNAL) && hasHTTPAttributes(spanAttrs) {
+				traceType = "endpoint"
+			}
 
-				var distributedTraceId *uuid.UUID
-				if dtid := getStringAttribute(spanAttrs, "traceway.distributed_trace_id"); dtid != "" {
-					if parsed, err := uuid.Parse(dtid); err == nil {
-						distributedTraceId = &parsed
-					}
-				}
-
-				if isRoot {
-					if span.Kind == tracepb.Span_SPAN_KIND_SERVER && hasHTTPAttributes(spanAttrs) {
-						ep := buildEndpoint(
-							traceId, projectId, span, spanAttrs, allAttrs,
-							startTime, duration, serverName, appVersion,
-						)
-						ep.DistributedTraceId = distributedTraceId
-						endpoints = append(endpoints, ep)
-					} else if span.Kind == tracepb.Span_SPAN_KIND_CONSUMER {
-						t := buildTask(
-							traceId, projectId, span, allAttrs,
-							startTime, endTime, duration, serverName, appVersion,
-						)
-						t.DistributedTraceId = distributedTraceId
-						tasks = append(tasks, t)
-					} else if hasGenAiAttributes(spanAttrs) {
-						aiTrace := buildAiTrace(
-							traceId, projectId, span, spanAttrs, allAttrs,
-							startTime, duration, serverName, appVersion,
-						)
-						aiTraces = append(aiTraces, aiTrace)
-						if conv := extractConversation(spanAttrs, projectId, traceId); conv != nil {
-							aiConversations = append(aiConversations, *conv)
-						}
-					} else {
-						continue
-					}
-				} else {
-					spanName := span.Name
-					if dbQuery := getStringAttribute(spanAttrs, "db.query.text"); dbQuery != "" {
-						spanName = dbQuery
-					} else if dbStatement := getStringAttribute(spanAttrs, "db.statement"); dbStatement != "" {
-						spanName = dbStatement
-					}
-
-					spans = append(spans, models.Span{
-						Id:         spanId,
-						TraceId:    traceId,
-						ProjectId:  projectId,
-						Name:       spanName,
-						StartTime:  startTime,
-						Duration:   duration,
-						RecordedAt: startTime,
-					})
-				}
-
-				traceType := "task"
-				if isRoot && span.Kind == tracepb.Span_SPAN_KIND_SERVER && hasHTTPAttributes(spanAttrs) {
-					traceType = "endpoint"
-				}
-
-				for _, event := range span.Events {
-					if event.Name == "exception" {
-						exc := buildException(
-							projectId, traceId, traceType, event,
-							serverName, appVersion,
-						)
-						exc.DistributedTraceId = distributedTraceId
-						exceptions = append(exceptions, exc)
-					}
+			for _, event := range span.Events {
+				if event.Name == "exception" {
+					exc := buildException(
+						projectId, traceId, traceType, event,
+						serverName, appVersion,
+					)
+					exc.DistributedTraceId = distributedTraceId
+					exceptions = append(exceptions, exc)
 				}
 			}
 		}

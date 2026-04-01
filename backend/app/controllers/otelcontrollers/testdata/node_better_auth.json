@@ -1,0 +1,99 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {"key": "service.name", "value": {"stringValue": "panelshot"}},
+          {"key": "service.version", "value": {"stringValue": "0.1.0"}}
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {"name": "@opentelemetry/instrumentation-net", "version": "0.58.0"},
+          "spans": [
+            {
+              "traceId": "59e33ba274805c8ac4d3c3d3255f4b2a",
+              "spanId": "fab4307b2bfdc856",
+              "parentSpanId": "3d30681bfa029543",
+              "flags": 257,
+              "name": "tcp.connect",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1774995349118000000",
+              "endTimeUnixNano": "1774995349122471125",
+              "attributes": [
+                {"key": "net.transport", "value": {"stringValue": "ip_tcp"}},
+                {"key": "net.peer.name", "value": {"stringValue": "postgres"}},
+                {"key": "net.peer.port", "value": {"intValue": "5432"}}
+              ],
+              "status": {}
+            }
+          ]
+        },
+        {
+          "scope": {"name": "better-auth", "version": "1.5.6"},
+          "spans": [
+            {
+              "traceId": "59e33ba274805c8ac4d3c3d3255f4b2a",
+              "spanId": "3d30681bfa029543",
+              "parentSpanId": "9c31a2fb43bec7f5",
+              "flags": 257,
+              "name": "db findOne session",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1774995349113000000",
+              "endTimeUnixNano": "1774995349133810500",
+              "attributes": [
+                {"key": "db.operation.name", "value": {"stringValue": "findOne"}},
+                {"key": "db.collection.name", "value": {"stringValue": "session"}}
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "59e33ba274805c8ac4d3c3d3255f4b2a",
+              "spanId": "e795832cb5a0e841",
+              "parentSpanId": "9c31a2fb43bec7f5",
+              "flags": 257,
+              "name": "db findOne user",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1774995349134000000",
+              "endTimeUnixNano": "1774995349135635750",
+              "attributes": [
+                {"key": "db.operation.name", "value": {"stringValue": "findOne"}},
+                {"key": "db.collection.name", "value": {"stringValue": "user"}}
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "59e33ba274805c8ac4d3c3d3255f4b2a",
+              "spanId": "9c31a2fb43bec7f5",
+              "parentSpanId": "e0fa18d76871a9d5",
+              "flags": 257,
+              "name": "handler /get-session",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1774995349107000000",
+              "endTimeUnixNano": "1774995349135923958",
+              "attributes": [
+                {"key": "http.route", "value": {"stringValue": "/get-session"}},
+                {"key": "better_auth.operation_id", "value": {"stringValue": "getSession"}}
+              ],
+              "status": {}
+            },
+            {
+              "traceId": "59e33ba274805c8ac4d3c3d3255f4b2a",
+              "spanId": "e0fa18d76871a9d5",
+              "flags": 257,
+              "name": "GET /get-session",
+              "kind": "SPAN_KIND_INTERNAL",
+              "startTimeUnixNano": "1774995349106000000",
+              "endTimeUnixNano": "1774995349135902042",
+              "attributes": [
+                {"key": "http.route", "value": {"stringValue": "/get-session"}},
+                {"key": "better_auth.operation_id", "value": {"stringValue": "getSession"}}
+              ],
+              "status": {}
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

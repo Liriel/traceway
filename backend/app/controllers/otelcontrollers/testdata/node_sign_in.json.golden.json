@@ -1,0 +1,46 @@
+{
+  "endpointCount": 1,
+  "endpoints": [
+    {
+      "endpoint": "POST /sign-in/email",
+      "statusCode": 0,
+      "serverName": "panelshot",
+      "appVersion": "0.1.0"
+    }
+  ],
+  "taskCount": 0,
+  "spanCount": 5,
+  "spans": [
+    {
+      "name": "db findMany account",
+      "linkedToParent": true
+    },
+    {
+      "name": "db findOne user",
+      "linkedToParent": true
+    },
+    {
+      "name": "handler /sign-in/email",
+      "linkedToParent": true
+    },
+    {
+      "name": "hook after /sign-in/email plugin:bearer",
+      "linkedToParent": true
+    },
+    {
+      "name": "tcp.connect",
+      "linkedToParent": true
+    }
+  ],
+  "exceptionCount": 1,
+  "exceptions": [
+    {
+      "stackTrace": "APIError: Invalid email or password\nAPIError: Invalid email or password",
+      "traceType": "task"
+    }
+  ],
+  "aiTraceCount": 0,
+  "aiTraces": [],
+  "conversationCount": 0,
+  "allSpansLinked": true
+}

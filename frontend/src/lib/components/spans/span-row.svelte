@@ -148,7 +148,7 @@
 					spanColor.bg,
 					isHovered && `ring-2 ${spanColor.ring}`
 				)}
-				style="left: {leftPercent}%; width: {Math.max(widthPercent, 1)}%"
+				style="left: {leftPercent}%; width: {Math.max(widthPercent, 0.3)}%; min-width: 2px"
 				onmouseenter={handleMouseEnter}
 				onmouseleave={handleMouseLeave}
 				role="presentation"

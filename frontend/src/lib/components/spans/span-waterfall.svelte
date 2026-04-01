@@ -10,7 +10,11 @@
 		traceStartTime: string;
 	};
 
-	let { spans, traceDuration, traceStartTime }: Props = $props();
+	let { spans: rawSpans, traceDuration, traceStartTime }: Props = $props();
+
+	const spans = $derived(
+		[...rawSpans].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+	);
 
 	const traceStart = $derived(
 		spans.length === 0
