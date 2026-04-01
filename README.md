@@ -6,7 +6,7 @@
   </picture>
 </p>
 
-<h3 align="center">Open-source error tracking and performance monitoring for Go applications</h3>
+<h3 align="center">Open-source error tracking and performance monitoring for All applications</h3>
 
 <p align="center">
   <a href="https://tracewayapp.com">Website</a> · <a href="https://docs.tracewayapp.com">Docs</a> · <a href="https://github.com/tracewayapp/go-client">Go Client SDK</a>
