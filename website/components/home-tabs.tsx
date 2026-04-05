@@ -20,6 +20,7 @@ const tabs = [
       "Scheduled task and background job monitoring",
       "Automatic Impact Score ranking",
       "OpenTelemetry-native ingestion",
+      "Works with serverless (Lambda, Cloud Functions, Workers)",
     ],
     href: "/product/performance",
   },

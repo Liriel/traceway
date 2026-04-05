@@ -13,7 +13,7 @@ const cards = [
     iconColor: "text-green-600",
     title: "No per-event pricing",
     description:
-      "Competitors charge you more as you grow. Traceway runs on your infrastructure with predictable, fixed costs.",
+      "Competitors charge you more as you grow. Self-host on your own infrastructure or use Cloud with fixed-price tiers — no per-event, per-host, or per-seat fees.",
   },
   {
     icon: Database,
@@ -29,7 +29,7 @@ const cards = [
     iconColor: "text-orange-600",
     title: "Fixed costs, not surprises",
     description:
-      "A single server handles millions of events. No metered billing, no overage charges, no surprises.",
+      "Every plan has a fixed monthly price. No metered billing, no overage charges, no surprise line items. Your bill never increases without your approval.",
   },
 ];
 

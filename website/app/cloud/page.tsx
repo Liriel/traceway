@@ -36,7 +36,7 @@ export default function CloudPage() {
             <section className="py-24 bg-zinc-50/50 border-y border-zinc-100">
                 <div className="container mx-auto px-4 max-w-5xl">
                     <div className="text-center mb-16">
-                        <h2 className="text-3xl md:text-4xl font-bold mb-4 text-zinc-900 tracking-tight">Simple, usage-based pricing</h2>
+                        <h2 className="text-3xl md:text-4xl font-bold mb-4 text-zinc-900 tracking-tight">Simple, predictable pricing</h2>
                         <p className="text-zinc-600 text-lg max-w-xl mx-auto">
                             Start for free and scale as you grow. No credit card required for the starter plan.
                         </p>
@@ -50,13 +50,64 @@ export default function CloudPage() {
             <section className="py-24 bg-white">
                 <div className="container mx-auto px-4 max-w-3xl">
                     <div className="text-center mb-12">
-                        <h2 className="text-3xl font-bold mb-4 text-zinc-900 tracking-tight">Cloud vs. Self-Hosted</h2>
+                        <h2 className="text-3xl font-bold mb-4 text-zinc-900 tracking-tight">Cloud FAQ</h2>
                         <p className="text-zinc-600 text-lg">
-                            Common questions about our deployment options.
+                            Common questions about Traceway Cloud, pricing, and support.
                         </p>
                     </div>
 
                     <Accordion type="single" collapsible className="w-full">
+                        <AccordionItem value="item-support" className="border-b-zinc-200">
+                            <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
+                                What support do Cloud customers get?
+                            </AccordionTrigger>
+                            <AccordionContent className="text-zinc-600 leading-relaxed">
+                                All Cloud customers on a paid plan can open GitHub issues that are triaged with highest priority by our engineering team.
+                                You are not routed to a help desk — you talk directly to the people who build Traceway.
+                                Enterprise+ customers also receive a shared Slack channel with direct access to the Traceway team for real-time collaboration, incident support, and onboarding assistance.
+                                Self-hosted and open-source users are welcome to open GitHub issues and participate in community discussions. We actively monitor and respond to all issues.
+                            </AccordionContent>
+                        </AccordionItem>
+                        <AccordionItem value="item-overages" className="border-b-zinc-200">
+                            <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
+                                Are there overage charges?
+                            </AccordionTrigger>
+                            <AccordionContent className="text-zinc-600 leading-relaxed">
+                                No. Every plan has a fixed monthly price. If you approach your included volume, we will notify you in advance so you can decide whether to upgrade.
+                                Your bill will never increase without your explicit approval. What you see on the pricing table is what you pay — no metered billing, no surprise line items, no usage-based surcharges.
+                            </AccordionContent>
+                        </AccordionItem>
+                        <AccordionItem value="item-cost-at-scale" className="border-b-zinc-200">
+                            <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
+                                How does Traceway Cloud compare on cost at scale?
+                            </AccordionTrigger>
+                            <AccordionContent className="text-zinc-600 leading-relaxed">
+                                At the Enterprise tier, 200 million monthly events cost $499.99 — that is $0.0000025 per event.
+                                Competitors like Datadog and Sentry charge orders of magnitude more at the same volume, often with additional per-host, per-seat, or overage fees on top.
+                                For workloads beyond 200 million events, our Enterprise+ plan offers even cheaper per-event pricing with a dedicated SRE and shared Slack channel.
+                                We price based on your actual infrastructure cost, not on a per-event markup, which means pricing stays reasonable even at billions of events per month.
+                            </AccordionContent>
+                        </AccordionItem>
+                        <AccordionItem value="item-events" className="border-b-zinc-200">
+                            <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
+                                What counts as an event?
+                            </AccordionTrigger>
+                            <AccordionContent className="text-zinc-600 leading-relaxed">
+                                An event is any single issue (exception), HTTP request, or background task run that Traceway ingests.
+                                Session replays, distributed trace spans, and custom metrics are included at no additional cost and do not count toward your event volume.
+                                For example, if your application handles 50,000 HTTP requests and encounters 200 exceptions in a month, that is 50,200 events.
+                            </AccordionContent>
+                        </AccordionItem>
+                        <AccordionItem value="item-fixed-costs" className="border-b-zinc-200">
+                            <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
+                                How does &ldquo;fixed costs&rdquo; work for Cloud vs. Self-Hosted?
+                            </AccordionTrigger>
+                            <AccordionContent className="text-zinc-600 leading-relaxed">
+                                Self-hosted Traceway runs on your own infrastructure with zero licensing cost — your only expense is the server itself, and ClickHouse compression keeps that minimal.
+                                Traceway Cloud has fixed-price tiers: you pick a plan, pay that amount monthly, and there are no overage charges, per-event fees, or surprise line items.
+                                In both cases, the cost is predictable. The difference is whether you manage the infrastructure yourself (self-hosted) or we manage it for you (cloud).
+                            </AccordionContent>
+                        </AccordionItem>
                         <AccordionItem value="item-1" className="border-b-zinc-200">
                             <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
                                 Why use Traceway Cloud?

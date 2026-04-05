@@ -463,12 +463,18 @@ export default function Home() {
               </AccordionTrigger>
               <AccordionContent className="text-zinc-600 leading-relaxed">
                 The Impact Score is Traceway&apos;s automatic prioritization
-                system. It combines five service-level indicators - inverted
-                apdex variant, error rate floor, P99 floor, client error floor,
-                and volume error floor - into a single score for every endpoint.
-                It takes the max across all five, so if any single signal is
-                degraded, that endpoint surfaces immediately. You open the
-                dashboard and instantly know what needs attention.
+                system. It combines five service-level indicators — inverted
+                apdex variant (response time vs. a threshold), error rate floor,
+                P99 latency floor, client error floor, and volume error floor —
+                into a single 0-100 score for every endpoint. It takes the max
+                across all five, so if any single signal is degraded, that
+                endpoint surfaces immediately. You can adjust the slow endpoint
+                threshold per endpoint to tune the apdex calculation for routes
+                with different latency profiles. For incident management, you can
+                configure notification rules that fire when the Impact Score or
+                error rate crosses a threshold, and route alerts to Slack, GitHub
+                Issues, email, or custom webhooks — so it plugs directly into
+                your existing on-call workflow.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="item-2" className="border-b-zinc-200">
@@ -476,13 +482,20 @@ export default function Home() {
                 How does Traceway compare to Sentry?
               </AccordionTrigger>
               <AccordionContent className="text-zinc-600 leading-relaxed">
-                Sentry is a great tool, but it requires manual triage and uses a
-                BSL license. Traceway automatically ranks issues by real user
-                impact so you always know what to fix first. It&apos;s 100% open
-                source (not BSL, not source-available), runs on your
-                infrastructure with fixed costs, and combines exception
-                tracking, performance monitoring, and session replay in one
-                tool.
+                Sentry groups errors and lets you triage them manually. Traceway
+                does that too, but adds an automatic Impact Score that ranks every
+                endpoint by five service-level signals — you open the dashboard and
+                immediately know what to fix first, without configuring alert rules
+                or manually assigning severity. Sentry uses a BSL license that
+                restricts how you can run and modify the code. Traceway is 100%
+                open source under a permissive license — fork it, modify it, run it
+                however you want. On the feature side, Traceway combines exception
+                tracking, endpoint performance (P50/P95/P99), session replay, and
+                distributed tracing in a single tool. Sentry offers some of these
+                as separate add-ons. On pricing, Sentry charges per event with
+                overage fees. Traceway Cloud plans have a fixed monthly price with
+                no overages — and self-hosting is completely free with no feature
+                gating.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="item-3" className="border-b-zinc-200">
@@ -490,12 +503,19 @@ export default function Home() {
                 How does Traceway compare to Datadog/New Relic?
               </AccordionTrigger>
               <AccordionContent className="text-zinc-600 leading-relaxed">
-                Datadog and New Relic are powerful but expensive at scale, often
-                charging per event or per host. Traceway runs on your
-                infrastructure with fixed costs. ClickHouse columnar storage
-                compresses data dramatically, so 1 million daily events use only
-                ~2-3 GB per month. You get endpoint analytics, exception
-                tracking, and session replay without metered billing.
+                Datadog and New Relic charge per host, per event, or per GB
+                ingested, and bills can spike unpredictably as traffic grows.
+                Traceway Cloud has fixed-price tiers — at the Enterprise level,
+                200 million monthly events cost $499.99 ($0.0000025 per event)
+                with no overage charges. Self-hosted Traceway has zero licensing
+                cost. Architecturally, Traceway uses ClickHouse columnar storage
+                that compresses 1 million daily events into ~2-3 GB per month,
+                keeping infrastructure costs low even at high volume. Feature-wise,
+                Traceway includes endpoint performance analytics (P50/P95/P99),
+                exception tracking with automatic grouping and ranking, session
+                replay, distributed tracing, and AI observability — all in one
+                tool. Datadog and New Relic split these across separate products,
+                each with its own billing meter.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="item-4" className="border-b-zinc-200">
@@ -634,6 +654,43 @@ export default function Home() {
                 OpenTelemetry spans with <code className="bg-zinc-100 px-1 py-0.5 rounded text-sm">gen_ai.*</code> attributes.
                 OpenRouter has built-in support — enable Observability in your settings and add Traceway as a destination.
                 Every LLM call is tracked with model, input/output tokens, costs, latency, and the full conversation content.
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="item-15" className="border-b-zinc-200">
+              <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
+                Does Traceway work with serverless and multi-cloud?
+              </AccordionTrigger>
+              <AccordionContent className="text-zinc-600 leading-relaxed">
+                Yes. Any service that exports OpenTelemetry traces can send data
+                to Traceway — including AWS Lambda, Google Cloud Functions, Azure
+                Functions, and Cloudflare Workers. Instrument your function with
+                your language&apos;s OTel SDK and point the OTLP exporter at
+                Traceway. Cold start latency, execution duration, and errors all
+                appear in the same endpoint and distributed tracing views as your
+                long-running services. For multi-cloud setups, every service
+                reports to the same Traceway instance regardless of provider, so
+                you get a single pane of glass across AWS, GCP, Azure, or any
+                combination.
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="item-16" className="border-b-zinc-200">
+              <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
+                What support options are available?
+              </AccordionTrigger>
+              <AccordionContent className="text-zinc-600 leading-relaxed">
+                All Traceway Cloud customers on a paid plan can open GitHub issues that are triaged with highest priority by our engineering team.
+                Enterprise+ customers also get a shared Slack channel with direct access to the team.
+                Self-hosted users are welcome to open GitHub issues and participate in community discussions — we actively monitor and respond to all issues.
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="item-17" className="border-b-zinc-200">
+              <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
+                Will my bill ever increase unexpectedly?
+              </AccordionTrigger>
+              <AccordionContent className="text-zinc-600 leading-relaxed">
+                No. Every Traceway Cloud plan has a fixed monthly price with no overage charges.
+                If you approach your included volume, we notify you in advance so you can decide whether to upgrade.
+                Your bill will never increase without your explicit approval. This applies to every tier, from Starter to Enterprise.
               </AccordionContent>
             </AccordionItem>
           </Accordion>

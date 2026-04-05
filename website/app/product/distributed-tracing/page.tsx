@@ -260,6 +260,23 @@ export default function DistributedTracingPage() {
                 paths and line numbers before displaying it.
               </AccordionContent>
             </AccordionItem>
+            <AccordionItem value="item-5" className="border-b-zinc-200">
+              <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
+                Does distributed tracing work with message queues and async workflows?
+              </AccordionTrigger>
+              <AccordionContent className="text-zinc-600 leading-relaxed">
+                Yes. Traceway uses W3C Trace Context, and OpenTelemetry
+                instrumentation libraries for Kafka, RabbitMQ, SQS, and other
+                message brokers propagate the trace context through message
+                headers automatically. When a consumer processes a message, its
+                spans are linked to the original producer&apos;s trace. This
+                means async workflows — such as an API that publishes to Kafka,
+                which triggers a worker, which calls a downstream service —
+                appear as a single connected trace in Traceway. The same applies
+                to cron-triggered jobs and event-driven architectures: as long
+                as the trace context is propagated, Traceway connects every span.
+              </AccordionContent>
+            </AccordionItem>
           </Accordion>
         </div>
       </section>

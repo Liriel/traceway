@@ -36,14 +36,14 @@ const TIERS = [
         limit: "200mil",
         price: "$499.99",
         monthlyLabel: "/ month",
-        description: "200mil issues, requests, task runs",
+        description: "200mil issues, requests, task runs. Just $0.0000025 per event.",
     },
     {
-        id: "custom",
-        name: "Custom",
+        id: "enterprise-plus",
+        name: "Enterprise+",
         limit: "Unlimited",
         price: "Contact Us",
-        description: "We are open to accommodating specific workloads and requirements.",
+        description: "Even cheaper per event. Dedicated SRE, shared Slack channel, and tailored SLAs.",
     },
 ];
 
@@ -82,6 +82,16 @@ export function PricingCalculator() {
                             </div>
                         ))}
                     </div>
+                </div>
+
+                <div className="px-6 py-4 bg-green-50/50 border-t border-zinc-100 text-center space-y-2">
+                    <p className="text-sm text-zinc-600">
+                        <span className="font-semibold text-zinc-900">No overage charges, ever.</span>{" "}
+                        Every plan has a fixed price. If you approach your limit, we&apos;ll notify you — your bill will never increase without your approval.
+                    </p>
+                    <p className="text-xs text-zinc-400">
+                        Each issue, HTTP request, or background task run counts as one event toward your monthly volume.
+                    </p>
                 </div>
             </div>
 
