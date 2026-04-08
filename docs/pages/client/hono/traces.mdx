@@ -1,0 +1,107 @@
+# Traces
+
+Auto-instrumentation handles HTTP request tracing automatically. This page covers manual spans and Hono middleware instrumentation.
+
+## Manual Spans
+
+Use `@opentelemetry/api` to create custom spans for operations that aren't auto-instrumented:
+
+```typescript
+import { trace, SpanStatusCode } from "@opentelemetry/api";
+
+const tracer = trace.getTracer("my-hono-app");
+
+app.get("/api/orders/:id", async (c) => {
+  const orderId = c.req.param("id");
+
+  return tracer.startActiveSpan("fetch-order", async (span) => {
+    try {
+      span.setAttribute("order.id", orderId);
+      const order = await db.orders.findById(orderId);
+
+      if (!order) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: "Order not found" });
+        span.end();
+        return c.json({ error: "Not found" }, 404);
+      }
+
+      span.end();
+      return c.json(order);
+    } catch (error) {
+      span.recordException(error);
+      span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+      span.end();
+      throw error;
+    }
+  });
+});
+```
+
+## Tracing Middleware
+
+Create a Hono middleware that adds attributes to the current span:
+
+```typescript
+import { trace } from "@opentelemetry/api";
+import { createMiddleware } from "hono/factory";
+
+const addUserContext = createMiddleware(async (c, next) => {
+  const span = trace.getActiveSpan();
+  const userId = c.get("userId");
+
+  if (span && userId) {
+    span.setAttribute("user.id", userId);
+  }
+
+  await next();
+});
+
+app.use("/api/*", addUserContext);
+```
+
+## Exception Recording
+
+Capture exceptions on the active span so they appear as Issues in Traceway:
+
+```typescript
+import { trace, SpanStatusCode } from "@opentelemetry/api";
+
+app.onError((err, c) => {
+  const span = trace.getActiveSpan();
+  if (span) {
+    span.recordException(err);
+    span.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
+  }
+  return c.json({ error: "Internal Server Error" }, 500);
+});
+```
+
+## Nested Spans
+
+Spans created inside an active span are automatically linked as children:
+
+```typescript
+const tracer = trace.getTracer("my-hono-app");
+
+async function processPayment(orderId: string) {
+  return tracer.startActiveSpan("process-payment", async (span) => {
+    try {
+      await validateCard(orderId);
+      await chargeAmount(orderId);
+      span.setStatus({ code: SpanStatusCode.OK });
+    } catch (error) {
+      span.recordException(error);
+      span.setStatus({ code: SpanStatusCode.ERROR });
+      throw error;
+    } finally {
+      span.end();
+    }
+  });
+}
+```
+
+## Next Steps
+
+- [Quick Start](/client/hono) — setup and installation
+- [Node.js Traces](/client/node-sdk/traces) — more on manual spans and context propagation
+- [Node.js Metrics](/client/node-sdk/metrics) — custom metrics with OTel

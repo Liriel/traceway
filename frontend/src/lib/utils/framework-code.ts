@@ -30,6 +30,8 @@ export function getInstallCommand(framework: Framework): string {
 			return 'npm install @tracewayapp/remix';
 		case 'jquery':
 			return 'npm install @tracewayapp/jquery';
+		case 'hono':
+			return '';
 		case 'symfony':
 			return 'composer require traceway/opentelemetry-symfony open-telemetry/exporter-otlp php-http/guzzle7-adapter';
 		case 'cloudflare':
@@ -273,6 +275,9 @@ $response = $kernel->handle($request);
 $response->send();
 $kernel->terminate($request, $response);`;
 
+		case 'hono':
+			return '';
+
 		case 'cloudflare':
 			return '';
 
@@ -391,6 +396,7 @@ export function getFrameworkLabel(framework: Framework): string {
 		express: 'Express',
 		remix: 'Remix',
 		jquery: 'jQuery',
+		hono: 'Hono',
 		cloudflare: 'Cloudflare',
 		opentelemetry: 'OpenTelemetry',
 		symfony: 'Symfony',
@@ -401,6 +407,7 @@ export function getFrameworkLabel(framework: Framework): string {
 export function getCodeLanguage(framework: Framework): 'go' | 'javascript' | 'bash' | 'php' {
 	if (framework === 'symfony') return 'php';
 	if (framework === 'opentelemetry') return 'go';
+	if (framework === 'hono') return 'javascript';
 	if (framework === 'cloudflare') return 'javascript';
 	return isJsFramework(framework) ? 'javascript' : 'go';
 }

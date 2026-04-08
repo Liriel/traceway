@@ -1,7 +1,7 @@
 import { api } from '$lib/api';
 import { authState } from './auth.svelte';
 
-export type Framework = 'gin' | 'fiber' | 'chi' | 'fasthttp' | 'stdlib' | 'custom' | 'react' | 'svelte' | 'vuejs' | 'nextjs' | 'nestjs' | 'express' | 'remix' | 'jquery' | 'cloudflare' | 'opentelemetry' | 'symfony';
+export type Framework = 'gin' | 'fiber' | 'chi' | 'fasthttp' | 'stdlib' | 'custom' | 'react' | 'svelte' | 'vuejs' | 'nextjs' | 'nestjs' | 'express' | 'remix' | 'jquery' | 'hono' | 'cloudflare' | 'opentelemetry' | 'symfony';
 
 export const FRONTEND_FRAMEWORKS: Framework[] = ['react', 'svelte', 'vuejs', 'jquery'];
 export const JS_FRAMEWORKS: Framework[] = ['react', 'svelte', 'vuejs', 'nextjs', 'nestjs', 'express', 'remix', 'jquery'];
@@ -21,6 +21,7 @@ export const FRAMEWORK_LABELS: Record<Framework, string> = {
 	express: 'Express',
 	remix: 'Remix',
 	jquery: 'jQuery',
+	hono: 'Hono',
 	cloudflare: 'Cloudflare',
 	opentelemetry: 'OpenTelemetry',
 	symfony: 'Symfony',
@@ -39,7 +40,7 @@ export function isJsFramework(fw: Framework): boolean {
 }
 
 export function isOtelFramework(fw: Framework): boolean {
-	return fw === 'opentelemetry';
+	return fw === 'opentelemetry' || fw === 'hono';
 }
 
 export function isCloudflareFramework(fw: Framework): boolean {

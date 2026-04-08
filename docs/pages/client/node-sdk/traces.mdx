@@ -1,328 +1,120 @@
 # Traces
 
-The backend SDK provides AsyncLocalStorage-based trace context management. Trace context automatically propagates through async operations, allowing you to link exceptions, spans, and attributes to the current trace.
+OpenTelemetry auto-instrumentation handles most tracing automatically. This page covers manual span creation and exception recording for cases where you need more control.
 
-## withTraceContext
+## How Spans Map to Traceway
 
-Run a function within a new trace context:
+| OTel Span | Traceway Concept |
+|-----------|-----------------|
+| Root SERVER span with HTTP attributes | **Endpoint** (e.g., `GET /api/users`) |
+| Root span (other kinds) | **Task** |
+| Child span | **Span** |
+| Exception event on any span | **Issue** |
 
-```typescript
-import { withTraceContext, captureCurrentTrace } from "@tracewayapp/backend";
+See [OTel Trace Mapping](/client/otel/traces) for full details on attributes and conventions.
 
-await withTraceContext(
-  {
-    endpoint: "GET /api/users",
-    clientIP: req.ip,
-  },
-  async () => {
-    // All async operations here share the same trace context
-    const users = await db.query("SELECT * FROM users");
-    res.json(users);
+## Manual Span Creation
 
-    // Capture the trace when done
-    captureCurrentTrace();
-  }
-);
-```
-
-### TraceContextOptions
-
-| Option | Type | Required | Description |
-|--------|------|----------|-------------|
-| `endpoint` | `string` | No | Endpoint name (e.g., "GET /api/users") |
-| `traceId` | `string` | No | Custom trace ID (auto-generated if not provided) |
-| `isTask` | `boolean` | No | Mark as background task instead of HTTP trace |
-| `attributes` | `Record<string, string>` | No | Initial trace attributes |
-| `clientIP` | `string` | No | Client IP address for HTTP traces |
-| `distributedTraceId` | `string` | No | Distributed trace ID from an incoming `traceway-trace-id` header (for frontend ↔ backend correlation) |
-
-## Reading Trace Context
-
-### getTraceContext
-
-Get the full trace context object:
+Use `@opentelemetry/api` to create custom spans for operations that aren't auto-instrumented:
 
 ```typescript
-import { getTraceContext } from "@tracewayapp/backend";
+import { trace, SpanStatusCode } from "@opentelemetry/api";
 
-const ctx = getTraceContext();
-if (ctx) {
-  console.log("Trace ID:", ctx.traceId);
-  console.log("Endpoint:", ctx.endpoint);
-  console.log("Spans:", ctx.spans.length);
-}
-```
+const tracer = trace.getTracer("my-service");
 
-### getTraceId
+async function processOrder(orderId: string) {
+  return tracer.startActiveSpan("process-order", async (span) => {
+    try {
+      span.setAttribute("order.id", orderId);
 
-Get just the current trace ID:
+      await validateOrder(orderId);
+      await chargePayment(orderId);
+      await sendConfirmation(orderId);
 
-```typescript
-import { getTraceId } from "@tracewayapp/backend";
-
-const traceId = getTraceId();
-// Returns undefined if not in a trace context
-```
-
-### hasTraceContext
-
-Check if currently within a trace context:
-
-```typescript
-import { hasTraceContext } from "@tracewayapp/backend";
-
-if (hasTraceContext()) {
-  // Safe to use trace-related functions
-}
-```
-
-## Setting Attributes
-
-### setTraceAttribute
-
-Set a single attribute on the current trace:
-
-```typescript
-import { setTraceAttribute } from "@tracewayapp/backend";
-
-setTraceAttribute("userId", currentUser.id);
-setTraceAttribute("tenantId", tenant.id);
-```
-
-### setTraceAttributes
-
-Set multiple attributes at once:
-
-```typescript
-import { setTraceAttributes } from "@tracewayapp/backend";
-
-setTraceAttributes({
-  userId: currentUser.id,
-  tenantId: tenant.id,
-  plan: subscription.plan,
-});
-```
-
-Attributes are no-op when called outside a trace context.
-
-## HTTP Response Info
-
-### setTraceResponseInfo
-
-Set HTTP response information for the trace:
-
-```typescript
-import { setTraceResponseInfo, withTraceContext, captureCurrentTrace } from "@tracewayapp/backend";
-
-await withTraceContext({ endpoint: "GET /api/users" }, async () => {
-  // ... handle request ...
-
-  // Set response info before capturing
-  setTraceResponseInfo(200, responseBody.length);
-  captureCurrentTrace();
-});
-```
-
-## Capturing Traces
-
-### captureCurrentTrace
-
-Capture the current trace context as a trace record:
-
-```typescript
-import { captureCurrentTrace, withTraceContext, setTraceResponseInfo } from "@tracewayapp/backend";
-
-await withTraceContext({ endpoint: "POST /api/orders" }, async () => {
-  const result = await createOrder(data);
-
-  setTraceResponseInfo(201, JSON.stringify(result).length);
-  captureCurrentTrace(); // Records the trace with all spans and attributes
-});
-```
-
-### captureTrace (Manual)
-
-Capture a trace with explicit parameters:
-
-```typescript
-import { captureTrace } from "@tracewayapp/backend";
-
-captureTrace(
-  traceId,           // string
-  "GET /api/users",  // endpoint
-  45.2,              // duration in ms
-  new Date(),        // start time
-  200,               // status code
-  1024,              // body size
-  "192.168.1.1",     // client IP
-  { userId: "123" }, // attributes (optional)
-  spans,             // spans array (optional)
-);
-```
-
-## Forking Trace Context
-
-### forkTraceContext
-
-Fork the current context for parallel operations with isolated spans:
-
-```typescript
-import { forkTraceContext, withTraceContext, startSpan, endSpan } from "@tracewayapp/backend";
-
-await withTraceContext({ endpoint: "GET /api/dashboard" }, async () => {
-  // Run multiple operations in parallel, each with isolated spans
-  await Promise.all([
-    forkTraceContext(async () => {
-      const span = startSpan("fetch-users");
-      await fetchUsers();
-      endSpan(span);
-    }),
-    forkTraceContext(async () => {
-      const span = startSpan("fetch-metrics");
-      await fetchMetrics();
-      endSpan(span);
-    }),
-  ]);
-
-  // All spans are merged back to the parent context
-  captureCurrentTrace();
-});
-```
-
-Forked contexts:
-- Share the same trace ID as the parent
-- Get their own isolated span list
-- Inherit parent attributes
-- Merge spans back to parent when complete
-
-## Trace Duration
-
-### getTraceDuration
-
-Get elapsed time since trace started:
-
-```typescript
-import { getTraceDuration } from "@tracewayapp/backend";
-
-const elapsedMs = getTraceDuration();
-// Returns 0 if not in a trace context
-```
-
-## Distributed Tracing
-
-### getDistributedTraceId
-
-Get the distributed trace ID from the current trace context:
-
-```typescript
-import { getDistributedTraceId } from "@tracewayapp/backend";
-
-const distributedId = getDistributedTraceId();
-// Returns undefined if no distributed trace ID is set
-```
-
-### Express Middleware with Distributed Tracing
-
-When building a custom Express middleware, read the `traceway-trace-id` header and pass it into the trace context to enable frontend ↔ backend correlation:
-
-```typescript
-import {
-  withTraceContext,
-  setTraceAttribute,
-  setTraceResponseInfo,
-  captureCurrentTrace,
-  captureException,
-} from "@tracewayapp/backend";
-
-function tracingMiddleware(req, res, next) {
-  const distributedTraceId = req.headers["traceway-trace-id"];
-
-  if (distributedTraceId) {
-    res.setHeader("traceway-trace-id", distributedTraceId);
-  }
-
-  withTraceContext(
-    {
-      endpoint: `${req.method} ${req.path}`,
-      clientIP: req.ip,
-      distributedTraceId,
-    },
-    async () => {
-      if (req.user) {
-        setTraceAttribute("userId", req.user.id);
-      }
-
-      res.on("finish", () => {
-        setTraceResponseInfo(res.statusCode, res.get("content-length") || 0);
-        captureCurrentTrace();
-      });
-
-      try {
-        await next();
-      } catch (error) {
-        captureException(error);
-        throw error;
-      }
+      span.setStatus({ code: SpanStatusCode.OK });
+    } catch (error) {
+      span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+      span.recordException(error);
+      throw error;
+    } finally {
+      span.end();
     }
-  );
+  });
 }
 ```
 
-See the [JS SDK Distributed Tracing](/client/js-sdk/distributed-tracing) guide for frontend setup details.
+## Nested Spans
 
-## Express Middleware Example (Basic)
+Spans created inside an active span are automatically linked as children:
 
 ```typescript
-import {
-  withTraceContext,
-  setTraceAttribute,
-  setTraceResponseInfo,
-  captureCurrentTrace,
-  captureException,
-} from "@tracewayapp/backend";
-
-function tracingMiddleware(req, res, next) {
-  withTraceContext(
-    {
-      endpoint: `${req.method} ${req.path}`,
-      clientIP: req.ip,
-    },
-    async () => {
-      if (req.user) {
-        setTraceAttribute("userId", req.user.id);
-      }
-
-      res.on("finish", () => {
-        setTraceResponseInfo(res.statusCode, res.get("content-length") || 0);
-        captureCurrentTrace();
-      });
-
-      try {
-        await next();
-      } catch (error) {
-        captureException(error);
-        throw error;
-      }
+async function chargePayment(orderId: string) {
+  return tracer.startActiveSpan("charge-payment", async (span) => {
+    try {
+      const result = await paymentGateway.charge(orderId);
+      span.setAttribute("payment.status", result.status);
+      return result;
+    } finally {
+      span.end();
     }
-  );
+  });
 }
 ```
 
-## Background Tasks
+## Recording Exceptions
 
-For background tasks, set `isTask: true`:
+Exceptions recorded as span events appear as **Issues** in Traceway:
 
 ```typescript
-await withTraceContext(
-  {
-    isTask: true,
-    endpoint: "process-emails",
-  },
-  async () => {
-    await processEmails();
-    captureCurrentTrace();
+import { trace, SpanStatusCode } from "@opentelemetry/api";
+
+function riskyOperation() {
+  const span = trace.getActiveSpan();
+
+  try {
+    doSomethingDangerous();
+  } catch (error) {
+    if (span) {
+      span.recordException(error);
+      span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+    }
+    throw error;
   }
-);
+}
 ```
 
-Tasks appear separately from HTTP traces in the dashboard.
+The `recordException` call adds an event with `exception.type`, `exception.message`, and `exception.stacktrace` attributes. Traceway normalizes and hashes the stack trace to group identical errors into a single Issue.
+
+## Span Attributes
+
+Add attributes to enrich your spans with context:
+
+```typescript
+span.setAttribute("user.id", userId);
+span.setAttribute("db.statement", "SELECT * FROM users");
+span.setAttributes({
+  "order.id": orderId,
+  "order.total": 99.99,
+  "order.items": 3,
+});
+```
+
+## Context Propagation
+
+OTel automatically propagates trace context across async operations. For manual propagation across service boundaries, use the `W3C Trace Context` headers:
+
+```typescript
+import { propagation, context } from "@opentelemetry/api";
+
+// Inject trace context into outgoing request headers
+const headers = {};
+propagation.inject(context.active(), headers);
+
+// The headers now contain `traceparent` and optionally `tracestate`
+await fetch("https://other-service.com/api", { headers });
+```
+
+## Next Steps
+
+- [Metrics](/client/node-sdk/metrics) — custom counters, histograms, and gauges
+- [Quick Start](/client/node-sdk) — setup and installation

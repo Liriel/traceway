@@ -1,139 +1,161 @@
-# Node.js Backend SDK
+# Node.js (OpenTelemetry)
 
-The `@tracewayapp/backend` package is a complete Node.js SDK for server-side applications. It provides error tracking, distributed tracing, span management, and metrics collection.
+Instrument any Node.js backend — Express, Fastify, Koa, Hono, NestJS, or plain HTTP — with OpenTelemetry and export traces and metrics to Traceway.
 
 ## Installation
 
 ```bash
-npm install @tracewayapp/backend
+npm install @opentelemetry/sdk-node \
+  @opentelemetry/auto-instrumentations-node \
+  @opentelemetry/exporter-trace-otlp-http \
+  @opentelemetry/exporter-metrics-otlp-http
 ```
 
-## Features
+## Setup
 
-| Feature | Description |
-|---------|-------------|
-| **Error Capture** | Capture exceptions and messages with full stack traces |
-| **Trace Context** | AsyncLocalStorage-based trace propagation across async operations |
-| **Span Management** | Time sub-operations within traces |
-| **Metrics** | Capture custom metrics and system metrics |
-| **Background Tasks** | Measure background jobs and async tasks |
-| **Sampling** | Configure sample rates for normal and error traces |
-
-## Quick Start
+Create an `instrumentation.ts` (or `.js`) file at the root of your project. This file must be loaded **before** your application code.
 
 ```typescript
-import {
-  init,
-  captureException,
-  withTraceContext,
-  startSpan,
-  endSpan,
-  captureCurrentTrace,
-  shutdown,
-} from "@tracewayapp/backend";
+import { NodeSDK } from "@opentelemetry/sdk-node";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
+import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
+import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 
-// Initialize once at startup
-init("your-token@https://traceway.example.com/api/report");
+const sdk = new NodeSDK({
+  serviceName: "my-service",
+  serviceVersion: "1.0.0",
 
-// Use trace context for HTTP requests
-async function handleRequest(req, res) {
-  await withTraceContext(
-    {
-      endpoint: `${req.method} ${req.path}`,
-      clientIP: req.ip,
-    },
-    async () => {
-      try {
-        // Start a span for database work
-        const dbSpan = startSpan("database-query");
-        const users = await db.query("SELECT * FROM users");
-        endSpan(dbSpan);
+  traceExporter: new OTLPTraceExporter({
+    url: "https://your-traceway-instance.com/api/otel/v1/traces",
+    headers: { Authorization: "Bearer your-project-token" },
+  }),
 
-        res.json(users);
-      } catch (error) {
-        captureException(error);
-        res.status(500).json({ error: "Internal error" });
-      } finally {
-        captureCurrentTrace();
-      }
-    }
-  );
-}
+  metricReader: new PeriodicExportingMetricReader({
+    exporter: new OTLPMetricExporter({
+      url: "https://your-traceway-instance.com/api/otel/v1/metrics",
+      headers: { Authorization: "Bearer your-project-token" },
+    }),
+    exportIntervalMillis: 30_000,
+  }),
 
-// Graceful shutdown
-process.on("SIGTERM", async () => {
-  await shutdown();
-  process.exit(0);
+  instrumentations: [getNodeAutoInstrumentations()],
+});
+
+sdk.start();
+```
+
+## Running Your App
+
+Load the instrumentation file before everything else using Node's `--require` (CommonJS) or `--import` (ESM) flag:
+
+```bash
+# CommonJS
+node --require ./instrumentation.js server.js
+
+# ESM / TypeScript (with tsx or ts-node)
+node --import ./instrumentation.ts server.ts
+```
+
+Or set it via environment variable:
+
+```bash
+export NODE_OPTIONS="--require ./instrumentation.js"
+node server.js
+```
+
+## Environment Variable Alternative
+
+Instead of hardcoding the endpoint and token, you can use standard OTel environment variables:
+
+```bash
+export OTEL_SERVICE_NAME="my-service"
+export OTEL_EXPORTER_OTLP_ENDPOINT="https://your-traceway-instance.com/api/otel"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-project-token"
+```
+
+With these set, the SDK picks them up automatically — your `instrumentation.ts` can omit the exporter URLs and headers.
+
+## What Gets Auto-Instrumented
+
+The `@opentelemetry/auto-instrumentations-node` package automatically instruments:
+
+| Library | What's Captured |
+|---------|-----------------|
+| `http` / `https` | Incoming and outgoing HTTP requests |
+| `express` | Route-level spans with `http.route` |
+| `fastify` | Route-level spans |
+| `koa` | Middleware and route spans |
+| `hono` | HTTP request spans (via `http` instrumentation) |
+| `pg` / `mysql2` / `mongodb` | Database query spans |
+| `redis` / `ioredis` | Cache operation spans |
+| `grpc` | gRPC call spans |
+| `fs` | File system operation spans |
+
+Root SERVER spans become **Endpoints** in Traceway, child spans become **Spans**, and exception events become **Issues**. See [Traces](/client/otel/traces) for the full mapping.
+
+## Framework Quick Start
+
+### Express
+
+```typescript
+import express from "express";
+
+const app = express();
+
+app.get("/api/users", (req, res) => {
+  res.json({ users: [] });
+});
+
+app.listen(3000);
+```
+
+No extra code needed — auto-instrumentation captures all requests, routes, and database calls.
+
+### Fastify
+
+```typescript
+import Fastify from "fastify";
+
+const app = Fastify();
+
+app.get("/api/users", async () => {
+  return { users: [] };
+});
+
+app.listen({ port: 3000 });
+```
+
+### Hono
+
+See the dedicated [Hono guide](/client/hono) for multi-runtime setup.
+
+```typescript
+import { serve } from "@hono/node-server";
+import { Hono } from "hono";
+
+const app = new Hono();
+
+app.get("/api/users", (c) => c.json({ users: [] }));
+
+serve({ fetch: app.fetch, port: 3000 });
+```
+
+## Test Your Integration
+
+Add a route that throws an error:
+
+```typescript
+app.get("/test-error", () => {
+  throw new Error("Test error from Traceway integration");
 });
 ```
 
-## When to Use
-
-Use `@tracewayapp/backend` when:
-
-- Building Node.js/Express/Fastify/Koa servers
-- Running background workers or task processors
-- Need distributed tracing across async operations
-- Want automatic trace context propagation
-
-For browser applications, use [`@tracewayapp/frontend`](/client/js-sdk) or framework-specific packages.
-
-## Connection String Format
-
-```
-<project_token>@<server_url>/api/report
-```
-
-Example:
-```
-abc123def456@https://traceway.example.com/api/report
-```
-
-Find your connection string in the Traceway dashboard under **Project Settings**.
-
-## Exports
-
-```typescript
-// Core functions
-export { init, shutdown } from "@tracewayapp/backend";
-
-// Exception capture
-export { captureException, captureExceptionWithAttributes, captureMessage } from "@tracewayapp/backend";
-
-// Trace context (AsyncLocalStorage-based)
-export {
-  withTraceContext,
-  runWithTraceContext,
-  getTraceContext,
-  getTraceId,
-  hasTraceContext,
-  setTraceAttribute,
-  setTraceAttributes,
-  setTraceResponseInfo,
-  forkTraceContext,
-} from "@tracewayapp/backend";
-
-// Trace capture
-export { captureCurrentTrace, captureTrace, captureTask } from "@tracewayapp/backend";
-
-// Span management
-export { startSpan, endSpan, addSpanToContext, getTraceSpans, getTraceDuration } from "@tracewayapp/backend";
-
-// Metrics
-export { captureMetric } from "@tracewayapp/backend";
-
-// Task measurement
-export { measureTask } from "@tracewayapp/backend";
-
-// Types
-export type { TracewayOptions, TraceContext, TraceContextOptions, SpanHandle } from "@tracewayapp/backend";
-```
+Visit `/test-error` and check your Traceway dashboard — the error should appear under **Issues** with a full stack trace.
 
 ## Next Steps
 
-- [Initialization](/client/node-sdk/initialization) — Configuration options and setup
-- [Exceptions](/client/node-sdk/exceptions) — Capturing errors and messages
-- [Traces](/client/node-sdk/traces) — Trace context management
-- [Spans](/client/node-sdk/spans) — Timing sub-operations
-- [Metrics](/client/node-sdk/metrics) — Custom and system metrics
-- [Tasks](/client/node-sdk/tasks) — Background task measurement
+- [Traces](/client/node-sdk/traces) — manual spans, exception recording, context propagation
+- [Metrics](/client/node-sdk/metrics) — custom counters, histograms, and gauges
+- [OTel Overview](/client/otel) — protocol details and authentication
+- [OTel Trace Mapping](/client/otel/traces) — how OTel spans map to Traceway concepts

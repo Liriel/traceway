@@ -30,12 +30,9 @@
         { value: 'react', label: 'React', description: 'Frontend UI library', group: 'JavaScript' },
         { value: 'svelte', label: 'Svelte', description: 'Frontend compiler framework', group: 'JavaScript' },
         { value: 'vuejs', label: 'Vue.js', description: 'Progressive frontend framework', group: 'JavaScript' },
-        { value: 'nextjs', label: 'Next.js', description: 'React full-stack framework', group: 'JavaScript' },
-        { value: 'nestjs', label: 'NestJS', description: 'Node.js server framework', group: 'JavaScript' },
-        { value: 'express', label: 'Express', description: 'Minimal Node.js framework', group: 'JavaScript' },
-        { value: 'remix', label: 'Remix', description: 'React full-stack framework', group: 'JavaScript' },
         { value: 'jquery', label: 'jQuery', description: 'Legacy-friendly AJAX and DOM library', group: 'JavaScript' },
         { value: 'symfony', label: 'Symfony', description: 'PHP full-stack framework (OTLP)', group: 'PHP' },
+        { value: 'hono', label: 'Hono', description: 'Lightweight multi-runtime framework (OTLP)', group: 'Backend' },
         { value: 'cloudflare', label: 'Cloudflare', description: 'Cloudflare Workers (OTLP Traces)', group: 'Backend' },
         { value: 'opentelemetry', label: 'OpenTelemetry', description: 'Vendor-neutral observability', group: 'Backend' },
     ] as const;

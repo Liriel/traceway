@@ -1,0 +1,133 @@
+# Hono
+
+Instrument your Hono application with OpenTelemetry and export traces and metrics to Traceway. Hono runs on multiple runtimes — this guide covers the Node.js setup. For Cloudflare Workers, see the [Cloudflare guide](/client/cloudflare).
+
+## Installation
+
+```bash
+npm install hono @hono/node-server \
+  @opentelemetry/sdk-node \
+  @opentelemetry/auto-instrumentations-node \
+  @opentelemetry/exporter-trace-otlp-http \
+  @opentelemetry/exporter-metrics-otlp-http
+```
+
+## Setup
+
+Create an `instrumentation.ts` file at the root of your project:
+
+```typescript
+import { NodeSDK } from "@opentelemetry/sdk-node";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
+import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
+import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
+
+const sdk = new NodeSDK({
+  serviceName: "my-hono-app",
+  serviceVersion: "1.0.0",
+
+  traceExporter: new OTLPTraceExporter({
+    url: "https://your-traceway-instance.com/api/otel/v1/traces",
+    headers: { Authorization: "Bearer your-project-token" },
+  }),
+
+  metricReader: new PeriodicExportingMetricReader({
+    exporter: new OTLPMetricExporter({
+      url: "https://your-traceway-instance.com/api/otel/v1/metrics",
+      headers: { Authorization: "Bearer your-project-token" },
+    }),
+    exportIntervalMillis: 30_000,
+  }),
+
+  instrumentations: [getNodeAutoInstrumentations()],
+});
+
+sdk.start();
+```
+
+## Application Code
+
+```typescript
+import { serve } from "@hono/node-server";
+import { Hono } from "hono";
+
+const app = new Hono();
+
+app.get("/api/users", (c) => {
+  return c.json({ users: [] });
+});
+
+app.get("/api/users/:id", (c) => {
+  const id = c.req.param("id");
+  return c.json({ id, name: "John" });
+});
+
+serve({ fetch: app.fetch, port: 3000 });
+```
+
+## Running Your App
+
+Load the instrumentation file before your application code:
+
+```bash
+# CommonJS
+node --require ./instrumentation.js server.js
+
+# ESM / TypeScript (with tsx)
+node --import ./instrumentation.ts server.ts
+```
+
+Or set via environment variable:
+
+```bash
+export NODE_OPTIONS="--require ./instrumentation.js"
+node server.js
+```
+
+## What Gets Captured
+
+Hono on Node.js uses `@hono/node-server`, which creates a standard Node.js HTTP server. OTel auto-instrumentation captures:
+
+| Layer | What's Captured |
+|-------|-----------------|
+| HTTP server | Incoming requests with method, route, status code, duration |
+| HTTP client (fetch) | Outgoing HTTP request spans |
+| Database (pg, mysql2, etc.) | Query spans |
+
+Root SERVER spans become **Endpoints** in Traceway (e.g., `GET /api/users`), child spans become **Spans**, and exception events become **Issues**.
+
+## Environment Variable Alternative
+
+```bash
+export OTEL_SERVICE_NAME="my-hono-app"
+export OTEL_EXPORTER_OTLP_ENDPOINT="https://your-traceway-instance.com/api/otel"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-project-token"
+```
+
+## Test Your Integration
+
+Add a test endpoint:
+
+```typescript
+app.get("/test-error", () => {
+  throw new Error("Test error from Hono");
+});
+```
+
+Visit `/test-error` and check your Traceway dashboard — the error should appear under **Issues** with a full stack trace.
+
+## Multi-Runtime Notes
+
+| Runtime | Instrumentation |
+|---------|----------------|
+| **Node.js** | OTel Node SDK (this guide) |
+| **Cloudflare Workers** | Native OTLP export — see [Cloudflare guide](/client/cloudflare) |
+| **Deno** | Use [Deno OTel](https://docs.deno.com/runtime/fundamentals/open_telemetry/) with OTLP/HTTP export to Traceway |
+| **Bun** | Use `@opentelemetry/sdk-node` (Bun supports most Node.js OTel packages) |
+
+## Next Steps
+
+- [Traces](/client/hono/traces) — manual spans and middleware instrumentation
+- [Node.js OTel Guide](/client/node-sdk) — general Node.js setup details
+- [OTel Overview](/client/otel) — protocol details and authentication
