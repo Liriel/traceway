@@ -30,6 +30,8 @@ init("your-token@https://traceway.example.com/api/report", {
 | `debounceMs` | `number` | `1500` | Milliseconds to wait before sending batched events |
 | `retryDelayMs` | `number` | `10000` | Milliseconds to wait before retrying failed uploads |
 | `version` | `string` | `undefined` | Your application version (shown in Traceway dashboard) |
+| `ignoreErrors` | `Array<string \| RegExp>` | `DEFAULT_IGNORE_PATTERNS` | Patterns to filter out errors before capture. See [Error Filtering](#error-filtering) |
+| `beforeCapture` | `(exception) => boolean` | `undefined` | Callback to programmatically suppress errors. Return `false` to drop. See [Error Filtering](#error-filtering) |
 
 ## Auto-Capture Behavior
 
@@ -53,6 +55,78 @@ window.addEventListener("unhandledrejection", (event) => {
   captureException(event.reason);
 });
 ```
+
+## Error Filtering
+
+By default, the SDK ignores common non-actionable errors: **4xx HTTP errors**, **network errors**, and **timeouts**. These are typically expected application behavior (e.g., form validation returning 422, auth redirects from 401) rather than bugs that need tracking.
+
+### Default Behavior
+
+The following patterns are ignored out of the box:
+
+- `"Failed to fetch"` (Chrome), `"Load failed"` (Safari), `"NetworkError when attempting to fetch resource"` (Firefox), `"Network Error"` (Axios)
+- `"The operation was aborted"` (AbortController), any message matching `/timeout/i`
+- Axios 4xx errors matching `/status code 4\d{2}/`
+- jQuery/custom 4xx errors matching `/failed: 4\d{2}/`
+
+### Capture All Errors
+
+To opt out of default filtering and capture everything:
+
+```javascript
+init("your-token@https://traceway.example.com/api/report", {
+  ignoreErrors: [],
+});
+```
+
+### Custom Patterns
+
+Pass your own patterns to replace the defaults. Strings match via `includes()`, RegExps match via `.test()`:
+
+```javascript
+init("your-token@https://traceway.example.com/api/report", {
+  ignoreErrors: [
+    "ResizeObserver loop",
+    /status code 5\d{2}/,
+  ],
+});
+```
+
+### Extending Default Patterns
+
+Import `DEFAULT_IGNORE_PATTERNS` to add your own patterns on top of the defaults:
+
+```javascript
+import { init, DEFAULT_IGNORE_PATTERNS } from "@tracewayapp/frontend";
+
+init("your-token@https://traceway.example.com/api/report", {
+  ignoreErrors: [
+    ...DEFAULT_IGNORE_PATTERNS,
+    "ResizeObserver loop",
+  ],
+});
+```
+
+### beforeCapture Callback
+
+For fine-grained control, use the `beforeCapture` callback. It receives the full exception object (including any attributes) and should return `false` to suppress:
+
+```javascript
+init("your-token@https://traceway.example.com/api/report", {
+  ignoreErrors: [],
+  beforeCapture: (exception) => {
+    // Suppress 401 errors based on attributes (e.g., from jQuery AJAX capture)
+    if (exception.attributes?.status === "401") return false;
+
+    // Suppress errors from third-party scripts
+    if (exception.stackTrace.includes("third-party.js")) return false;
+
+    return true;
+  },
+});
+```
+
+`beforeCapture` is checked **after** `ignoreErrors` — if a pattern already suppresses the error, the callback is not called. If the callback throws, the error is captured normally (safe default).
 
 ## Debug Mode
 

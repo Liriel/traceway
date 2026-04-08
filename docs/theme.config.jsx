@@ -14,11 +14,12 @@ const SDK_VISIBILITY = {
   sdk: "go-",
   "node-sdk": "js-node",
   nestjs: "js-nestjs",
+  hono: "js-hono",
   react: "js-react",
   vue: "js-vue",
   svelte: "js-svelte",
   jquery: "js-jquery",
-  "js-sdk": "js-",
+  "js-sdk": ["js-react", "js-vue", "js-svelte", "js-jquery", "js-generic"],
   openrouter: "openrouter",
   otel: "otel",
   cloudflare: "cloudflare",
@@ -102,9 +103,14 @@ export default {
 
 function SdkGuard({ requiredSdk, children }) {
   const { sdk } = useSdk();
-  const visible = requiredSdk.endsWith("-")
-    ? sdk.startsWith(requiredSdk)
-    : sdk === requiredSdk;
+  let visible;
+  if (Array.isArray(requiredSdk)) {
+    visible = requiredSdk.includes(sdk);
+  } else if (requiredSdk.endsWith("-")) {
+    visible = sdk.startsWith(requiredSdk);
+  } else {
+    visible = sdk === requiredSdk;
+  }
   if (!visible) {
     return <HiddenItem />;
   }
