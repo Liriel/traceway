@@ -1,0 +1,184 @@
+# Next.js (OpenTelemetry)
+
+Instrument your Next.js application with OpenTelemetry and export server-side traces and metrics to Traceway. This guide covers the App Router (Next.js 13.4+). For client-side error tracking, see `@tracewayapp/next` on the Connection page in your Traceway dashboard.
+
+## Installation
+
+```bash
+npm install @opentelemetry/sdk-node \
+  @opentelemetry/auto-instrumentations-node \
+  @opentelemetry/exporter-trace-otlp-http \
+  @opentelemetry/exporter-metrics-otlp-http \
+  @opentelemetry/api
+```
+
+## Setup
+
+Create an `instrumentation.ts` file in the root of your project (next to `next.config.js`). Next.js loads this file automatically during server startup — no `--require` flag needed.
+
+```typescript
+export async function register() {
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    const { NodeSDK } = await import("@opentelemetry/sdk-node");
+    const { OTLPTraceExporter } = await import(
+      "@opentelemetry/exporter-trace-otlp-http"
+    );
+    const { OTLPMetricExporter } = await import(
+      "@opentelemetry/exporter-metrics-otlp-http"
+    );
+    const { PeriodicExportingMetricReader } = await import(
+      "@opentelemetry/sdk-metrics"
+    );
+    const { getNodeAutoInstrumentations } = await import(
+      "@opentelemetry/auto-instrumentations-node"
+    );
+
+    const sdk = new NodeSDK({
+      serviceName: "my-nextjs-app",
+      serviceVersion: "1.0.0",
+
+      traceExporter: new OTLPTraceExporter({
+        url: "https://your-traceway-instance.com/api/otel/v1/traces",
+        headers: { Authorization: "Bearer your-project-token" },
+      }),
+
+      metricReader: new PeriodicExportingMetricReader({
+        exporter: new OTLPMetricExporter({
+          url: "https://your-traceway-instance.com/api/otel/v1/metrics",
+          headers: { Authorization: "Bearer your-project-token" },
+        }),
+        exportIntervalMillis: 30_000,
+      }),
+
+      instrumentations: [getNodeAutoInstrumentations()],
+    });
+
+    sdk.start();
+  }
+}
+```
+
+The `process.env.NEXT_RUNTIME === "nodejs"` guard is required — Next.js runs `instrumentation.ts` in both the Node.js and Edge runtimes, but the OTel Node SDK only works in Node.js. Dynamic `import()` prevents OTel packages from being bundled into the Edge runtime.
+
+## Enabling the Instrumentation Hook (Next.js 13.4–14.x)
+
+For Next.js versions before 15, enable the instrumentation hook in `next.config.js`:
+
+```javascript
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    instrumentationHook: true,
+  },
+};
+
+module.exports = nextConfig;
+```
+
+This is not needed for Next.js 15+, where the instrumentation hook is stable by default.
+
+## Route Helper (Required)
+
+Next.js (App Router) does not use Express or Fastify under the hood, so the OTel auto-instrumentation cannot set `http.route` automatically. Without it, Traceway falls back to the literal URL path — every unique URL becomes a separate endpoint (e.g., `/api/users/1` and `/api/users/2` instead of `GET /api/users/[id]`).
+
+Create a `withRoute` helper that wraps your API route handlers. It sets `http.route` for endpoint grouping and records exceptions as Issues:
+
+```typescript
+// lib/with-route.ts
+import { trace, SpanStatusCode } from "@opentelemetry/api";
+
+type RouteHandler = (
+  req: Request,
+  context: { params: Promise<Record<string, string>> }
+) => Response | Promise<Response>;
+
+export function withRoute(route: string, handler: RouteHandler): RouteHandler {
+  return async (req, context) => {
+    const span = trace.getActiveSpan();
+    if (span) {
+      span.setAttribute("http.route", route);
+    }
+    try {
+      return await handler(req, context);
+    } catch (error) {
+      if (span) {
+        span.recordException(error as Error);
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: (error as Error).message,
+        });
+      }
+      throw error;
+    }
+  };
+}
+```
+
+Wrap every API route handler with `withRoute`, passing the route pattern that matches your file path:
+
+```typescript
+// app/api/users/route.ts
+import { withRoute } from "@/lib/with-route";
+
+export const GET = withRoute("/api/users", async () => {
+  const users = await db.users.findAll();
+  return Response.json(users);
+});
+```
+
+```typescript
+// app/api/users/[id]/route.ts
+import { withRoute } from "@/lib/with-route";
+
+export const GET = withRoute("/api/users/[id]", async (req, { params }) => {
+  const { id } = await params;
+  return Response.json({ id, name: "John" });
+});
+```
+
+## What Gets Captured
+
+With the setup above and the `withRoute` helper, OTel captures:
+
+| Layer | What's Captured |
+|-------|-----------------|
+| HTTP server | Incoming requests with method, status code, duration |
+| `withRoute` helper | `http.route` for endpoint grouping + exception recording |
+| Database (pg, mysql2, Prisma, etc.) | Query spans |
+| HTTP client (fetch) | Outgoing HTTP request spans |
+
+Root SERVER spans become **Endpoints** in Traceway (e.g., `GET /api/users/[id]`), child spans become **Spans**, and exception events become **Issues**.
+
+## Environment Variable Alternative
+
+Instead of hardcoding the endpoint and token, you can use standard OTel environment variables:
+
+```bash
+export OTEL_SERVICE_NAME="my-nextjs-app"
+export OTEL_EXPORTER_OTLP_ENDPOINT="https://your-traceway-instance.com/api/otel"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-project-token"
+```
+
+With these set, the SDK picks them up automatically — your `instrumentation.ts` can omit the exporter URLs and headers.
+
+## Test Your Integration
+
+Add a test API route:
+
+```typescript
+// app/api/test-error/route.ts
+import { withRoute } from "@/lib/with-route";
+
+export const GET = withRoute("/api/test-error", async () => {
+  throw new Error("Test error from Next.js");
+});
+```
+
+Visit `/api/test-error` and check your Traceway dashboard — the error should appear under **Issues** with a full stack trace, and the endpoint should be grouped as `GET /api/test-error`.
+
+## Next Steps
+
+- [Traces](/client/nextjs/traces) — manual spans, Server Component tracing
+- [Node.js OTel Guide](/client/node-sdk) — general Node.js setup details
+- [OTel Overview](/client/otel) — protocol details and authentication
+- [OTel Trace Mapping](/client/otel/traces) — how OTel spans map to Traceway concepts

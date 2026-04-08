@@ -46,13 +46,75 @@ const sdk = new NodeSDK({
 sdk.start();
 ```
 
+## Route & Error Middleware (Required)
+
+Hono has no dedicated OTel instrumentation package, so two pieces are missing that you must add manually:
+
+1. **Route middleware** — Without it, Traceway falls back to the literal URL path (e.g., `/api/users/1`, `/api/users/2`) instead of grouping requests by route pattern (`GET /api/users/:id`).
+2. **Error handler** — Hono catches errors before they reach the HTTP layer, so OTel never sees them. Without an explicit handler, errors won't appear as Issues in Traceway.
+
+### Route Middleware
+
+Register this middleware **before** your route handlers. It runs after the handler completes (`await next()`), reads the matched route pattern via `c.req.routePath`, and sets `http.route` on the active OTel span:
+
+```typescript
+import { trace } from "@opentelemetry/api";
+
+app.use("*", async (c, next) => {
+  await next();
+  const span = trace.getActiveSpan();
+  if (span) {
+    span.setAttribute("http.route", c.req.routePath);
+  }
+});
+```
+
+### Error Handler
+
+Record exceptions on the active span so they appear as Issues in Traceway:
+
+```typescript
+import { trace, SpanStatusCode } from "@opentelemetry/api";
+
+app.onError((err, c) => {
+  const span = trace.getActiveSpan();
+  if (span) {
+    span.recordException(err);
+    span.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
+  }
+  return c.json({ error: "Internal Server Error" }, 500);
+});
+```
+
 ## Application Code
+
+Here's a complete example with the route middleware and error handler in place:
 
 ```typescript
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
+import { trace, SpanStatusCode } from "@opentelemetry/api";
 
 const app = new Hono();
+
+// Route middleware — sets http.route for endpoint grouping
+app.use("*", async (c, next) => {
+  await next();
+  const span = trace.getActiveSpan();
+  if (span) {
+    span.setAttribute("http.route", c.req.routePath);
+  }
+});
+
+// Error handler — records exceptions as Issues
+app.onError((err, c) => {
+  const span = trace.getActiveSpan();
+  if (span) {
+    span.recordException(err);
+    span.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
+  }
+  return c.json({ error: "Internal Server Error" }, 500);
+});
 
 app.get("/api/users", (c) => {
   return c.json({ users: [] });
@@ -87,15 +149,17 @@ node server.js
 
 ## What Gets Captured
 
-Hono on Node.js uses `@hono/node-server`, which creates a standard Node.js HTTP server. OTel auto-instrumentation captures:
+Hono on Node.js uses `@hono/node-server`, which creates a standard Node.js HTTP server. With the route middleware and error handler from above, OTel captures:
 
 | Layer | What's Captured |
 |-------|-----------------|
-| HTTP server | Incoming requests with method, route, status code, duration |
+| HTTP server | Incoming requests with method, status code, duration |
+| Route middleware | `http.route` for endpoint grouping (e.g., `GET /api/users/:id`) |
+| Error handler | Exceptions recorded as Issues with stack traces |
 | HTTP client (fetch) | Outgoing HTTP request spans |
 | Database (pg, mysql2, etc.) | Query spans |
 
-Root SERVER spans become **Endpoints** in Traceway (e.g., `GET /api/users`), child spans become **Spans**, and exception events become **Issues**.
+Root SERVER spans become **Endpoints** in Traceway, child spans become **Spans**, and exception events become **Issues**.
 
 ## Environment Variable Alternative
 

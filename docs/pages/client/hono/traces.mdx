@@ -61,6 +61,8 @@ app.use("/api/*", addUserContext);
 
 ## Exception Recording
 
+> **Important:** The `app.onError` handler below is required for all Hono + OTel setups. If you followed the [Quick Start](/client/hono), it's already included. Without it, Hono catches errors internally and OTel never records them.
+
 Capture exceptions on the active span so they appear as Issues in Traceway:
 
 ```typescript

@@ -14,6 +14,7 @@
   "node-sdk": "Node.js (OTel)",
   "nestjs": "NestJS (OTel)",
   "hono": "Hono",
+  "nextjs": "Next.js (OTel)",
   "react": "React",
   "vue": "Vue.js",
   "svelte": "Svelte",
