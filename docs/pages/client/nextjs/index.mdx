@@ -33,9 +33,13 @@ export async function register() {
       "@opentelemetry/auto-instrumentations-node"
     );
 
+    const { Resource } = await import("@opentelemetry/resources");
+
     const sdk = new NodeSDK({
-      serviceName: "my-nextjs-app",
-      serviceVersion: "1.0.0",
+      resource: new Resource({
+        "service.name": "my-nextjs-app",
+        "service.version": "1.0.0",
+      }),
 
       traceExporter: new OTLPTraceExporter({
         url: "https://your-traceway-instance.com/api/otel/v1/traces",
