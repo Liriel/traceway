@@ -6,7 +6,7 @@
     import { TableEmptyState } from "$lib/components/ui/table-empty-state";
     import { ViewAllTableRow } from "$lib/components/ui/view-all-table-row";
     import type { ExceptionOccurrence } from '$lib/types/exceptions';
-    import { formatDateTime } from '$lib/utils/formatters';
+    import { formatDateTime, truncateStackTrace } from '$lib/utils/formatters';
     import { getTimezone } from '$lib/state/timezone.svelte';
     import { projectsState, isFrontendFramework } from '$lib/state/projects.svelte';
 
@@ -61,7 +61,12 @@
                             label="Recorded At"
                             tooltip="When this occurrence was recorded"
                         />
-                        {#if !isFrontend}
+                        {#if isFrontend}
+                        <TracewayTableHeader
+                            label="Title"
+                            tooltip="Exception message from the first line of the stack trace"
+                        />
+                        {:else}
                         <TracewayTableHeader
                             label="Server"
                             tooltip="Server instance where error occurred"
@@ -76,7 +81,7 @@
                 {/if}
                 <Table.Body>
                     {#if occurrences.length === 0}
-                        <TableEmptyState colspan={isFrontend ? 1 : 3} message="No occurrences found." />
+                        <TableEmptyState colspan={isFrontend ? 2 : 3} message="No occurrences found." />
                     {:else}
                         {#each occurrences as occurrence}
                             <Table.Row
@@ -89,7 +94,11 @@
                                         <span class="ml-2 text-xs text-muted-foreground">(current)</span>
                                     {/if}
                                 </Table.Cell>
-                                {#if !isFrontend}
+                                {#if isFrontend}
+                                <Table.Cell class="font-mono text-sm text-muted-foreground truncate max-w-[400px]" title={occurrence.stackTrace.split('\n')[0]}>
+                                    {truncateStackTrace(occurrence.stackTrace, 60)}
+                                </Table.Cell>
+                                {:else}
                                 <Table.Cell class="font-mono text-sm text-muted-foreground">
                                     {occurrence.serverName || '-'}
                                 </Table.Cell>
@@ -100,7 +109,7 @@
                             </Table.Row>
                         {/each}
                         {#if hasMore && showViewAll}
-                            <ViewAllTableRow colspan={isFrontend ? 1 : 3} href={`/issues/${exceptionHash}/events`} label={`View all ${total} events`} />
+                            <ViewAllTableRow colspan={isFrontend ? 2 : 3} href={`/issues/${exceptionHash}/events`} label={`View all ${total} events`} />
                         {/if}
                     {/if}
                 </Table.Body>

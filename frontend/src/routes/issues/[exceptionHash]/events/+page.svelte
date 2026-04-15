@@ -205,7 +205,12 @@
                             label="Recorded At"
                             tooltip="When this occurrence was recorded"
                         />
-                        {#if !isFrontend}
+                        {#if isFrontend}
+                        <TracewayTableHeader
+                            label="Title"
+                            tooltip="Exception message from the first line of the stack trace"
+                        />
+                        {:else}
                         <TracewayTableHeader
                             label="Server"
                             tooltip="Server instance where error occurred"
@@ -221,14 +226,14 @@
                 <Table.Body>
                     {#if loading}
                         <Table.Row>
-                            <Table.Cell colspan={isFrontend ? 1 : 3} class="h-48">
+                            <Table.Cell colspan={isFrontend ? 2 : 3} class="h-48">
                                 <div class="flex items-center justify-center">
                                     <LoadingCircle size="lg" />
                                 </div>
                             </Table.Cell>
                         </Table.Row>
                     {:else if occurrences.length === 0}
-                        <TableEmptyState colspan={isFrontend ? 1 : 3} message="No events found." />
+                        <TableEmptyState colspan={isFrontend ? 2 : 3} message="No events found." />
                     {:else}
                         {#each occurrences as occurrence}
                             <Table.Row
@@ -236,7 +241,11 @@
                                 onclick={createRowClickHandler(`/issues/${page.params.exceptionHash}/${occurrence.id}`, 'preset', 'from', 'to')}
                             >
                                 <Table.Cell>{formatDateTime(occurrence.recordedAt, { timezone })}</Table.Cell>
-                                {#if !isFrontend}
+                                {#if isFrontend}
+                                <Table.Cell class="font-mono text-sm text-muted-foreground truncate max-w-[400px]" title={occurrence.stackTrace.split('\n')[0]}>
+                                    {truncateStackTrace(occurrence.stackTrace, 60)}
+                                </Table.Cell>
+                                {:else}
                                 <Table.Cell class="font-mono text-sm text-muted-foreground">
                                     {occurrence.serverName || '-'}
                                 </Table.Cell>
