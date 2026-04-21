@@ -30,7 +30,6 @@ export function MotionPolish() {
           .from(".hero .chip", { y: 16, opacity: 0, duration: 0.7 }, 0.15)
           .from(".hero h1", { y: 30, opacity: 0, duration: 0.9 }, 0.25)
           .from(".hero-sub", { y: 18, opacity: 0, duration: 0.7 }, 0.55)
-          .from(".hero-cta-row > *", { y: 14, opacity: 0, duration: 0.6, stagger: 0.08 }, 0.7)
           .from(".pillars > *", { y: 24, opacity: 0, duration: 0.7, stagger: 0.07, ease: "power2.out" }, 0.85)
           .from(".pillars-sec > *", { y: 12, opacity: 0, duration: 0.5, stagger: 0.05 }, 1.05);
       }
@@ -130,24 +129,6 @@ export function MotionPolish() {
           },
         });
         triggers.push(t);
-      });
-
-      // Magnetic CTAs
-      document.querySelectorAll<HTMLElement>(".btn-accent, .btn-primary").forEach((btn) => {
-        const strength = 14;
-        const onMove = (e: MouseEvent) => {
-          const r = btn.getBoundingClientRect();
-          const x = (e.clientX - r.left - r.width / 2) / (r.width / 2);
-          const y = (e.clientY - r.top - r.height / 2) / (r.height / 2);
-          gsap.to(btn, { x: x * strength, y: y * strength, duration: 0.4, ease: "power3.out" });
-        };
-        const onLeave = () => gsap.to(btn, { x: 0, y: 0, duration: 0.55, ease: "elastic.out(1, 0.5)" });
-        btn.addEventListener("mousemove", onMove);
-        btn.addEventListener("mouseleave", onLeave);
-        cleanups.push(() => {
-          btn.removeEventListener("mousemove", onMove);
-          btn.removeEventListener("mouseleave", onLeave);
-        });
       });
 
       // Cost-bar fills

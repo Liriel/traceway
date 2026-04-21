@@ -334,9 +334,11 @@
     color: #0a0612;
     box-shadow: 0 10px 30px -12px color-mix(in oklab, var(--a1) 80%, transparent),
       0 0 0 1px color-mix(in oklab, var(--a1) 40%, transparent);
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
   }
   .btn-accent:hover {
     background: linear-gradient(180deg, color-mix(in oklab, var(--a1) 100%, white 18%), var(--a1));
+    transform: translateY(2px);
   }
   .btn-ghost {
     border-color: var(--hair-2);
@@ -712,6 +714,12 @@
     color: var(--fg-3);
     font-size: 11px;
     padding-top: 3px;
+  }
+  .term-line .tx,
+  .term-line .cmd,
+  .term-line .mute,
+  .term-line .ok {
+    white-space: pre-wrap;
   }
   .term-line .tx {
     color: var(--fg-1);

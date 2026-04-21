@@ -1,5 +1,6 @@
 <script lang="ts">
     import { goto } from '$app/navigation';
+    import { page } from '$app/state';
     import { Button } from "$lib/components/ui/button";
     import { Input } from "$lib/components/ui/input";
     import { Label } from "$lib/components/ui/label";
@@ -8,20 +9,27 @@
     import * as Select from "$lib/components/ui/select";
     import { CircleAlert, Check } from "@lucide/svelte";
     import { authState } from '$lib/state/auth.svelte';
-    import { projectsState, type Framework } from '$lib/state/projects.svelte';
+    import { projectsState, FRAMEWORK_LABELS, type Framework } from '$lib/state/projects.svelte';
     import { themeState } from '$lib/state/theme.svelte';
     import { toast } from 'svelte-sonner';
     import FrameworkCombobox from '$lib/components/framework-combobox.svelte';
     import TurnstileWidget from '$lib/components/turnstile-widget.svelte';
 
-    let email = $state('');
+    const DEFAULT_FRAMEWORK: Framework = 'gin';
+
+    function parseFrameworkParam(value: string | null): Framework {
+        if (!value) return DEFAULT_FRAMEWORK;
+        return (value in FRAMEWORK_LABELS ? value : DEFAULT_FRAMEWORK) as Framework;
+    }
+
+    let email = $state(page.url.searchParams.get('email') ?? '');
     let name = $state('');
     let password = $state('');
     let confirmPassword = $state('');
     let organizationName = $state('');
     let timezone = $state(Intl.DateTimeFormat().resolvedOptions().timeZone);
     let projectName = $state('');
-    let framework = $state<Framework>('gin');
+    let framework = $state<Framework>(parseFrameworkParam(page.url.searchParams.get('framework')));
     let error = $state('');
     let loading = $state(false);
     let captchaToken = $state('');

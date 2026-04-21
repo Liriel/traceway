@@ -29,7 +29,7 @@ export default function FlutterSessionReplayPage() {
           </p>
           <div className="hero-cta-row">
             <Link
-              href="https://cloud.tracewayapp.com/register"
+              href="https://cloud.tracewayapp.com/register?framework=flutter"
               className="btn btn-accent"
             >
               Start free
@@ -133,7 +133,7 @@ export default function FlutterSessionReplayPage() {
         description="10,000 recordings every month. Free. Forever. No card required."
         primary={{
           label: "Create your project",
-          href: "https://cloud.tracewayapp.com/register",
+          href: "https://cloud.tracewayapp.com/register?framework=flutter",
         }}
         secondary={{
           label: "View on GitHub",

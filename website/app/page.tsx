@@ -307,7 +307,6 @@ export default function Home() {
                 { num: "<em>0s</em>", label: "Config required" },
                 { num: "100%", label: "Feature parity" },
                 { num: "MIT", label: "License" },
-                { num: "<em>22×</em>", label: "Vs. Datadog" },
               ]}
             />
           </div>
