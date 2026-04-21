@@ -1,143 +1,181 @@
-import { PricingCalculator } from "@/components/pricing-calculator";
 import Link from "next/link";
+import { ArrowRight, Cloud as CloudIcon } from "lucide-react";
 
-import { ArrowRight } from "lucide-react";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Badge } from "@/components/ui/badge";
+import { Chip } from "@/components/chip";
+import { SectionHead } from "@/components/section-head";
+import { FaqList } from "@/components/faq-list";
+import { FinalCTA } from "@/components/final-cta";
+import { AuroraBackground } from "@/components/aurora-background";
+import { PricingCalculator } from "@/components/pricing-calculator";
+import { CostComparison } from "@/components/cost-comparison";
 
 export default function CloudPage() {
-    return (
-        <main className="min-h-screen bg-white text-zinc-950 font-sans selection:bg-zinc-100 selection:text-zinc-900">
-            {/* Hero Section */}
-            <section className="relative pt-16 pb-20 overflow-hidden">
-                <div className="absolute inset-0 -z-10 h-full w-full bg-white bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] [mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_70%,transparent_100%)]"></div>
-                <div className="container mx-auto px-4 text-center">
-                    <Badge variant="secondary" className="mb-4 bg-blue-50 text-blue-700 hover:bg-blue-100 px-2.5 py-0.5 border border-blue-100 text-xs font-normal rounded-full">
-                        Traceway Cloud
-                    </Badge>
-                    <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6 text-zinc-900">
-                        Managed Traceway <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">for Teams</span>
-                    </h1>
-                    <p className="text-zinc-600 text-lg md:text-xl max-w-xl mx-auto mb-10 leading-relaxed font-medium">
-                        Focus on shipping features, not managing infrastructure. Get all the power of Traceway with zero maintenance.
-                    </p>
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                        <Link href="http://cloud.tracewayapp.com/register" className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-all cursor-pointer h-10 px-6 bg-[#4ba3f7] text-white hover:bg-[#3b93e7] font-bold shadow-sm shadow-blue-400/20">
-                                Start Free Trial <ArrowRight className="ml-2 h-4 w-4" />
-                        </Link>
-                        <Link href="https://docs.tracewayapp.com/cloud" className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-all cursor-pointer h-10 px-6 border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-900">
-                                How it works
-                        </Link>
-                    </div>
-                </div>
-            </section>
+  return (
+    <main className="relative">
+      <section className="hero gridbg relative">
+        <AuroraBackground variant="hero" />
+        <div className="wrap relative z-10 max-w-3xl">
+          <Chip>
+            <CloudIcon className="h-3 w-3 inline mr-1" />
+            Traceway Cloud
+          </Chip>
+          <h1 className="mt-6">
+            Managed Traceway <em>for teams.</em>
+          </h1>
+          <p className="hero-sub">
+            Focus on shipping features, not managing infrastructure. All the
+            power of Traceway with zero maintenance — same open-source code,
+            managed by us.
+          </p>
+          <div className="hero-cta-row">
+            <Link href="https://cloud.tracewayapp.com/register" className="btn btn-accent">
+              Start Free <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link href="https://docs.tracewayapp.com/cloud" className="btn btn-ghost">
+              How it works
+            </Link>
+          </div>
+        </div>
+      </section>
 
-            {/* Pricing Section */}
-            <section className="py-24 bg-zinc-50/50 border-y border-zinc-100">
-                <div className="container mx-auto px-4 max-w-5xl">
-                    <div className="text-center mb-16">
-                        <h2 className="text-3xl md:text-4xl font-bold mb-4 text-zinc-900 tracking-tight">Simple, predictable pricing</h2>
-                        <p className="text-zinc-600 text-lg max-w-xl mx-auto">
-                            Start for free and scale as you grow. No credit card required for the starter plan.
-                        </p>
-                    </div>
+      {/* Pricing */}
+      <section className="wrap py-20">
+        <SectionHead
+          eyebrow="Pricing"
+          title="Simple, predictable pricing"
+          description="Start free and scale as you grow. No credit card required for the Starter plan."
+        />
+        <div className="mt-8">
+          <PricingCalculator />
+        </div>
+      </section>
 
-                    <PricingCalculator />
-                </div>
-            </section>
+      {/* Cost comparison / cost advantage — absorbed from home */}
+      <section className="wrap py-10" id="cost-mount" data-cost-mount>
+        <SectionHead
+          eyebrow="Cost"
+          title={
+            <>
+              Designed for efficiency. <em>Built to lower your cloud bill.</em>
+            </>
+          }
+          description="Traceway runs lean. ClickHouse columnar storage compresses 1 million daily events into ~2-3 GB per month. Postgres is used for efficient user and organization storage."
+        />
+        <div className="mt-8">
+          <CostComparison />
+        </div>
+        <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <Link href="https://cloud.tracewayapp.com/register" className="btn btn-accent">
+            Start on Cloud <ArrowRight className="h-4 w-4" />
+          </Link>
+          <Link href="https://docs.tracewayapp.com" className="btn btn-ghost">
+            Self-host for free
+          </Link>
+        </div>
+      </section>
 
-            {/* Cloud vs Self-Hosted Q&A */}
-            <section className="py-24 bg-white">
-                <div className="container mx-auto px-4 max-w-3xl">
-                    <div className="text-center mb-12">
-                        <h2 className="text-3xl font-bold mb-4 text-zinc-900 tracking-tight">Cloud FAQ</h2>
-                        <p className="text-zinc-600 text-lg">
-                            Common questions about Traceway Cloud, pricing, and support.
-                        </p>
-                    </div>
+      <FinalCTA
+        title={
+          <>
+            Observability <em>without the infra tax</em>
+          </>
+        }
+        description="Run on us, or run it yourself. Same features, no asterisks."
+        primary={{
+          label: "Start Free",
+          href: "https://cloud.tracewayapp.com/register",
+        }}
+        secondary={{
+          label: "Contact Sales",
+          href: "/contact",
+        }}
+      />
 
-                    <Accordion type="single" collapsible className="w-full">
-                        <AccordionItem value="item-support" className="border-b-zinc-200">
-                            <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
-                                What support do Cloud customers get?
-                            </AccordionTrigger>
-                            <AccordionContent className="text-zinc-600 leading-relaxed">
-                                All Cloud customers on a paid plan can open GitHub issues that are triaged with highest priority by our engineering team.
-                                You are not routed to a help desk — you talk directly to the people who build Traceway.
-                                Enterprise+ customers also receive a shared Slack channel with direct access to the Traceway team for real-time collaboration, incident support, and onboarding assistance.
-                                Self-hosted and open-source users are welcome to open GitHub issues and participate in community discussions. We actively monitor and respond to all issues.
-                            </AccordionContent>
-                        </AccordionItem>
-                        <AccordionItem value="item-overages" className="border-b-zinc-200">
-                            <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
-                                Are there overage charges?
-                            </AccordionTrigger>
-                            <AccordionContent className="text-zinc-600 leading-relaxed">
-                                No. Every plan has a fixed monthly price. If you approach your included volume, we will notify you in advance so you can decide whether to upgrade.
-                                Your bill will never increase without your explicit approval. What you see on the pricing table is what you pay — no metered billing, no surprise line items, no usage-based surcharges.
-                            </AccordionContent>
-                        </AccordionItem>
-                        <AccordionItem value="item-cost-at-scale" className="border-b-zinc-200">
-                            <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
-                                How does Traceway Cloud compare on cost at scale?
-                            </AccordionTrigger>
-                            <AccordionContent className="text-zinc-600 leading-relaxed">
-                                At the Enterprise tier, 200 million monthly events cost $499.99 — that is $0.0000025 per event.
-                                Competitors like Datadog and Sentry charge orders of magnitude more at the same volume, often with additional per-host, per-seat, or overage fees on top.
-                                For workloads beyond 200 million events, our Enterprise+ plan offers even cheaper per-event pricing with a dedicated SRE and shared Slack channel.
-                                We price based on your actual infrastructure cost, not on a per-event markup, which means pricing stays reasonable even at billions of events per month.
-                            </AccordionContent>
-                        </AccordionItem>
-                        <AccordionItem value="item-events" className="border-b-zinc-200">
-                            <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
-                                What counts as an event?
-                            </AccordionTrigger>
-                            <AccordionContent className="text-zinc-600 leading-relaxed">
-                                An event is any single issue (exception), HTTP request, or background task run that Traceway ingests.
-                                Session replays, distributed trace spans, and custom metrics are included at no additional cost and do not count toward your event volume.
-                                For example, if your application handles 50,000 HTTP requests and encounters 200 exceptions in a month, that is 50,200 events.
-                            </AccordionContent>
-                        </AccordionItem>
-                        <AccordionItem value="item-fixed-costs" className="border-b-zinc-200">
-                            <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
-                                How does &ldquo;fixed costs&rdquo; work for Cloud vs. Self-Hosted?
-                            </AccordionTrigger>
-                            <AccordionContent className="text-zinc-600 leading-relaxed">
-                                Self-hosted Traceway runs on your own infrastructure with zero licensing cost — your only expense is the server itself, and ClickHouse compression keeps that minimal.
-                                Traceway Cloud has fixed-price tiers: you pick a plan, pay that amount monthly, and there are no overage charges, per-event fees, or surprise line items.
-                                In both cases, the cost is predictable. The difference is whether you manage the infrastructure yourself (self-hosted) or we manage it for you (cloud).
-                            </AccordionContent>
-                        </AccordionItem>
-                        <AccordionItem value="item-1" className="border-b-zinc-200">
-                            <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
-                                Why use Traceway Cloud?
-                            </AccordionTrigger>
-                            <AccordionContent className="text-zinc-600 leading-relaxed">
-                                Traceway Cloud is simply for teams that don't want to self-host. We run the exact same open-source code but manage the infrastructure, updates, and backups for you.
-                                It allows you to focus on shipping features without worrying about maintaining an observability stack.
-                            </AccordionContent>
-                        </AccordionItem>
-                        <AccordionItem value="item-2" className="border-b-zinc-200">
-                            <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
-                                Is the Open Source version limited?
-                            </AccordionTrigger>
-                            <AccordionContent className="text-zinc-600 leading-relaxed">
-                                No. The code is 100% open source and fully featured. We do not gate features behind the cloud version.
-                                The cloud offering exists solely for convenience and for users who prefer a managed service over self-hosting.
-                            </AccordionContent>
-                        </AccordionItem>
-                        <AccordionItem value="item-3" className="border-b-zinc-200">
-                            <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
-                                Can I migrate from Cloud to Self-Hosted later?
-                            </AccordionTrigger>
-                            <AccordionContent className="text-zinc-600 leading-relaxed">
-                                Yes, since the underlying software is the same, we can work with you to export your data and migrate to a self-hosted instance at any time.
-                                You are never locked into our cloud platform.
-                            </AccordionContent>
-                        </AccordionItem>
-                    </Accordion>
-                </div>
-            </section>
-        </main>
-    );
+      {/* FAQ — includes absorbed from home */}
+      <section className="wrap pt-10 pb-24">
+        <div className="max-w-3xl mx-auto">
+          <SectionHead align="center" eyebrow="FAQ" title="Cloud & pricing FAQ" />
+          <div className="mt-4">
+            <FaqList
+              items={[
+                {
+                  q: "How does Traceway compare to Datadog / New Relic?",
+                  a: (
+                    <>
+                      <p>
+                        Datadog and New Relic charge per host, per event, or per
+                        GB ingested, and bills can spike unpredictably as
+                        traffic grows. Traceway Cloud has fixed-price tiers —
+                        at the Enterprise level, 200 million monthly events
+                        cost $499.99 ($0.0000025 per event) with no overage
+                        charges. Self-hosted Traceway has zero licensing cost.
+                      </p>
+                      <p>
+                        Architecturally, Traceway uses ClickHouse columnar
+                        storage that compresses 1 million daily events into
+                        ~2-3 GB per month, keeping infrastructure costs low even
+                        at high volume. Feature-wise, Traceway includes
+                        endpoint performance analytics, exception tracking with
+                        automatic grouping and ranking, session replay,
+                        distributed tracing, metrics, logs, and AI
+                        observability — all in one tool. Datadog and New Relic
+                        split these across separate products, each with its
+                        own billing meter.
+                      </p>
+                    </>
+                  ),
+                },
+                {
+                  q: "Is Traceway really free to self-host?",
+                  a: (
+                    <>
+                      <p>
+                        Yes. Traceway is 100% open source with no feature
+                        gating. Every feature available on Traceway Cloud works
+                        identically when self-hosted. Deploy with{" "}
+                        <code>docker compose up -d</code> and you&apos;re
+                        running.
+                      </p>
+                    </>
+                  ),
+                },
+                {
+                  q: "Will my bill ever increase unexpectedly?",
+                  a: "No. Every Traceway Cloud plan has a fixed monthly price with no overage charges. If you approach your included volume, we notify you in advance so you can decide whether to upgrade. Your bill will never increase without your explicit approval. This applies to every tier, from Starter to Enterprise.",
+                },
+                {
+                  q: "What support do Cloud customers get?",
+                  a: "All Cloud customers on a paid plan can open GitHub issues that are triaged with highest priority by our engineering team. You talk directly to the people who build Traceway — no help desk routing. Enterprise+ customers also receive a shared Slack channel with direct access to the team. Self-hosted users are welcome to open GitHub issues and participate in community discussions — we actively monitor and respond.",
+                },
+                {
+                  q: "Are there overage charges?",
+                  a: "No. Every plan has a fixed monthly price. If you approach your included volume, we notify you in advance so you can decide whether to upgrade. What you see on the pricing table is what you pay — no metered billing, no surprise line items, no usage-based surcharges.",
+                },
+                {
+                  q: "How does Traceway Cloud compare on cost at scale?",
+                  a: "At the Enterprise tier, 200 million monthly events cost $499.99 — that is $0.0000025 per event. Competitors like Datadog and Sentry charge orders of magnitude more at the same volume, often with additional per-host, per-seat, or overage fees on top. Enterprise+ offers even cheaper per-event pricing with a dedicated SRE and shared Slack channel.",
+                },
+                {
+                  q: "What counts as an event?",
+                  a: "An event is any single issue (exception), HTTP request, or background task run that Traceway ingests. Session replays, distributed trace spans, custom metrics, and logs are included at no additional cost and do not count toward your event volume. For example, if your application handles 50,000 HTTP requests and encounters 200 exceptions in a month, that is 50,200 events.",
+                },
+                {
+                  q: "Can I migrate from Cloud to Self-Hosted later?",
+                  a: "Yes. Since the underlying software is the same, we can work with you to export your data and migrate to a self-hosted instance at any time. You are never locked into our cloud platform.",
+                },
+                {
+                  q: "Is the open-source version limited?",
+                  a: "No. The code is 100% open source and fully featured. We do not gate features behind the Cloud version. Cloud exists solely for convenience and for users who prefer a managed service over self-hosting.",
+                },
+                {
+                  q: "Why use Traceway Cloud?",
+                  a: "Cloud is for teams that don't want to self-host. We run the exact same open-source code but manage the infrastructure, updates, and backups for you. Focus on shipping features without maintaining an observability stack.",
+                },
+              ]}
+            />
+          </div>
+        </div>
+      </section>
+    </main>
+  );
 }

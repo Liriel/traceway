@@ -14,19 +14,29 @@ export function DockerCommand() {
   }
 
   return (
-    <div className="relative inline-flex items-center gap-3 rounded-lg bg-zinc-900 text-zinc-100 px-5 py-3 font-mono text-sm shadow-lg">
-      <span className="text-zinc-500 select-none">$</span>
-      <code>{command}</code>
+    <div
+      className="relative inline-flex items-center gap-3 rounded-[10px] px-5 py-3 text-sm"
+      style={{
+        background: "linear-gradient(180deg, #080b12, #0d1220)",
+        border: "1px solid var(--hair-2)",
+        color: "var(--fg-0)",
+        fontFamily: "var(--font-mono)",
+        boxShadow: "0 20px 40px -20px rgba(0, 0, 0, 0.6)",
+      }}
+    >
+      <span style={{ color: "var(--fg-3)" }} className="select-none">
+        $
+      </span>
+      <code style={{ color: "var(--fg-0)", background: "transparent", border: 0, padding: 0 }}>
+        {command}
+      </code>
       <button
         onClick={handleCopy}
-        className="ml-2 text-zinc-400 hover:text-white transition-colors"
+        className="ml-2 transition-colors"
+        style={{ color: copied ? "var(--ok)" : "var(--fg-3)" }}
         aria-label="Copy command"
       >
-        {copied ? (
-          <Check className="h-4 w-4 text-green-400" />
-        ) : (
-          <Copy className="h-4 w-4" />
-        )}
+        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
       </button>
     </div>
   );

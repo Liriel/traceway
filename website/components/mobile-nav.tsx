@@ -1,129 +1,161 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { createPortal } from "react-dom";
-import { Button } from "@/components/ui/button";
-import { Github, Menu, X } from "lucide-react";
+import { Github, Menu, ArrowUpRight } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import { Eyebrow } from "@/components/eyebrow";
+import { cn } from "@/lib/utils";
 
-export function MobileNav() {
-    const [isOpen, setIsOpen] = useState(false);
-    const [mounted, setMounted] = useState(false);
+type NavItem = {
+  title: string;
+  description: string;
+  href: string;
+  icon: LucideIcon;
+};
 
-    useEffect(() => {
-        setMounted(true);
-    }, []);
+export function MobileNav({
+  pillars,
+  specialized,
+}: {
+  pillars: NavItem[];
+  specialized: NavItem[];
+}) {
+  const [open, setOpen] = useState(false);
 
-    useEffect(() => {
-        if (isOpen) {
-            document.body.style.overflow = "hidden";
-        } else {
-            document.body.style.overflow = "auto";
-        }
-        return () => {
-            document.body.style.overflow = "auto";
-        }
-    }, [isOpen]);
+  return (
+    <div className="md:hidden">
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetTrigger asChild>
+          <button
+            className="inline-flex items-center justify-center h-9 w-9 rounded-md text-[color:var(--fg-1)] hover:text-[color:var(--fg-0)] hover:bg-[color:var(--ink-2)] transition-colors"
+            aria-label="Open menu"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        </SheetTrigger>
+        <SheetContent
+          side="right"
+          className="w-full sm:max-w-[360px] border-l-[color:var(--hair)] bg-[color:var(--ink-0)] p-0 flex flex-col"
+        >
+          <SheetTitle className="sr-only">Menu</SheetTitle>
+          <SheetDescription className="sr-only">Traceway product navigation</SheetDescription>
 
-    return (
-        <div className="md:hidden">
-            <Button
-                variant="ghost"
-                size="icon"
-                className="text-zinc-600"
-                onClick={() => setIsOpen(!isOpen)}
+          <div className="px-6 pt-16 pb-6 overflow-y-auto flex-1">
+            <Eyebrow className="block mb-3">Observability pillars</Eyebrow>
+            <div className="flex flex-col">
+              {pillars.map((p) => (
+                <MobileLink key={p.href} item={p} onClick={() => setOpen(false)} />
+              ))}
+            </div>
+
+            <Eyebrow className="block mt-8 mb-3">Specialized</Eyebrow>
+            <div className="flex flex-col">
+              {specialized.map((p) => (
+                <MobileLink key={p.href} item={p} onClick={() => setOpen(false)} />
+              ))}
+            </div>
+
+            <div
+              className="mt-8 pt-6 flex flex-col gap-1"
+              style={{ borderTop: "1px solid var(--hair)" }}
             >
-                {isOpen ? (
-                    <X className="h-6 w-6" />
-                ) : (
-                    <Menu className="h-6 w-6" />
-                )}
-                <span className="sr-only">Toggle menu</span>
-            </Button>
+              <Link
+                href="/cloud"
+                onClick={() => setOpen(false)}
+                className="py-3 text-[16px] font-medium text-[color:var(--fg-0)] hover:text-[color:var(--a2)]"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                Cloud
+              </Link>
+              <Link
+                href="https://docs.tracewayapp.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setOpen(false)}
+                className="py-3 text-[16px] font-medium text-[color:var(--fg-0)] hover:text-[color:var(--a2)]"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                Docs
+              </Link>
+              <Link
+                href="https://github.com/tracewayapp/traceway"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setOpen(false)}
+                className="py-3 text-[16px] font-medium text-[color:var(--fg-0)] hover:text-[color:var(--a2)] inline-flex items-center gap-2"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                GitHub
+                <Github className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
 
-            {isOpen && mounted && createPortal(
-                <div className="md:hidden fixed top-14 left-0 right-0 bottom-0 bg-white z-50 p-4 overflow-y-auto border-t border-zinc-100 animate-in slide-in-from-top-2 fade-in duration-200 flex flex-col">
-                    <div className="flex flex-col gap-6 mt-4">
-                        <div className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Product</div>
-                        <Link
-                            href="/product/issue-tracking"
-                            className="text-lg font-medium text-zinc-600 hover:text-zinc-900 transition-colors pl-2"
-                            onClick={() => setIsOpen(false)}
-                        >
-                            Issue Tracking
-                        </Link>
-                        <Link
-                            href="/product/performance"
-                            className="text-lg font-medium text-zinc-600 hover:text-zinc-900 transition-colors pl-2"
-                            onClick={() => setIsOpen(false)}
-                        >
-                            Performance
-                        </Link>
-                        <Link
-                            href="/product/session-replay"
-                            className="text-lg font-medium text-zinc-600 hover:text-zinc-900 transition-colors pl-2"
-                            onClick={() => setIsOpen(false)}
-                        >
-                            Session Replay
-                        </Link>
-                        <Link
-                            href="/product/distributed-tracing"
-                            className="text-lg font-medium text-zinc-600 hover:text-zinc-900 transition-colors pl-2"
-                            onClick={() => setIsOpen(false)}
-                        >
-                            Distributed Tracing
-                        </Link>
-                        <Link
-                            href="/product/ai-tracing"
-                            className="text-lg font-medium text-zinc-600 hover:text-zinc-900 transition-colors pl-2"
-                            onClick={() => setIsOpen(false)}
-                        >
-                            AI Tracing
-                        </Link>
-                        <Link
-                            href="/product/logs"
-                            className="text-lg font-medium text-zinc-600 hover:text-zinc-900 transition-colors pl-2"
-                            onClick={() => setIsOpen(false)}
-                        >
-                            Logs
-                        </Link>
-                        <div className="border-t border-zinc-100"></div>
-                        <Link
-                            href="/cloud"
-                            className="text-lg font-medium text-zinc-600 hover:text-zinc-900 transition-colors"
-                            onClick={() => setIsOpen(false)}
-                        >
-                            Cloud
-                        </Link>
-                        <Link
-                            href="https://docs.tracewayapp.com"
-                            className="text-lg font-medium text-zinc-600 hover:text-zinc-900 transition-colors"
-                            onClick={() => setIsOpen(false)}
-                        >
-                            Docs
-                        </Link>
-                        <Link
-                            href="https://github.com/tracewayapp/traceway"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-lg font-medium text-zinc-600 hover:text-zinc-900 transition-colors flex items-center gap-2"
-                            onClick={() => setIsOpen(false)}
-                        >
-                            GitHub <Github className="h-4 w-4" />
-                        </Link>
-                    </div>
-                    <div className="flex-1"></div>
-                    <div className="mt-8 flex flex-col gap-4">
-                        <Link href="http://cloud.tracewayapp.com/register" onClick={() => setIsOpen(false)} className="inline-flex items-center justify-center gap-2 rounded-md font-medium transition-all cursor-pointer w-full bg-[#4ba3f7] text-white hover:bg-[#3b93e7] h-12 text-lg">
-                                Try for free
-                        </Link>
-                        <Link href="http://cloud.tracewayapp.com/login" onClick={() => setIsOpen(false)} className="inline-flex items-center justify-center gap-2 rounded-md font-medium transition-all cursor-pointer w-full h-12 text-lg border border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100">
-                                Sign in
-                        </Link>
-                    </div>
-                </div>,
-                document.body
-            )}
+          <div
+            className="p-6 flex flex-col gap-3"
+            style={{ borderTop: "1px solid var(--hair)" }}
+          >
+            <Link
+              href="https://cloud.tracewayapp.com/register"
+              onClick={() => setOpen(false)}
+              className="btn btn-accent w-full justify-center"
+            >
+              Try for free
+              <ArrowUpRight className="h-4 w-4" />
+            </Link>
+            <Link
+              href="https://cloud.tracewayapp.com/login"
+              onClick={() => setOpen(false)}
+              className="btn btn-ghost w-full justify-center"
+            >
+              Sign in
+            </Link>
+          </div>
+        </SheetContent>
+      </Sheet>
+    </div>
+  );
+}
+
+function MobileLink({ item, onClick }: { item: NavItem; onClick?: () => void }) {
+  const Icon = item.icon;
+  return (
+    <Link
+      href={item.href}
+      onClick={onClick}
+      className={cn(
+        "grid grid-cols-[32px_1fr] gap-3 items-start py-3 -mx-2 px-2 rounded-md transition-colors hover:bg-[color:var(--ink-2)]"
+      )}
+    >
+      <div
+        className="h-8 w-8 rounded-md grid place-items-center"
+        style={{
+          background: "rgba(255,255,255,0.04)",
+          border: "1px solid var(--hair)",
+          color: "var(--a2)",
+        }}
+      >
+        <Icon className="h-4 w-4" />
+      </div>
+      <div>
+        <div
+          className="text-[15px] font-medium leading-tight"
+          style={{ fontFamily: "var(--font-display)", color: "var(--fg-0)" }}
+        >
+          {item.title}
         </div>
-    );
+        <div className="text-[12px] mt-0.5 leading-snug" style={{ color: "var(--fg-3)" }}>
+          {item.description}
+        </div>
+      </div>
+    </Link>
+  );
 }

@@ -1,701 +1,416 @@
-import Image from "next/image";
 import Link from "next/link";
-
+import Image from "next/image";
 import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import {
-  Github,
   ArrowRight,
-  Bug,
   Video,
-  Activity,
-  Lock,
-  Terminal,
-  GitCompare,
+  ScrollText,
+  Network,
+  BarChart3,
   Workflow,
+  Bug,
+  XCircle,
+  CheckCircle2,
 } from "lucide-react";
-import { ImpactScoreVisual } from "@/components/impact-score-visual";
-import { CostComparison } from "@/components/cost-comparison";
-import { DockerCommand } from "@/components/docker-command";
-import { DistributedTraceVisual } from "@/components/distributed-trace-visual";
-import { HomeTabs } from "@/components/home-tabs";
-import { FrameworkMarquee } from "@/components/framework-marquee";
+
+import { Eyebrow } from "@/components/eyebrow";
+import { Chip } from "@/components/chip";
+import { PillarCard } from "@/components/pillar-card";
+import { FinalCTA } from "@/components/final-cta";
+import { Terminal } from "@/components/terminal";
+import { StatsStrip } from "@/components/stats-strip";
+import { TwoTrack } from "@/components/two-track";
+import { HeroEmailCTA } from "@/components/hero-email-cta";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-white text-zinc-950 font-sans selection:bg-zinc-100 selection:text-zinc-900">
-      {/* Section 1: Hero */}
-      <section className="relative pt-16 pb-20 overflow-hidden">
-        <div className="absolute inset-0 -z-10 h-full w-full bg-white bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] [mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_70%,transparent_100%)]"></div>
+    <main className="relative">
+      {/* HERO — dash0-style centered block: chip, title, subtitle, email form, book-a-demo helper */}
+      <section className="hero gridbg">
+        <div className="wrap">
+          <div className="text-center max-w-3xl mx-auto flex flex-col items-center">
+            <Chip variant="ok">OpenTelemetry-native</Chip>
+            <h1 className="mt-6">
+              Observability that <em>closes the loop.</em>
+            </h1>
 
-        <div className="container mx-auto px-4 relative z-10 text-center">
-          <Link href="https://github.com/tracewayapp/traceway" target="_blank">
-            <span className="inline-flex items-center mb-4 bg-green-50 text-green-700 hover:bg-green-100 px-2.5 py-0.5 border border-green-200 text-xs font-medium rounded-full cursor-pointer transition-colors">
-              100% Open Source
-            </span>
-          </Link>
-          <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6 text-zinc-900">
-            The full picture behind every error
-          </h1>
-          <p className="text-zinc-600 text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed font-medium">
-            Traceway attaches session replays, distributed traces, and resolved
-            stack traces to every error automatically. Open an issue and
-            immediately understand what went wrong, across frontend and
-            backend.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link href="https://docs.tracewayapp.com" className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-all cursor-pointer h-10 px-6 bg-zinc-900 text-white hover:bg-zinc-800 shadow-lg shadow-zinc-900/20">
-                Get Started <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-            <Link href="https://github.com/tracewayapp/traceway" target="_blank" className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-all cursor-pointer h-10 px-6 border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-900 shadow-sm">
-                <Github className="mr-2 h-4 w-4" /> View on GitHub
-            </Link>
+            <div className="mt-10 w-full">
+              <HeroEmailCTA />
+            </div>
           </div>
-          <div className="mt-4">
-            <Link
-              href="https://cloud.tracewayapp.com/login?email=demo@tracewayapp.com&password=demoaccount!"
-              className="text-sm text-zinc-500 hover:text-zinc-700 transition-colors"
+        </div>
+      </section>
+
+      {/* PRODUCT SHOWCASE — 6 pillars in the branded "Traceway" box */}
+      <section className="pb-24">
+        <div className="wrap max-w-5xl mx-auto">
+          <div id="dashboard-mount" className="pillar-wrap">
+            <div className="pillar-wrap-head">
+              <span className="pillar-wrap-brand">
+                <Image
+                  src="/images/logo.png"
+                  alt="Traceway"
+                  width={120}
+                  height={24}
+                  priority
+                />
+              </span>
+              <span className="pillar-wrap-tag">
+                <span className="dot" aria-hidden />
+                observability · live
+              </span>
+            </div>
+            <div className="pillar-wrap-body">
+              <div className="pillars-all">
+                <PillarCard
+                  icon={ScrollText}
+                  title="Logs"
+                  description="Structured, trace-linked, sub-second search."
+                  href="/product/logs"
+                  color="a2"
+                />
+                <PillarCard
+                  icon={Network}
+                  title="Traces"
+                  description="End-to-end span waterfalls across every service."
+                  href="/product/traces"
+                  color="a1"
+                />
+                <PillarCard
+                  icon={BarChart3}
+                  title="Metrics"
+                  description="Host, runtime, custom — any dimension, any chart."
+                  href="/product/metrics"
+                  color="ok"
+                />
+                <PillarCard
+                  icon={Video}
+                  title="Session replay"
+                  description="Web DOM capture + exception attach."
+                  href="/product/session-replay"
+                  color="a2"
+                />
+                <PillarCard
+                  icon={Bug}
+                  title="Stack traces"
+                  description="Grouped, ranked, Impact Score."
+                  href="/product/stack-traces"
+                  color="a3"
+                />
+                <PillarCard
+                  icon={Workflow}
+                  title="AI tracing"
+                  description="LLM cost, tokens, conversations."
+                  href="/product/ai-tracing"
+                  color="a4"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SMB POSITIONING — 3-way comparison: Enterprise SaaS / DIY OSS / Traceway */}
+      <section className="two-track" id="otel">
+        <div className="wrap">
+          <div className="two-track-head">
+            <Eyebrow>For teams without an SRE</Eyebrow>
+            <h2>
+              Everything you&apos;d build or buy.{" "}
+              <em>Stitched by one trace ID.</em>
+            </h2>
+            <p className="muted mt-4 max-w-[700px]">
+              Most teams either pay enterprise tools, or spend months wiring up
+              their own. Traceway gives you both — logs, traces, metrics,
+              session replay, stack traces, and AI — in one connected system,
+              not six.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* Column 1 — Enterprise SaaS route */}
+            <div
+              className="rounded-[12px] p-7 relative overflow-hidden"
+              style={{
+                background:
+                  "linear-gradient(180deg, color-mix(in oklab, var(--ink-2) 70%, transparent), color-mix(in oklab, var(--ink-1) 50%, transparent))",
+                border: "1px solid var(--hair)",
+              }}
             >
-              or try the live demo <ArrowRight className="inline h-3 w-3" />
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Section 2: Framework Logos */}
-      <section className="pt-0 pb-10 bg-white border-b border-zinc-100">
-        <div className="mx-auto max-w-4xl">
-          <p className="text-center text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-6">
-            Works with YOUR stack
-          </p>
-          <FrameworkMarquee />
-        </div>
-      </section>
-
-      {/* Section 3: Impact Score */}
-      <section className="py-20 bg-zinc-50/50 border-b border-zinc-100">
-        <div className="container mx-auto px-4 max-w-5xl">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-zinc-900 tracking-tight">
-              One score. Five signals. Zero guesswork.
-            </h2>
-            <p className="text-zinc-600 text-lg max-w-2xl mx-auto">
-              The Impact Score combines five service-level indicators into one
-              automatic priority for every endpoint. It takes the max across all
-              five - if any single signal is bad, the endpoint surfaces
-              immediately.
-            </p>
-          </div>
-          <div className="max-w-4xl mx-auto overflow-x-auto">
-            <ImpactScoreVisual />
-          </div>
-        </div>
-      </section>
-
-      {/* OpenTelemetry Support */}
-      <section className="py-16 bg-white border-b border-zinc-100">
-        <div className="container mx-auto px-4 max-w-3xl text-center">
-          <Image
-            src="/images/frameworks/otel.png"
-            alt="OpenTelemetry"
-            width={48}
-            height={48}
-            className="mx-auto mb-6 h-12 w-auto"
-          />
-          <h2 className="text-3xl md:text-4xl font-bold mb-4 text-zinc-900 tracking-tight">
-            Send from any OpenTelemetry source
-          </h2>
-          <p className="text-zinc-600 text-lg max-w-xl mx-auto">
-            Already instrumented with OTel? Point your OTLP exporter at
-            Traceway. No proprietary SDK lock-in.
-          </p>
-        </div>
-      </section>
-
-      {/* Distributed Tracing Example */}
-      <section className="py-20 bg-zinc-50/50 border-b border-zinc-100">
-        <div className="container mx-auto px-4 max-w-5xl">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-zinc-900 tracking-tight">
-              Trace requests across every service
-            </h2>
-            <p className="text-zinc-600 text-lg max-w-2xl mx-auto">
-              Follow a single user action from the browser through your API
-              gateway, backend services, and database calls. See the full
-              picture in one distributed trace.
-            </p>
-          </div>
-          <div className="max-w-4xl mx-auto">
-            <DistributedTraceVisual />
-          </div>
-        </div>
-      </section>
-
-      {/* Section 4: Feature Showcase */}
-      <section className="py-24 bg-white border-b border-zinc-100">
-        <div className="container mx-auto px-4 max-w-5xl space-y-32">
-          {/* 4a: Exception Tracking */}
-          <div className="flex flex-col md:flex-row items-center gap-12 lg:gap-20">
-            <div className="flex-1 space-y-6">
-              <div className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center">
-                <Bug className="w-6 h-6 text-red-600" />
-              </div>
-              <h3 className="text-2xl md:text-3xl font-bold text-zinc-900 tracking-tight">
-                Every exception, grouped and ranked
-              </h3>
-              <p className="text-zinc-600 text-lg leading-relaxed">
-                Full stack traces, 10-step normalization, SHA-256 grouping.
-                Thousands of duplicates collapse into one ranked issue so you
-                fix what matters first.
-              </p>
-              <ul className="space-y-3 pt-2">
-                <li className="flex items-center gap-3 text-zinc-700">
-                  <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
-                  Full stack trace capture
-                </li>
-                <li className="flex items-center gap-3 text-zinc-700">
-                  <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
-                  Intelligent error grouping
-                </li>
-                <li className="flex items-center gap-3 text-zinc-700">
-                  <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
-                  User impact analysis
-                </li>
-              </ul>
-            </div>
-            <div className="flex-1 w-full relative">
-              <div className="absolute inset-0 bg-gradient-to-tr from-red-100/50 to-transparent rounded-3xl transform rotate-3 scale-105 -z-10"></div>
-              <div className="relative rounded-xl overflow-hidden border border-zinc-200 bg-white">
-                <Image
-                  src="/images/screenshot-2.png"
-                  alt="Exception Tracking Interface"
-                  width={800}
-                  height={600}
-                  className="w-full h-auto"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* 4b: Session Replay */}
-          <div className="flex flex-col md:flex-row-reverse items-center gap-12 lg:gap-20">
-            <div className="flex-1 space-y-6">
-              <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center">
-                <Video className="w-6 h-6 text-purple-600" />
-              </div>
-              <h3 className="text-2xl md:text-3xl font-bold text-zinc-900 tracking-tight">
-                See exactly what the user did
-              </h3>
-              <p className="text-zinc-600 text-lg leading-relaxed">
-                Traceway captures ~10 seconds of user activity before every
-                error. Clicks, scrolls, and form interactions are attached to
-                exceptions automatically - no manual reproduction needed.
-              </p>
-              <ul className="space-y-3 pt-2">
-                <li className="flex items-center gap-3 text-zinc-700">
-                  <div className="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
-                  Pre-error activity capture
-                </li>
-                <li className="flex items-center gap-3 text-zinc-700">
-                  <div className="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
-                  Automatic attachment to exceptions
-                </li>
-                <li className="flex items-center gap-3 text-zinc-700">
-                  <div className="w-1.5 h-1.5 rounded-full bg-purple-500"></div>
-                  Clicks, scrolls, and form interactions
-                </li>
-              </ul>
-            </div>
-            <div className="flex-1 w-full relative">
-              <div className="absolute inset-0 bg-gradient-to-tl from-purple-100/50 to-transparent rounded-3xl transform -rotate-3 scale-105 -z-10"></div>
-              <div className="relative rounded-xl overflow-hidden border border-zinc-200 bg-white">
-                <Image
-                  src="/images/session-replay.png"
-                  alt="Session Replay Interface"
-                  width={800}
-                  height={600}
-                  className="w-full h-auto"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* 4c: Endpoint Introspection */}
-          <div className="flex flex-col md:flex-row items-center gap-12 lg:gap-20">
-            <div className="flex-1 space-y-6">
-              <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center">
-                <Activity className="w-6 h-6 text-blue-600" />
-              </div>
-              <h3 className="text-2xl md:text-3xl font-bold text-zinc-900 tracking-tight">
-                Drill into any request
-              </h3>
-              <p className="text-zinc-600 text-lg leading-relaxed">
-                Request/response details, waterfall traces, and custom context
-                tags. Understand the exact state of your application for every
-                single trace.
-              </p>
-              <ul className="space-y-3 pt-2">
-                <li className="flex items-center gap-3 text-zinc-700">
-                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
-                  Detailed request/response data
-                </li>
-                <li className="flex items-center gap-3 text-zinc-700">
-                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
-                  Waterfall trace view
-                </li>
-                <li className="flex items-center gap-3 text-zinc-700">
-                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
-                  Custom context & tagging
-                </li>
-              </ul>
-            </div>
-            <div className="flex-1 w-full relative">
-              <div className="absolute inset-0 bg-gradient-to-tr from-blue-100/50 to-transparent rounded-3xl transform rotate-3 scale-105 -z-10"></div>
-              <div className="relative rounded-xl overflow-hidden border border-zinc-200 bg-white">
-                <Image
-                  src="/images/screenshot-1.png"
-                  alt="Endpoint Introspection"
-                  width={800}
-                  height={600}
-                  className="w-full h-auto"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Section 6: Use Case Tabs */}
-      <section className="py-20 bg-zinc-50/50 border-b border-zinc-100">
-        <div className="container mx-auto px-4 max-w-5xl">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-zinc-900 tracking-tight">
-              Built for every layer of your stack
-            </h2>
-            <p className="text-zinc-600 text-lg max-w-2xl mx-auto">
-              Whether you&apos;re debugging a slow API, a frontend crash, or a
-              failing microservice call, Traceway gives you the right view.
-            </p>
-          </div>
-          <HomeTabs />
-        </div>
-      </section>
-
-      {/* Section: AI Tracing */}
-      <section className="py-20 bg-white border-b border-zinc-100">
-        <div className="container mx-auto px-4 max-w-5xl">
-          <div className="flex flex-col md:flex-row items-center gap-12 lg:gap-20">
-            <div className="flex-1 space-y-6">
-              <div className="w-12 h-12 bg-violet-50 rounded-2xl flex items-center justify-center">
-                <Workflow className="w-6 h-6 text-violet-600" />
-              </div>
-              <h3 className="text-2xl md:text-3xl font-bold text-zinc-900 tracking-tight">
-                AI Tracing for Agent observability
-              </h3>
-              <p className="text-zinc-600 text-lg leading-relaxed">
-                Monitor every AI call with full cost, token usage, latency, and conversation tracking.
-                Works with OpenRouter, OpenAI, Anthropic, and any OpenTelemetry-compatible provider — zero code changes needed.
-              </p>
-              <ul className="space-y-3 pt-2">
-                <li className="flex items-center gap-3 text-zinc-700">
-                  <div className="w-1.5 h-1.5 rounded-full bg-violet-500"></div>
-                  Per-call cost and token tracking
-                </li>
-                <li className="flex items-center gap-3 text-zinc-700">
-                  <div className="w-1.5 h-1.5 rounded-full bg-violet-500"></div>
-                  Conversation replay with chat view
-                </li>
-                <li className="flex items-center gap-3 text-zinc-700">
-                  <div className="w-1.5 h-1.5 rounded-full bg-violet-500"></div>
-                  P50/P95 latency per agent and model
-                </li>
-              </ul>
-              <Link
-                href="/product/ai-tracing"
-                className="inline-flex items-center text-sm font-medium text-violet-600 hover:text-violet-800 transition-colors"
+              <Eyebrow>The enterprise route</Eyebrow>
+              <h3
+                className="mt-3"
+                style={{
+                  color: "var(--fg-1)",
+                  fontSize: 19,
+                  letterSpacing: "-0.015em",
+                }}
               >
-                Learn more about AI Tracing <ArrowRight className="ml-1 h-4 w-4" />
+                Pay Datadog + Sentry + PagerDuty.
+              </h3>
+              <ul className="mt-5 space-y-3">
+                {[
+                  "Hire a senior SRE (~$200k+/year)",
+                  "Datadog + Sentry + PagerDuty — 3 bills, 3 auth systems",
+                  "Metered per event, per host, per seat — surprise overages",
+                  "Proprietary SDKs per language, per vendor",
+                ].map((item) => (
+                  <li
+                    key={item}
+                    className="flex items-start gap-3 text-[14px]"
+                    style={{ color: "var(--fg-2)", lineHeight: 1.5 }}
+                  >
+                    <XCircle
+                      className="mt-0.5 flex-shrink-0"
+                      style={{ color: "var(--crit)" }}
+                      size={18}
+                    />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Column 2 — DIY open-source route */}
+            <div
+              className="rounded-[12px] p-7 relative overflow-hidden"
+              style={{
+                background:
+                  "linear-gradient(180deg, color-mix(in oklab, var(--ink-2) 70%, transparent), color-mix(in oklab, var(--ink-1) 50%, transparent))",
+                border: "1px solid var(--hair)",
+              }}
+            >
+              <Eyebrow>The DIY route</Eyebrow>
+              <h3
+                className="mt-3"
+                style={{
+                  color: "var(--fg-1)",
+                  fontSize: 19,
+                  letterSpacing: "-0.015em",
+                }}
+              >
+                Glue 6 open-source tools together.
+              </h3>
+              <ul className="mt-5 space-y-3">
+                {[
+                  "Prometheus + Grafana + Loki + Tempo + Alertmanager",
+                  "OTel Collector on top + errbit or self-hosted Sentry",
+                  "Cardinality, retention, upgrades — weekly ops work",
+                  "Session replay + source maps? Good luck wiring it.",
+                ].map((item) => (
+                  <li
+                    key={item}
+                    className="flex items-start gap-3 text-[14px]"
+                    style={{ color: "var(--fg-2)", lineHeight: 1.5 }}
+                  >
+                    <XCircle
+                      className="mt-0.5 flex-shrink-0"
+                      style={{ color: "var(--crit)" }}
+                      size={18}
+                    />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Column 3 — With Traceway (highlighted) */}
+            <div
+              className="rounded-[12px] p-7 relative overflow-hidden"
+              style={{
+                background:
+                  "radial-gradient(500px 280px at 90% 0%, color-mix(in oklab, var(--ok) 14%, transparent), transparent 60%), linear-gradient(180deg, var(--ink-3), var(--ink-2))",
+                border: "1px solid color-mix(in oklab, var(--ok) 30%, var(--hair-2))",
+                boxShadow:
+                  "0 20px 40px -20px color-mix(in oklab, var(--ok) 30%, transparent)",
+              }}
+            >
+              <Eyebrow>With Traceway</Eyebrow>
+              <h3
+                className="mt-3"
+                style={{
+                  color: "var(--fg-0)",
+                  fontSize: 19,
+                  letterSpacing: "-0.015em",
+                }}
+              >
+                One system. One trace ID. Every surface stitched.
+              </h3>
+              <ul className="mt-5 space-y-3">
+                {[
+                  "Logs + traces + metrics + replay + stacks + AI — bundled",
+                  "MIT-licensed — no BSL, no open-core asterisks",
+                  <>
+                    <code>docker compose up -d</code> — 90-second install
+                  </>,
+                  "Click a log, see its span, see the replay, see the exception",
+                ].map((item, i) => (
+                  <li
+                    key={i}
+                    className="flex items-start gap-3 text-[14px]"
+                    style={{ color: "var(--fg-1)", lineHeight: 1.5 }}
+                  >
+                    <CheckCircle2
+                      className="mt-0.5 flex-shrink-0"
+                      style={{ color: "var(--ok)" }}
+                      size={18}
+                    />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* COST — brief, left-aligned */}
+      <section className="py-24" id="cost">
+        <div className="wrap">
+          <div className="max-w-3xl">
+            <Eyebrow>Pricing that doesn&apos;t lie to you</Eyebrow>
+            <h2 className="mt-4">
+              A fraction of the cost. <em>None of the asterisks.</em>
+            </h2>
+            <p className="muted mt-4 max-w-[640px]">
+              Traceway runs on ClickHouse columnar storage — 1M daily events
+              compresses to ~2GB/month. Fixed monthly tiers, no per-event
+              gouging, no overage invoices at 2am.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link href="/cloud" className="btn btn-accent">
+                See pricing
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link href="https://docs.tracewayapp.com" className="btn btn-ghost">
+                Self-host for free
               </Link>
             </div>
-            <div className="flex-1 w-full relative">
-              <div className="absolute inset-0 bg-gradient-to-tl from-violet-100/50 to-transparent rounded-3xl transform -rotate-3 scale-105 -z-10"></div>
-              <div className="relative rounded-xl overflow-hidden border border-zinc-200 bg-white">
-                <Image
-                  src="/images/ai-traces-detail.png"
-                  alt="AI Tracing Dashboard"
-                  width={800}
-                  height={600}
-                  className="w-full h-auto"
-                />
-              </div>
-            </div>
           </div>
         </div>
       </section>
 
-      {/* Section 7: Open Source & Self-Hosting */}
-      <section className="py-20 bg-zinc-50/50 border-b border-zinc-100">
-        <div className="container mx-auto px-4 max-w-5xl">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-zinc-900 tracking-tight">
-              100% open source. No asterisks.
+      {/* DEPLOY — stats strip + terminal */}
+      <section className="py-24">
+        <div className="wrap grid gap-14 md:grid-cols-[1fr_1.1fr] items-center">
+          <div>
+            <Eyebrow>Your data. Your metal.</Eyebrow>
+            <h2 className="mt-4">
+              Self-host in <em>90 seconds flat.</em>
             </h2>
-            <p className="text-zinc-600 text-lg max-w-2xl mx-auto">
-              Not BSL. Not source-available. Not &ldquo;open core.&rdquo; Every
-              feature works identically self-hosted or on cloud. Deploy with a
-              single Docker command.
+            <p className="muted mt-4 max-w-[460px]">
+              MIT licensed. No BSL. No &ldquo;open core.&rdquo; Every feature
+              Traceway Cloud has, your cluster has. Point an OTLP exporter at
+              it and you&apos;re in business.
+            </p>
+            <StatsStrip
+              stats={[
+                { num: "<em>0s</em>", label: "Config required" },
+                { num: "100%", label: "Feature parity" },
+                { num: "MIT", label: "License" },
+                { num: "<em>22×</em>", label: "Vs. Datadog" },
+              ]}
+            />
+          </div>
+          <Terminal
+            title="bash · traceway.sh · 80×24"
+            lines={[
+              {
+                ln: "1",
+                type: "tx",
+                content: (
+                  <>
+                    <span className="cmd">$</span> git clone github.com/tracewayapp/traceway
+                  </>
+                ),
+              },
+              {
+                ln: "2",
+                type: "tx",
+                content: (
+                  <>
+                    <span className="cmd">$</span> cd traceway &amp;&amp; docker compose up -d
+                  </>
+                ),
+              },
+              { ln: "3", type: "mute", content: "# pulling images…" },
+              { ln: "4", type: "mute", content: "# starting clickhouse · postgres · collector" },
+              { ln: "5", type: "ok", content: "# ✓ dashboard at http://localhost:3000" },
+              {
+                ln: "6",
+                type: "tx",
+                content: (
+                  <>
+                    <span className="cmd">$</span>
+                  </>
+                ),
+              },
+            ]}
+            showCursor
+          />
+        </div>
+      </section>
+
+      {/* DETECT → RESOLVE */}
+      <section className="py-24">
+        <div className="wrap">
+          <div className="two-track-head">
+            <Eyebrow>Why it matters</Eyebrow>
+            <h2 className="mt-3">
+              Customers don&apos;t complain — they quit.{" "}
+              <em>We stop the bleeding.</em>
+            </h2>
+            <p className="muted mt-4 max-w-[640px]">
+              Your users won&apos;t open a ticket when something breaks —
+              they&apos;ll close the tab. Traceway catches the error, the
+              session replay, and the exact failing span before they bounce.
             </p>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="bg-white border-zinc-200 transition-all duration-300">
-              <CardHeader className="p-6 pt-0">
-                <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center mb-3">
-                  <Lock className="w-5 h-5 text-green-600" />
-                </div>
-                <CardTitle className="text-lg">Truly Open Source</CardTitle>
-                <CardDescription className="text-zinc-500 text-sm mt-1.5">
-                  Unlike Sentry&apos;s BSL license, Traceway is fully open
-                  source. Fork it, modify it, run it however you want.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="bg-white border-zinc-200 transition-all duration-300">
-              <CardHeader className="p-6 pt-0">
-                <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center mb-3">
-                  <Terminal className="w-5 h-5 text-blue-600" />
-                </div>
-                <CardTitle className="text-lg">One-Command Deploy</CardTitle>
-                <CardDescription className="text-zinc-500 text-sm mt-1.5">
-                  Get up and running with a single command. No complex
-                  configuration or infrastructure setup required.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="bg-white border-zinc-200 transition-all duration-300">
-              <CardHeader className="p-6 pt-0">
-                <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center mb-3">
-                  <GitCompare className="w-5 h-5 text-orange-600" />
-                </div>
-                <CardTitle className="text-lg">Same Code Everywhere</CardTitle>
-                <CardDescription className="text-zinc-500 text-sm mt-1.5">
-                  No feature gating between self-hosted and cloud. The exact
-                  same codebase powers both.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          </div>
-
-          <div className="flex justify-center mt-10">
-            <DockerCommand />
-          </div>
+          <TwoTrack
+            detect={{
+              badge: "01 · Detect",
+              title: "Surface what actually matters.",
+              description:
+                "Impact Score ranks every endpoint by five SLIs and bubbles the worst up first. Alerts route to Slack, GitHub, or webhook by threshold — no false-positive fatigue.",
+              items: [
+                "Impact Score across 5 service-level signals",
+                "Per-endpoint slow threshold override",
+                "Slack, GitHub, webhook, email routing",
+                "Regression detection on new releases",
+              ],
+            }}
+            resolve={{
+              badge: "02 · Resolve",
+              title: "Walk the full trace. Fix. Ship.",
+              description:
+                "Click an exception, see the frontend replay, the cross-service trace, the exact span that threw, and the source-mapped stack. Context-switching is the bug.",
+              items: [
+                "Frontend replay linked to backend errors",
+                "Cross-service distributed trace waterfalls",
+                "Source-mapped stack traces (webpack, esbuild, Vite)",
+                "SHA-256 grouped duplicates into one ranked issue",
+              ],
+            }}
+          />
         </div>
       </section>
 
-      {/* Section 9: Demo CTA */}
-      <section className="py-8 bg-white border-b border-zinc-100">
-        <div className="container mx-auto px-4 max-w-3xl text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4 text-zinc-900 tracking-tight">
-            See it in action
-          </h2>
-          <p className="text-zinc-600 text-lg mb-4">
-            Explore a live demo with sample data, no signup required.
-          </p>
-          <Link href="https://cloud.tracewayapp.com/login?email=demo@tracewayapp.com&password=demoaccount!" className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-all cursor-pointer h-10 px-4 bg-zinc-900 text-white hover:bg-zinc-800 shadow-lg shadow-zinc-900/20">
-              Try Live Demo <ArrowRight className="ml-2 h-4 w-4" />
-          </Link>
-        </div>
-      </section>
-
-      {/* Section 10: Pricing & Cost Advantage */}
-      <section className="py-20 bg-zinc-50/50 border-b border-zinc-100">
-        <div className="container mx-auto px-4 max-w-5xl">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-zinc-900 tracking-tight">
-              Designed for efficiency. Built to lower your cloud bill.
-            </h2>
-            <p className="text-zinc-600 text-lg max-w-2xl mx-auto">
-              Traceway runs lean. ClickHouse columnar storage compresses 1
-              million daily events into ~2-3 GB per month. Postgres is used for
-              efficient user and organization storage.
-            </p>
-          </div>
-          <CostComparison />
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-10">
-            <Link href="/cloud" className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-all cursor-pointer h-10 px-6 bg-[#4ba3f7] text-white hover:bg-[#3b93e7] shadow-lg shadow-blue-900/10">
-                See Cloud pricing <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-            <Link href="https://docs.tracewayapp.com" className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-all cursor-pointer h-10 px-6 border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-900 shadow-sm">
-                Self-host for free <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Section 11: FAQ */}
-      <section className="py-24 bg-zinc-50 border-t border-zinc-100">
-        <div className="container mx-auto px-4 max-w-3xl">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold mb-4 text-zinc-900 tracking-tight">
-              Frequently Asked Questions
-            </h2>
-            <p className="text-zinc-600 text-lg">
-              Everything you need to know about Traceway.
-            </p>
-          </div>
-
-          <Accordion type="single" collapsible className="w-full">
-            <AccordionItem value="item-1" className="border-b-zinc-200">
-              <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
-                What is the Impact Score?
-              </AccordionTrigger>
-              <AccordionContent className="text-zinc-600 leading-relaxed">
-                The Impact Score is Traceway&apos;s automatic prioritization
-                system. It combines five service-level indicators — inverted
-                apdex variant (response time vs. a threshold), error rate floor,
-                P99 latency floor, client error floor, and volume error floor —
-                into a single 0-100 score for every endpoint. It takes the max
-                across all five, so if any single signal is degraded, that
-                endpoint surfaces immediately. You can adjust the slow endpoint
-                threshold per endpoint to tune the apdex calculation for routes
-                with different latency profiles. For incident management, you can
-                configure notification rules that fire when the Impact Score or
-                error rate crosses a threshold, and route alerts to Slack, GitHub
-                Issues, email, or custom webhooks — so it plugs directly into
-                your existing on-call workflow.
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-2" className="border-b-zinc-200">
-              <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
-                How does Traceway compare to Sentry?
-              </AccordionTrigger>
-              <AccordionContent className="text-zinc-600 leading-relaxed">
-                Sentry groups errors and lets you triage them manually. Traceway
-                does that too, but adds an automatic Impact Score that ranks every
-                endpoint by five service-level signals — you open the dashboard and
-                immediately know what to fix first, without configuring alert rules
-                or manually assigning severity. Sentry uses a BSL license that
-                restricts how you can run and modify the code. Traceway is 100%
-                open source under a permissive license — fork it, modify it, run it
-                however you want. On the feature side, Traceway combines exception
-                tracking, endpoint performance (P50/P95/P99), session replay, and
-                distributed tracing in a single tool. Sentry offers some of these
-                as separate add-ons. On pricing, Sentry charges per event with
-                overage fees. Traceway Cloud plans have a fixed monthly price with
-                no overages — and self-hosting is completely free with no feature
-                gating.
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-3" className="border-b-zinc-200">
-              <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
-                How does Traceway compare to Datadog/New Relic?
-              </AccordionTrigger>
-              <AccordionContent className="text-zinc-600 leading-relaxed">
-                Datadog and New Relic charge per host, per event, or per GB
-                ingested, and bills can spike unpredictably as traffic grows.
-                Traceway Cloud has fixed-price tiers — at the Enterprise level,
-                200 million monthly events cost $499.99 ($0.0000025 per event)
-                with no overage charges. Self-hosted Traceway has zero licensing
-                cost. Architecturally, Traceway uses ClickHouse columnar storage
-                that compresses 1 million daily events into ~2-3 GB per month,
-                keeping infrastructure costs low even at high volume. Feature-wise,
-                Traceway includes endpoint performance analytics (P50/P95/P99),
-                exception tracking with automatic grouping and ranking, session
-                replay, distributed tracing, and AI observability — all in one
-                tool. Datadog and New Relic split these across separate products,
-                each with its own billing meter.
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-4" className="border-b-zinc-200">
-              <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
-                Is Traceway really free to self-host?
-              </AccordionTrigger>
-              <AccordionContent className="text-zinc-600 leading-relaxed">
-                Yes. Traceway is 100% open source with no feature gating. Every
-                feature available on Traceway Cloud works identically when
-                self-hosted. Deploy with{" "}
-                <code className="bg-zinc-100 px-1 py-0.5 rounded text-sm">
-                  docker compose up -d
-                </code>{" "}
-                and you&apos;re running.
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-5" className="border-b-zinc-200">
-              <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
-                How does error grouping work?
-              </AccordionTrigger>
-              <AccordionContent className="text-zinc-600 leading-relaxed">
-                Traceway applies a 10-step normalization pipeline to every stack
-                trace: extracting the error type, removing absolute file paths,
-                replacing hex addresses, UUIDs, IPs, timestamps, and numeric IDs
-                with placeholders, normalizing whitespace, and stripping ANSI
-                codes. The result is hashed with SHA-256 so identical logical
-                errors always group together, even if runtime values differ.
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-6" className="border-b-zinc-200">
-              <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
-                What is session replay?
-              </AccordionTrigger>
-              <AccordionContent className="text-zinc-600 leading-relaxed">
-                Session replay records DOM changes in the browser. When an error
-                occurs, Traceway captures approximately 10 seconds of user
-                activity leading up to the exception - clicks, scrolls, form
-                interactions, and page navigations. The replay is attached to
-                the exception automatically, so you can see exactly what the
-                user did without asking them to reproduce the issue.
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-7" className="border-b-zinc-200">
-              <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
-                Does Traceway support OpenTelemetry?
-              </AccordionTrigger>
-              <AccordionContent className="text-zinc-600 leading-relaxed">
-                Yes. If your services are already instrumented with
-                OpenTelemetry, you can point your OTLP exporter at Traceway and
-                start receiving data immediately. There&apos;s no proprietary
-                SDK lock-in - use Traceway&apos;s lightweight middleware or any
-                OTel-compatible instrumentation.
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-8" className="border-b-zinc-200">
-              <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
-                How does distributed tracing work?
-              </AccordionTrigger>
-              <AccordionContent className="text-zinc-600 leading-relaxed">
-                Traceway propagates a trace ID across every service in a
-                request chain. The frontend SDK generates the ID and passes it
-                to your backend via headers. Each backend service forwards it
-                to downstream calls. Every span, exception, and session replay
-                recorded with that trace ID is linked together, giving you a
-                complete picture of a single user action across your entire
-                architecture.
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-9" className="border-b-zinc-200">
-              <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
-                Does Traceway connect frontend and backend issues?
-              </AccordionTrigger>
-              <AccordionContent className="text-zinc-600 leading-relaxed">
-                Yes. When a backend service returns an error, Traceway links it
-                to the frontend session replay that triggered the request. You
-                see the user&apos;s clicks and navigations alongside the
-                server-side stack trace and span waterfall. Both sides are
-                connected automatically via the shared trace ID.
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-10" className="border-b-zinc-200">
-              <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
-                Can I create custom metrics?
-              </AccordionTrigger>
-              <AccordionContent className="text-zinc-600 leading-relaxed">
-                Yes. In addition to the automatic system metrics (CPU, memory,
-                goroutines, GC stats), you can capture custom metrics with a
-                single function call. Custom metrics appear in the metrics
-                dashboard where you can build widget groups with charts and
-                organize them however you want.
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-11" className="border-b-zinc-200">
-              <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
-                What types of alerts and notifications does Traceway send?
-              </AccordionTrigger>
-              <AccordionContent className="text-zinc-600 leading-relaxed">
-                Traceway supports notifications via Slack, GitHub Issues, email,
-                and custom webhooks. You can configure rules based on new
-                exceptions, error rate thresholds, or performance degradations.
-                Notifications are sent to the channels you choose so your team
-                is alerted where they already work.
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-12" className="border-b-zinc-200">
-              <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
-                What languages and frameworks does Traceway support?
-              </AccordionTrigger>
-              <AccordionContent className="text-zinc-600 leading-relaxed">
-                Traceway has native SDKs for Go (Gin, Chi, Fiber, FastHTTP,
-                net/http) and JavaScript (Node.js, NestJS, React, Vue, Svelte,
-                jQuery, Remix, Next.js). PHP is supported via the Symfony
-                OpenTelemetry bundle. Any language with an OpenTelemetry SDK
-                (Java, Python, .NET, Ruby, and more) can send traces and
-                metrics to Traceway via OTLP.
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-13" className="border-b-zinc-200">
-              <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
-                Can I monitor background tasks and cron jobs?
-              </AccordionTrigger>
-              <AccordionContent className="text-zinc-600 leading-relaxed">
-                Yes. Traceway tracks background tasks and scheduled jobs with
-                the same level of detail as HTTP requests. You see execution
-                duration, success/failure status, and any exceptions thrown
-                during the task. Tasks are listed in a dedicated dashboard with
-                filtering and sorting.
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-14" className="border-b-zinc-200">
-              <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
-                Does Traceway support AI/LLM observability?
-              </AccordionTrigger>
-              <AccordionContent className="text-zinc-600 leading-relaxed">
-                Yes. Traceway captures AI traces from any provider that exports
-                OpenTelemetry spans with <code className="bg-zinc-100 px-1 py-0.5 rounded text-sm">gen_ai.*</code> attributes.
-                OpenRouter has built-in support — enable Observability in your settings and add Traceway as a destination.
-                Every LLM call is tracked with model, input/output tokens, costs, latency, and the full conversation content.
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-15" className="border-b-zinc-200">
-              <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
-                Does Traceway work with serverless and multi-cloud?
-              </AccordionTrigger>
-              <AccordionContent className="text-zinc-600 leading-relaxed">
-                Yes. Any service that exports OpenTelemetry traces can send data
-                to Traceway — including AWS Lambda, Google Cloud Functions, Azure
-                Functions, and Cloudflare Workers. Instrument your function with
-                your language&apos;s OTel SDK and point the OTLP exporter at
-                Traceway. Cold start latency, execution duration, and errors all
-                appear in the same endpoint and distributed tracing views as your
-                long-running services. For multi-cloud setups, every service
-                reports to the same Traceway instance regardless of provider, so
-                you get a single pane of glass across AWS, GCP, Azure, or any
-                combination.
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-16" className="border-b-zinc-200">
-              <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
-                What support options are available?
-              </AccordionTrigger>
-              <AccordionContent className="text-zinc-600 leading-relaxed">
-                All Traceway Cloud customers on a paid plan can open GitHub issues that are triaged with highest priority by our engineering team.
-                Enterprise+ customers also get a shared Slack channel with direct access to the team.
-                Self-hosted users are welcome to open GitHub issues and participate in community discussions — we actively monitor and respond to all issues.
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-17" className="border-b-zinc-200">
-              <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
-                Will my bill ever increase unexpectedly?
-              </AccordionTrigger>
-              <AccordionContent className="text-zinc-600 leading-relaxed">
-                No. Every Traceway Cloud plan has a fixed monthly price with no overage charges.
-                If you approach your included volume, we notify you in advance so you can decide whether to upgrade.
-                Your bill will never increase without your explicit approval. This applies to every tier, from Starter to Enterprise.
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        </div>
-      </section>
+      {/* Final CTA */}
+      <FinalCTA
+        title={
+          <>
+            Detect. Replay. <em>Resolve.</em>
+          </>
+        }
+        description="Start for free. Self-host whenever you want. Book a demo if you'd like a walkthrough."
+        primary={{
+          label: "Start for free",
+          href: "https://cloud.tracewayapp.com/register",
+        }}
+        secondary={{
+          label: "Book a demo",
+          href: "/contact",
+        }}
+      />
     </main>
   );
 }

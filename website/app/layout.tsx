@@ -1,18 +1,25 @@
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { MotionPolish } from "@/components/motion-polish";
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { JetBrains_Mono, IBM_Plex_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Dark-only site — no theme toggle.
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-display",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const ibmPlexMono = IBM_Plex_Mono({
+  variable: "--font-mono",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -20,8 +27,9 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "./",
   },
-  title: "Traceway - Know what to fix first",
-  description: "Traceway scores every endpoint and exception by real user impact, then ranks them. 100% open source telemetry, issue tracking, and session replay for Go & JavaScript.",
+  title: "Traceway — Logs, Traces, Metrics, Session Replay, Stack Traces",
+  description:
+    "Traceway is open-source observability for modern backends. Logs, traces, metrics, session replay, and stack traces — correlated by one trace ID. Self-host free or run on Traceway Cloud.",
   icons: {
     icon: "/favicon.ico",
   },
@@ -33,7 +41,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      className={`${jetbrainsMono.variable} ${ibmPlexMono.variable}`}
+    >
       <Script
         src="https://www.googletagmanager.com/gtag/js?id=G-KSB465GF2W"
         strategy="afterInteractive"
@@ -46,12 +57,11 @@ export default function RootLayout({
           gtag('config', 'G-KSB465GF2W');
         `}
       </Script>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className="antialiased">
         <SiteHeader />
         {children}
         <SiteFooter />
+        <MotionPolish />
       </body>
     </html>
   );

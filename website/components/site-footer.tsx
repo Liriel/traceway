@@ -1,90 +1,141 @@
 import Link from "next/link";
+import Image from "next/image";
+import { Github } from "lucide-react";
+
+type Column = {
+  heading: string;
+  links: { label: string; href: string; external?: boolean }[];
+};
+
+const COLUMNS: Column[] = [
+  {
+    heading: "Pillars",
+    links: [
+      { label: "Logs", href: "/product/logs" },
+      { label: "Traces", href: "/product/traces" },
+      { label: "Metrics", href: "/product/metrics" },
+      { label: "Session Replay", href: "/product/session-replay" },
+      { label: "Stack Traces", href: "/product/stack-traces" },
+    ],
+  },
+  {
+    heading: "Specialized",
+    links: [
+      { label: "AI Tracing", href: "/product/ai-tracing" },
+      { label: "Performance", href: "/product/performance" },
+    ],
+  },
+  {
+    heading: "Resources",
+    links: [
+      { label: "Docs", href: "https://docs.tracewayapp.com", external: true },
+      { label: "GitHub", href: "https://github.com/tracewayapp/traceway", external: true },
+      {
+        label: "Live Demo",
+        href: "https://cloud.tracewayapp.com/login?email=demo@tracewayapp.com&password=demoaccount!",
+        external: true,
+      },
+    ],
+  },
+  {
+    heading: "Hosting",
+    links: [
+      { label: "Cloud", href: "/cloud" },
+      { label: "Self-host", href: "https://docs.tracewayapp.com", external: true },
+    ],
+  },
+  {
+    heading: "About",
+    links: [
+      { label: "Privacy Policy", href: "/privacy-policy" },
+      { label: "Terms of Use", href: "/terms-of-use" },
+      { label: "Contact", href: "/contact" },
+    ],
+  },
+];
 
 export function SiteFooter() {
-    return (
-        <footer className="py-10 border-t border-zinc-200 bg-white">
-            <div className="container mx-auto px-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-sm">
-                    <div>
-                        <h4 className="font-semibold text-zinc-900 mb-3">Product</h4>
-                        <ul className="space-y-2 text-zinc-500">
-                            <li>
-                                <Link href="/product/issue-tracking" className="hover:text-zinc-900 transition-colors">
-                                    Issue Tracking
-                                </Link>
-                            </li>
-                            <li>
-                                <Link href="/product/performance" className="hover:text-zinc-900 transition-colors">
-                                    Performance
-                                </Link>
-                            </li>
-                            <li>
-                                <Link href="/product/session-replay" className="hover:text-zinc-900 transition-colors">
-                                    Session Replay
-                                </Link>
-                            </li>
-                            <li>
-                                <Link href="/product/distributed-tracing" className="hover:text-zinc-900 transition-colors">
-                                    Distributed Tracing
-                                </Link>
-                            </li>
-                        </ul>
-                    </div>
-                    <div>
-                        <h4 className="font-semibold text-zinc-900 mb-3">Resources</h4>
-                        <ul className="space-y-2 text-zinc-500">
-                            <li>
-                                <Link href="https://docs.tracewayapp.com" className="hover:text-zinc-900 transition-colors">
-                                    Docs
-                                </Link>
-                            </li>
-                            <li>
-                                <Link href="https://github.com/tracewayapp/traceway" target="_blank" className="hover:text-zinc-900 transition-colors">
-                                    GitHub
-                                </Link>
-                            </li>
-                            <li>
-                                <Link href="https://cloud.tracewayapp.com/login?email=demo@tracewayapp.com&password=demoaccount!" className="hover:text-zinc-900 transition-colors">
-                                    Live Demo
-                                </Link>
-                            </li>
-                        </ul>
-                    </div>
-                    <div>
-                        <h4 className="font-semibold text-zinc-900 mb-3">Hosting</h4>
-                        <ul className="space-y-2 text-zinc-500">
-                            <li>
-                                <Link href="/cloud" className="hover:text-zinc-900 transition-colors">
-                                    Cloud
-                                </Link>
-                            </li>
-                        </ul>
-                    </div>
-                    <div>
-                        <h4 className="font-semibold text-zinc-900 mb-3">About</h4>
-                        <ul className="space-y-2 text-zinc-500">
-                            <li>
-                                <Link href="/privacy-policy" className="hover:text-zinc-900 transition-colors">
-                                    Privacy Policy
-                                </Link>
-                            </li>
-                            <li>
-                                <Link href="/terms-of-use" className="hover:text-zinc-900 transition-colors">
-                                    Terms of Use
-                                </Link>
-                            </li>
-                            <li>
-                                <Link href="/contact" className="hover:text-zinc-900 transition-colors">
-                                    Contact Us
-                                </Link>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-                <div className="mt-8 pt-6 border-t border-zinc-100 text-xs text-zinc-400">
-                    &copy; {new Date().getFullYear()} Traceway. All rights reserved.
-                </div>
+  const year = new Date().getFullYear();
+  return (
+    <footer
+      className="mt-20"
+      style={{ borderTop: "1px solid var(--hair)", padding: "50px 0 40px" }}
+    >
+      <div className="wrap">
+        <div className="footer-grid grid gap-10 md:gap-9 grid-cols-2 md:grid-cols-[1.2fr_repeat(5,1fr)]">
+          <div className="col-span-2 md:col-span-1">
+            <Link href="/" className="inline-flex items-center gap-2">
+              <Image
+                src="/images/logo.png"
+                alt="Traceway"
+                width={120}
+                height={28}
+                className="logo-img h-6 w-auto"
+              />
+            </Link>
+            <p
+              className="mt-4 text-[13px] leading-relaxed max-w-xs"
+              style={{ color: "var(--fg-2)", fontFamily: "var(--font-mono)" }}
+            >
+              Observability that tells you what to fix first. Open source. Self-host or cloud.
+            </p>
+            <div className="mt-5 flex items-center gap-2">
+              <Link
+                href="https://github.com/tracewayapp/traceway"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="h-8 w-8 inline-flex items-center justify-center rounded-md text-[color:var(--fg-2)] hover:text-[color:var(--fg-0)] hover:bg-[color:var(--ink-2)] transition-colors"
+                aria-label="GitHub"
+              >
+                <Github className="h-4 w-4" />
+              </Link>
             </div>
-        </footer>
-    );
+          </div>
+
+          {COLUMNS.map((col) => (
+            <div key={col.heading}>
+              <h5
+                className="mb-3 text-[11px] uppercase tracking-[.1em] font-medium"
+                style={{ color: "var(--fg-2)", fontFamily: "var(--font-mono)" }}
+              >
+                {col.heading}
+              </h5>
+              <ul className="flex flex-col gap-1.5">
+                {col.links.map((l) => (
+                  <li key={l.href}>
+                    <Link
+                      href={l.href}
+                      {...(l.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                      className="text-[13px] inline-block py-1 transition-colors hover:text-[color:var(--fg-0)]"
+                      style={{ color: "var(--fg-1)" }}
+                    >
+                      {l.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        <div
+          className="mt-10 pt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+          style={{ borderTop: "1px solid var(--hair)" }}
+        >
+          <p
+            className="text-[11px] uppercase tracking-[.08em]"
+            style={{ color: "var(--fg-3)", fontFamily: "var(--font-mono)" }}
+          >
+            © {year} Traceway. All rights reserved.
+          </p>
+          <p
+            className="text-[11px] uppercase tracking-[.08em]"
+            style={{ color: "var(--fg-3)", fontFamily: "var(--font-mono)" }}
+          >
+            Built with OpenTelemetry · ClickHouse · Go
+          </p>
+        </div>
+      </div>
+    </footer>
+  );
 }

@@ -3,18 +3,28 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Server, Monitor, Network, Workflow, Radio, ArrowRight } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
-const tabs = [
+type Tab = {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  color: string;
+  heading: string;
+  description: string;
+  bullets: string[];
+  href: string;
+};
+
+const tabs: Tab[] = [
   {
     id: "backend",
     label: "Backend",
     icon: Server,
-    iconBg: "bg-teal-50",
-    iconColor: "text-teal-600",
-    dotColor: "bg-teal-500",
-    heading: "Trace every request. Score every endpoint.",
+    color: "var(--a2)",
+    heading: "Trace every request. Rank every endpoint.",
     description:
-      "Traceway captures detailed span waterfall traces for every backend request, monitors scheduled tasks and background jobs, and ranks endpoints by real user impact with the Impact Score.",
+      "Traceway captures detailed span waterfall traces for every backend request, monitors scheduled tasks and background jobs, and ranks endpoints by real user impact.",
     bullets: [
       "Full request/response span traces",
       "Scheduled task and background job monitoring",
@@ -28,12 +38,10 @@ const tabs = [
     id: "frontend",
     label: "Frontend",
     icon: Monitor,
-    iconBg: "bg-purple-50",
-    iconColor: "text-purple-600",
-    dotColor: "bg-purple-500",
+    color: "var(--a1)",
     heading: "Replay the moment before every error.",
     description:
-      "See exactly what users did before an exception. Session replays are attached to errors automatically. Source map stack trace resolution turns minified errors into readable, actionable traces.",
+      "See exactly what users did before an exception. Session replays are attached to errors automatically. Source map resolution turns minified errors into readable, actionable traces.",
     bullets: [
       "Session replay with pre-error capture",
       "Automatic source map stack trace resolution",
@@ -46,9 +54,7 @@ const tabs = [
     id: "microservice",
     label: "Microservice",
     icon: Network,
-    iconBg: "bg-cyan-50",
-    iconColor: "text-cyan-600",
-    dotColor: "bg-cyan-500",
+    color: "var(--ok)",
     heading: "Follow a request across every service.",
     description:
       "Distributed tracing connects frontend sessions to backend errors across your entire microservice topology. When a backend service throws an exception, you see the user's session replay, the full cross-service trace, and the exact span that failed.",
@@ -58,15 +64,13 @@ const tabs = [
       "Full trace context across service boundaries",
       "Exception pinpointing across services",
     ],
-    href: "/product/distributed-tracing",
+    href: "/product/traces",
   },
   {
     id: "ai-agents",
     label: "AI Agents",
     icon: Workflow,
-    iconBg: "bg-violet-50",
-    iconColor: "text-violet-600",
-    dotColor: "bg-violet-500",
+    color: "var(--a3)",
     heading: "Track every AI call, its cost, and its conversation.",
     description:
       "Monitor LLM costs, token usage, and latency across every provider. See the full prompt and completion for every call, with per-agent and per-model breakdowns.",
@@ -82,9 +86,7 @@ const tabs = [
     id: "iot",
     label: "IoT",
     icon: Radio,
-    iconBg: "bg-amber-50",
-    iconColor: "text-amber-600",
-    dotColor: "bg-amber-500",
+    color: "var(--a4)",
     heading: "Monitor fleets of devices at scale.",
     description:
       "Traceway's OpenTelemetry-native ingestion and ClickHouse columnar storage handle high-volume telemetry from IoT devices efficiently. Enterprise pricing supports large device fleets with predictable, fixed costs — no per-event billing surprises.",
@@ -106,16 +108,24 @@ export function HomeTabs() {
   return (
     <div>
       <div className="flex items-center justify-center mb-8">
-        <div className="inline-flex items-center bg-zinc-100 rounded-lg p-1 gap-1">
+        <div
+          className="inline-flex items-center gap-1 p-1 rounded-lg"
+          style={{
+            background: "color-mix(in oklab, var(--ink-3) 80%, transparent)",
+            border: "1px solid var(--hair)",
+          }}
+        >
           {tabs.map((t, i) => (
             <button
               key={t.id}
               onClick={() => setActive(i)}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                active === i
-                  ? "bg-white text-zinc-900 shadow-sm"
-                  : "text-zinc-500 hover:text-zinc-700"
-              }`}
+              className="px-4 py-2 rounded-md text-[13px] font-medium transition-all"
+              style={{
+                fontFamily: "var(--font-display)",
+                background: active === i ? "var(--ink-0)" : "transparent",
+                color: active === i ? "var(--fg-0)" : "var(--fg-2)",
+                boxShadow: active === i ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
+              }}
             >
               {t.label}
             </button>
@@ -123,31 +133,51 @@ export function HomeTabs() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-zinc-200 bg-white p-8 md:p-10">
+      <div
+        className="rounded-[14px] p-8 md:p-10"
+        style={{
+          background:
+            "linear-gradient(180deg, color-mix(in oklab, var(--ink-3) 30%, transparent), color-mix(in oklab, var(--ink-2) 20%, transparent))",
+          border: "1px solid var(--hair)",
+        }}
+      >
         <div className="flex flex-col md:flex-row items-start gap-8">
           <div className="flex-1 space-y-5">
             <div
-              className={`w-12 h-12 ${tab.iconBg} rounded-2xl flex items-center justify-center`}
+              className="w-12 h-12 rounded-[10px] flex items-center justify-center"
+              style={{
+                background: `color-mix(in oklab, ${tab.color} 18%, transparent)`,
+                border: `1px solid color-mix(in oklab, ${tab.color} 40%, transparent)`,
+                color: tab.color,
+              }}
             >
-              <Icon className={`w-6 h-6 ${tab.iconColor}`} />
+              <Icon className="w-5 h-5" />
             </div>
-            <h3 className="text-xl md:text-2xl font-bold text-zinc-900 tracking-tight">
+            <h3 className="text-xl md:text-2xl font-semibold tracking-tight" style={{ color: "var(--fg-0)" }}>
               {tab.heading}
             </h3>
-            <p className="text-zinc-600 leading-relaxed">{tab.description}</p>
+            <p className="leading-relaxed" style={{ color: "var(--fg-1)" }}>
+              {tab.description}
+            </p>
             <ul className="space-y-3 pt-1">
               {tab.bullets.map((b) => (
-                <li key={b} className="flex items-center gap-3 text-zinc-700">
+                <li
+                  key={b}
+                  className="flex items-center gap-3 text-[15px]"
+                  style={{ color: "var(--fg-1)" }}
+                >
                   <div
-                    className={`w-1.5 h-1.5 rounded-full ${tab.dotColor}`}
-                  ></div>
+                    className="w-1.5 h-1.5 rounded-full"
+                    style={{ background: tab.color }}
+                  />
                   {b}
                 </li>
               ))}
             </ul>
             <Link
               href={tab.href}
-              className="inline-flex items-center gap-1 text-sm font-medium text-zinc-500 hover:text-zinc-900 transition-colors pt-2"
+              className="inline-flex items-center gap-1 text-sm font-medium transition-colors pt-2 hover:opacity-80"
+              style={{ color: tab.color }}
             >
               Learn more <ArrowRight className="w-3.5 h-3.5" />
             </Link>

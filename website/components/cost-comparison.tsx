@@ -1,32 +1,23 @@
 import { DollarSign, Database, ShieldCheck } from "lucide-react";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 
 const cards = [
   {
     icon: DollarSign,
-    iconBg: "bg-green-50",
-    iconColor: "text-green-600",
+    color: "var(--ok)",
     title: "No per-event pricing",
     description:
-      "Competitors charge you more as you grow. Self-host on your own infrastructure or use Cloud with fixed-price tiers — no per-event, per-host, or per-seat fees.",
+      "Competitors charge more as you grow. Self-host on your own infrastructure or use Cloud with fixed-price tiers — no per-event, per-host, or per-seat fees.",
   },
   {
     icon: Database,
-    iconBg: "bg-blue-50",
-    iconColor: "text-blue-600",
+    color: "var(--a2)",
     title: "ClickHouse compression",
     description:
       "Columnar storage compresses 1 million daily events into ~2-3 GB per month. Your storage bill stays tiny.",
   },
   {
     icon: ShieldCheck,
-    iconBg: "bg-orange-50",
-    iconColor: "text-orange-600",
+    color: "var(--a4)",
     title: "Fixed costs, not surprises",
     description:
       "Every plan has a fixed monthly price. No metered billing, no overage charges, no surprise line items. Your bill never increases without your approval.",
@@ -35,25 +26,39 @@ const cards = [
 
 export function CostComparison() {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {cards.map((card) => (
-        <Card
-          key={card.title}
-          className="bg-white border-zinc-200 transition-all duration-300"
-        >
-          <CardHeader className="p-6 pt-0">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {cards.map((card) => {
+        const Icon = card.icon;
+        return (
+          <div
+            key={card.title}
+            className="surface-card"
+            style={{
+              padding: 24,
+            }}
+          >
             <div
-              className={`w-10 h-10 ${card.iconBg} rounded-lg flex items-center justify-center mb-3`}
+              className="w-10 h-10 rounded-[8px] flex items-center justify-center mb-4"
+              style={{
+                background: `color-mix(in oklab, ${card.color} 18%, transparent)`,
+                border: `1px solid color-mix(in oklab, ${card.color} 40%, transparent)`,
+                color: card.color,
+              }}
             >
-              <card.icon className={`w-5 h-5 ${card.iconColor}`} />
+              <Icon className="w-5 h-5" />
             </div>
-            <CardTitle className="text-lg">{card.title}</CardTitle>
-            <CardDescription className="text-zinc-500 text-sm mt-1.5">
+            <div
+              className="text-[17px] font-semibold mb-2"
+              style={{ color: "var(--fg-0)", fontFamily: "var(--font-display)" }}
+            >
+              {card.title}
+            </div>
+            <div className="text-[14px]" style={{ color: "var(--fg-2)", lineHeight: 1.55 }}>
               {card.description}
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      ))}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

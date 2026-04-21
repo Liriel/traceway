@@ -1,105 +1,152 @@
 "use client";
 
-import * as React from "react";
-import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
-
 const TIERS = [
-    {
-        id: "starter",
-        name: "Starter",
-        limit: "10k",
-        price: "Free",
-        description: "10k issues, requests, task runs",
-    },
-    {
-        id: "pro",
-        name: "Pro",
-        limit: "100k",
-        price: "$12.99",
-        monthlyLabel: "/ month",
-        description: "100k issues, requests, task runs",
-    },
-    {
-        id: "premium",
-        name: "Premium",
-        limit: "1mil",
-        price: "$24.99",
-        monthlyLabel: "/ month",
-        description: "1mil issues, requests, task runs",
-    },
-    {
-        id: "enterprise",
-        name: "Enterprise",
-        limit: "200mil",
-        price: "$499.99",
-        monthlyLabel: "/ month",
-        description: "200mil issues, requests, task runs. Just $0.0000025 per event.",
-    },
-    {
-        id: "enterprise-plus",
-        name: "Enterprise+",
-        limit: "Unlimited",
-        price: "Contact Us",
-        description: "Even cheaper per event. Dedicated SRE, shared Slack channel, and tailored SLAs.",
-    },
+  {
+    id: "starter",
+    name: "Starter",
+    limit: "10k",
+    price: "Free",
+    description: "10k issues, requests, task runs",
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    limit: "100k",
+    price: "$12.99",
+    monthlyLabel: "/ mo",
+    description: "100k issues, requests, task runs",
+  },
+  {
+    id: "premium",
+    name: "Premium",
+    limit: "1M",
+    price: "$24.99",
+    monthlyLabel: "/ mo",
+    description: "1 million issues, requests, task runs",
+  },
+  {
+    id: "enterprise",
+    name: "Enterprise",
+    limit: "200M",
+    price: "$499.99",
+    monthlyLabel: "/ mo",
+    description: "200M events. $0.0000025 / event.",
+    highlight: true,
+  },
+  {
+    id: "enterprise-plus",
+    name: "Enterprise+",
+    limit: "Unlimited",
+    price: "Contact Us",
+    description: "Dedicated SRE, shared Slack, tailored SLAs.",
+  },
 ];
 
 export function PricingCalculator() {
-    return (
-        <div className="w-full max-w-4xl mx-auto">
-            <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
-                {/* Pricing Table */}
-                <div>
-                    <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-zinc-50/50 text-xs font-semibold text-zinc-500 uppercase tracking-wider border-b border-zinc-100">
-                        <div className="col-span-3">Tier</div>
-                        <div className="col-span-3">Monthly Requests</div>
-                        <div className="col-span-3">Base Price</div>
-                        <div className="col-span-3">Includes</div>
-                    </div>
-
-                    <div className="divide-y divide-zinc-100">
-                        {TIERS.map((tier) => (
-                            <div
-                                key={tier.id}
-                                className="grid grid-cols-12 gap-4 px-6 py-5 items-center hover:bg-zinc-50 transition-colors"
-                            >
-                                <div className="col-span-3 font-bold text-zinc-900 flex items-center gap-3">
-                                    {tier.name}
-                                </div>
-                                <div className="col-span-3 text-zinc-600 font-medium text-sm">
-                                    {tier.limit}
-                                </div>
-                                <div className="col-span-3 text-zinc-900 font-bold">
-                                    {tier.price}
-                                    <span className="text-zinc-400 font-normal text-xs">{tier.monthlyLabel}</span>
-                                </div>
-                                <div className="col-span-3 text-zinc-500 text-xs text-balance leading-relaxed">
-                                    {tier.description}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="px-6 py-4 bg-green-50/50 border-t border-zinc-100 text-center space-y-2">
-                    <p className="text-sm text-zinc-600">
-                        <span className="font-semibold text-zinc-900">No overage charges, ever.</span>{" "}
-                        Every plan has a fixed price. If you approach your limit, we&apos;ll notify you — your bill will never increase without your approval.
-                    </p>
-                    <p className="text-xs text-zinc-400">
-                        Each issue, HTTP request, or background task run counts as one event toward your monthly volume.
-                    </p>
-                </div>
-            </div>
-
-            <div className="mt-8 flex justify-center">
-                <Link href="http://cloud.tracewayapp.com/register" className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-all cursor-pointer h-10 px-6 bg-[#4ba3f7] text-white hover:bg-[#3b93e7] font-bold shadow-sm shadow-blue-400/20">
-                        Try for free <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-            </div>
+  return (
+    <div className="w-full max-w-5xl mx-auto">
+      <div
+        className="rounded-[14px] overflow-hidden"
+        style={{
+          background: "linear-gradient(180deg, var(--ink-3), var(--ink-2))",
+          border: "1px solid var(--hair-2)",
+        }}
+      >
+        <div
+          className="grid grid-cols-12 gap-4 px-6 py-3 text-[11px] font-semibold uppercase tracking-wider"
+          style={{
+            background: "rgba(0,0,0,0.15)",
+            borderBottom: "1px solid var(--hair)",
+            color: "var(--fg-3)",
+            fontFamily: "var(--font-mono)",
+          }}
+        >
+          <div className="col-span-3">Tier</div>
+          <div className="col-span-3">Monthly events</div>
+          <div className="col-span-3">Price</div>
+          <div className="col-span-3">Includes</div>
         </div>
-    );
+
+        <div>
+          {TIERS.map((tier, i) => (
+            <div
+              key={tier.id}
+              className="grid grid-cols-12 gap-4 px-6 py-5 items-center transition-colors hover:bg-[color:rgba(255,255,255,0.02)]"
+              style={{
+                borderBottom: i < TIERS.length - 1 ? "1px solid var(--hair)" : "none",
+                background: tier.highlight
+                  ? "linear-gradient(90deg, color-mix(in oklab, var(--a1) 12%, transparent), transparent)"
+                  : undefined,
+              }}
+            >
+              <div
+                className="col-span-3 font-semibold flex items-center gap-2"
+                style={{
+                  color: tier.highlight ? "var(--a2)" : "var(--fg-0)",
+                  fontFamily: "var(--font-display)",
+                }}
+              >
+                {tier.name}
+              </div>
+              <div
+                className="col-span-3 text-sm"
+                style={{ color: "var(--fg-1)", fontFamily: "var(--font-mono)" }}
+              >
+                {tier.limit}
+              </div>
+              <div
+                className="col-span-3 font-semibold"
+                style={{
+                  color: "var(--fg-0)",
+                  fontFamily: "var(--font-display)",
+                }}
+              >
+                {tier.price}
+                {tier.monthlyLabel ? (
+                  <span
+                    className="ml-1 text-xs font-normal"
+                    style={{ color: "var(--fg-3)" }}
+                  >
+                    {tier.monthlyLabel}
+                  </span>
+                ) : null}
+              </div>
+              <div
+                className="col-span-3 text-xs leading-relaxed"
+                style={{ color: "var(--fg-2)" }}
+              >
+                {tier.description}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div
+          className="px-6 py-5 text-center space-y-2"
+          style={{
+            borderTop: "1px solid var(--hair)",
+            background: "color-mix(in oklab, var(--ok) 6%, transparent)",
+          }}
+        >
+          <p className="text-sm" style={{ color: "var(--fg-1)" }}>
+            <span style={{ color: "var(--fg-0)", fontWeight: 600 }}>No overage charges, ever.</span>{" "}
+            Every plan has a fixed price. If you approach your limit, we&apos;ll notify you — your bill
+            will never increase without your approval.
+          </p>
+          <p className="text-xs" style={{ color: "var(--fg-3)" }}>
+            Each issue, HTTP request, or background task run counts as one event toward your monthly volume.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-8 flex justify-center">
+        <Link href="https://cloud.tracewayapp.com/register" className="btn btn-accent">
+          Try for free <ArrowRight className="ml-1 h-4 w-4" />
+        </Link>
+      </div>
+    </div>
+  );
 }
