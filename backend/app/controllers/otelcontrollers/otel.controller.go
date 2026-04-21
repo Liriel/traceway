@@ -4,22 +4,16 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/tracewayapp/traceway/backend/app/hooks"
 	"github.com/tracewayapp/traceway/backend/app/middleware"
 	"github.com/tracewayapp/traceway/backend/app/models"
-	"github.com/tracewayapp/traceway/backend/app/monitoring"
 	"github.com/tracewayapp/traceway/backend/app/repositories"
 	"github.com/tracewayapp/traceway/backend/app/services"
 	"github.com/tracewayapp/traceway/backend/app/storage"
 	traceway "go.tracewayapp.com"
 )
-
-func msSince(t time.Time) float64 {
-	return float64(time.Since(t).Microseconds()) / 1000.0
-}
 
 type otelController struct{}
 
@@ -37,7 +31,6 @@ func (o otelController) ExportTraces(c *gin.Context) {
 				attrs.SetTag("organization_id", fmt.Sprintf("%d", *p.OrganizationId))
 			}
 			if !hooks.CanReport(*p.OrganizationId) {
-				monitoring.RecordRateLimited(*p.OrganizationId)
 				c.AbortWithStatus(http.StatusTooManyRequests)
 				return
 			}
@@ -49,11 +42,7 @@ func (o otelController) ExportTraces(c *gin.Context) {
 		return
 	}
 
-	convertStart := time.Now()
 	endpoints, tasks, spans, exceptions, aiTraces, aiConversations := convertTraces(projectId, req)
-	convertMs := msSince(convertStart)
-
-	insertStart := time.Now()
 
 	if len(endpoints) > 0 {
 		if err := repositories.EndpointRepository.InsertAsync(c, endpoints); err != nil {
@@ -97,10 +86,6 @@ func (o otelController) ExportTraces(c *gin.Context) {
 		}
 	}
 
-	insertMs := msSince(insertStart)
-	totalSize := len(endpoints) + len(tasks) + len(spans) + len(exceptions) + len(aiTraces)
-	monitoring.RecordIngestBatch(monitoring.SignalTraces, "traces", convertMs, insertMs, totalSize)
-
 	var exceptionHashes []string
 	for _, ex := range exceptions {
 		exceptionHashes = append(exceptionHashes, ex.ExceptionHash)
@@ -135,7 +120,6 @@ func (o otelController) ExportMetrics(c *gin.Context) {
 				attrs.SetTag("organization_id", fmt.Sprintf("%d", *p.OrganizationId))
 			}
 			if !hooks.CanReport(*p.OrganizationId) {
-				monitoring.RecordRateLimited(*p.OrganizationId)
 				c.AbortWithStatus(http.StatusTooManyRequests)
 				return
 			}
@@ -148,25 +132,17 @@ func (o otelController) ExportMetrics(c *gin.Context) {
 		return
 	}
 
-	convertStart := time.Now()
 	result := convertMetricPoints(projectId, req)
-	convertMs := msSince(convertStart)
-
-	insertMs := 0.0
 	if len(result.Points) > 0 {
-		insertStart := time.Now()
 		if err := repositories.MetricPointRepository.InsertAsync(c, result.Points); err != nil {
 			c.AbortWithError(500, traceway.NewStackTraceErrorf("error inserting OTEL metric points: %w", err))
 			return
 		}
-		insertMs = msSince(insertStart)
 
 		if len(result.Entries) > 0 {
 			go services.AutoRegisterMetricsWithUnits(projectId, result.Entries)
 		}
 	}
-
-	monitoring.RecordIngestBatch(monitoring.SignalMetrics, "metric_points", convertMs, insertMs, len(result.Points))
 
 	writeMetricsResponse(c)
 }
@@ -184,7 +160,6 @@ func (o otelController) ExportLogs(c *gin.Context) {
 				attrs.SetTag("organization_id", fmt.Sprintf("%d", *p.OrganizationId))
 			}
 			if !hooks.CanReport(*p.OrganizationId) {
-				monitoring.RecordRateLimited(*p.OrganizationId)
 				c.AbortWithStatus(http.StatusTooManyRequests)
 				return
 			}
@@ -197,21 +172,13 @@ func (o otelController) ExportLogs(c *gin.Context) {
 		return
 	}
 
-	convertStart := time.Now()
 	records := convertLogs(projectId, req)
-	convertMs := msSince(convertStart)
-
-	insertMs := 0.0
 	if len(records) > 0 {
-		insertStart := time.Now()
 		if err := repositories.LogRecordRepository.InsertAsync(c, records); err != nil {
 			c.AbortWithError(500, traceway.NewStackTraceErrorf("error inserting OTEL log records: %w", err))
 			return
 		}
-		insertMs = msSince(insertStart)
 	}
-
-	monitoring.RecordIngestBatch(monitoring.SignalLogs, "log_records", convertMs, insertMs, len(records))
 
 	writeLogsResponse(c)
 }
