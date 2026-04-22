@@ -54,7 +54,7 @@ export default function SessionReplayPage() {
             "Clicks, scrolls, and form interactions",
             "Page navigation timeline",
           ]}
-          image={{ src: "/images/session-replay.png", alt: "Session replay interface" }}
+          image={{ src: "/images/session-replay-viewer.png", alt: "Session replay interface" }}
         />
       </section>
 
@@ -71,7 +71,7 @@ export default function SessionReplayPage() {
             "Console and network overlays",
             "Trace ID links every replay to the backend",
           ]}
-          image={{ src: "/images/session-replay.png", alt: "DOM replay scrubbing" }}
+          image={{ src: "/images/session-replay-scrubbing-timeline.png", alt: "DOM replay scrubbing" }}
         />
       </section>
 

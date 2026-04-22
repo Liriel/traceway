@@ -9,7 +9,6 @@ import { BentoGrid, BentoCell } from "@/components/bento-grid";
 import { FaqList } from "@/components/faq-list";
 import { FinalCTA } from "@/components/final-cta";
 import { AuroraBackground } from "@/components/aurora-background";
-import { DistributedTraceVisual } from "@/components/distributed-trace-visual";
 
 export default function TracesPage() {
   return (
@@ -48,7 +47,14 @@ export default function TracesPage() {
           description="Follow a single user action from the browser through your API gateway, backend services, and database calls. See the full picture in one distributed trace."
         />
         <div className="mt-8 max-w-4xl mx-auto">
-          <DistributedTraceVisual />
+          <Image
+            src="/images/traces-cross-service.png"
+            alt="Distributed trace across multiple services"
+            width={1600}
+            height={500}
+            className="w-full h-auto rounded-[12px]"
+            style={{ border: "1px solid var(--hair)" }}
+          />
         </div>
       </section>
 
@@ -68,7 +74,7 @@ export default function TracesPage() {
             "Drill-down to span attributes, logs, events",
             "Async workflows (Kafka, RabbitMQ, SQS)",
           ]}
-          image={{ src: "/images/distributed-trace.png", alt: "Distributed trace waterfall", width: 1200, height: 400 }}
+          image={{ src: "/images/traces-spans-waterfall.png", alt: "Span waterfall timing breakdown", width: 1600, height: 500 }}
         />
       </section>
 
@@ -85,7 +91,7 @@ export default function TracesPage() {
             "No manual reproduction needed",
             "Works across browser and server",
           ]}
-          image={{ src: "/images/session-replay.png", alt: "Session replay linked to trace" }}
+          image={{ src: "/images/session-replay-viewer.png", alt: "Session replay linked to trace" }}
         />
       </section>
 

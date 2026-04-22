@@ -54,7 +54,7 @@ export default function LogsPage() {
             "Attribute filters on resource, scope, and log fields",
             "Time-range facet navigation",
           ]}
-          image={{ src: "/images/logs.png", alt: "Logs search and detail view", width: 1600, height: 1000 }}
+          image={{ src: "/images/logs-search-and-detail.png", alt: "Logs search and detail view", width: 1600, height: 1000 }}
         />
       </section>
 

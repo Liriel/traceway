@@ -265,7 +265,7 @@ export default function Home() {
 
       {/* COST — brief, left-aligned */}
       <section className="py-24" id="cost">
-        <div className="wrap">
+        <div className="wrap grid gap-14 md:grid-cols-[1fr_1.1fr] items-center">
           <div className="max-w-3xl">
             <Eyebrow>Pricing that doesn&apos;t lie to you</Eyebrow>
             <h2 className="mt-4">
@@ -286,6 +286,14 @@ export default function Home() {
               </Link>
             </div>
           </div>
+          <Image
+            src="/images/home-hero-overview.png"
+            alt="Traceway dashboard: endpoints overview with impact scoring"
+            width={1600}
+            height={1000}
+            className="w-full h-auto rounded-[12px]"
+            style={{ border: "1px solid var(--hair)" }}
+          />
         </div>
       </section>
 

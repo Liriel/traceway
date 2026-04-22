@@ -53,7 +53,7 @@ export default function MetricsPage() {
             "Dimensional tags become facet filters",
             "No per-metric billing",
           ]}
-          image={{ src: "/images/screenshot-4.png", alt: "Application metrics dashboard" }}
+          image={{ src: "/images/metrics-application-dashboard.png", alt: "Application metrics dashboard" }}
         />
       </section>
 
@@ -61,17 +61,21 @@ export default function MetricsPage() {
       <section className="wrap">
         <FeatureRow
           reverse
-          eyebrow="Server metrics"
-          title="CPU, memory, goroutines, GC — automatic"
-          description="The Traceway SDK emits runtime metrics every 10 seconds without any configuration. See host health alongside application metrics in a single view."
+          eyebrow="Host metrics"
+          title="CPU, memory, disk, network — one line to install"
+          description={
+            <>
+              The <Link href="https://github.com/tracewayapp/traceway-otel-agent" style={{ color: "var(--a2)", textDecoration: "underline" }}>Traceway OTel Agent</Link> is a pre-built OpenTelemetry Collector distribution that scrapes host metrics every 30 seconds and ships them to your project over OTLP/HTTP. Install with a single curl, no config file required.
+            </>
+          }
           bullets={[
-            "CPU usage percentage",
-            "Memory (allocated, heap, used%)",
-            "Goroutine count + heap object count",
-            "GC cycles and pause time",
-            "Zero-config, always on",
+            "One-line install on Linux (systemd), macOS (launchd), or Windows",
+            "CPU, memory, load, disk, filesystem, network, process",
+            "30-second collection interval via hostmetricsreceiver",
+            "Runs alongside your apps — no code changes",
+            "Also tails any log files you point it at (opt-in)",
           ]}
-          image={{ src: "/images/screenshot-4.png", alt: "Server metrics dashboard" }}
+          image={{ src: "/images/metrics-server-runtime.png", alt: "Server metrics dashboard" }}
         />
       </section>
 
@@ -91,7 +95,7 @@ export default function MetricsPage() {
             "Per-metric filters and rollups",
             "Set default dashboards per organization",
           ]}
-          image={{ src: "/images/screenshot-3.png", alt: "Widget groups dashboard" }}
+          image={{ src: "/images/metrics-widget-groups.png", alt: "Widget groups dashboard" }}
         />
       </section>
 
@@ -138,8 +142,30 @@ export default function MetricsPage() {
                   ),
                 },
                 {
-                  q: "What server metrics are collected automatically?",
-                  a: "The Traceway SDK automatically emits CPU usage, memory usage (allocated, heap, used%), goroutine count, heap object count, GC cycle count, and GC pause time every 10 seconds. No configuration required — they show up in the Metrics dashboard out of the box.",
+                  q: "What host metrics are collected automatically?",
+                  a: (
+                    <>
+                      <p>
+                        The{" "}
+                        <Link href="https://github.com/tracewayapp/traceway-otel-agent" style={{ color: "var(--a2)", textDecoration: "underline" }}>
+                          Traceway OTel Agent
+                        </Link>{" "}
+                        is a pre-built OpenTelemetry Collector distribution that
+                        you install on the host with a single curl. It scrapes
+                        CPU, memory, load, disk, filesystem, network, and
+                        per-process metrics via the upstream{" "}
+                        <code>hostmetricsreceiver</code> every 30 seconds and
+                        ships them to your Traceway project over OTLP/HTTP.
+                      </p>
+                      <p>
+                        No config file to write — you set{" "}
+                        <code>TRACEWAY_TOKEN</code> and the installer wires up
+                        systemd/launchd/Windows service for you. In-process Go
+                        runtime metrics (goroutines, heap objects, GC) are
+                        emitted separately by the Go client SDK if you use it.
+                      </p>
+                    </>
+                  ),
                 },
                 {
                   q: "Do custom metrics count toward my event limit?",

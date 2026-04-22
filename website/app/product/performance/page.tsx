@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight, Activity, ChartGantt, Gauge } from "lucide-react";
 
 import { Chip } from "@/components/chip";
@@ -7,7 +8,6 @@ import { FeatureRow } from "@/components/feature-row";
 import { FaqList } from "@/components/faq-list";
 import { FinalCTA } from "@/components/final-cta";
 import { AuroraBackground } from "@/components/aurora-background";
-import { ImpactScoreVisual } from "@/components/impact-score-visual";
 
 export default function PerformancePage() {
   return (
@@ -48,8 +48,15 @@ export default function PerformancePage() {
           }
           description="The Impact Score combines five service-level indicators into one automatic priority for every endpoint. It takes the max across all five — if any single signal is bad, the endpoint surfaces immediately."
         />
-        <div className="mt-10 max-w-4xl mx-auto">
-          <ImpactScoreVisual />
+        <div className="mt-10 max-w-5xl mx-auto">
+          <Image
+            src="/images/performance-endpoints-impact-table.png"
+            alt="Endpoints sorted by Impact Score"
+            width={1600}
+            height={1000}
+            className="w-full h-auto rounded-[12px]"
+            style={{ border: "1px solid var(--hair)" }}
+          />
         </div>
       </section>
 
@@ -69,7 +76,7 @@ export default function PerformancePage() {
             "Custom context and tag facets",
             "Filter by status, latency, or tag",
           ]}
-          image={{ src: "/images/screenshot-1.png", alt: "Endpoint introspection" }}
+          image={{ src: "/images/performance-endpoint-drilldown.png", alt: "Endpoint introspection" }}
         />
       </section>
 
@@ -86,7 +93,7 @@ export default function PerformancePage() {
             "Historical trend comparison",
             "Per-endpoint slow threshold override",
           ]}
-          image={{ src: "/images/screenshot-3.png", alt: "Endpoint analytics" }}
+          image={{ src: "/images/performance-percentiles-overview.png", alt: "Endpoint analytics" }}
         />
       </section>
 
@@ -102,7 +109,7 @@ export default function PerformancePage() {
             "Pinpoint bottlenecks instantly",
             "Expand spans to see logs + attributes",
           ]}
-          image={{ src: "/images/distributed-trace.png", alt: "Span waterfall view", width: 1200, height: 400 }}
+          image={{ src: "/images/traces-spans-waterfall.png", alt: "Span waterfall view", width: 1600, height: 500 }}
         />
       </section>
 

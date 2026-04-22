@@ -54,29 +54,14 @@ export default function StackTracesPage() {
             "User impact analysis across sessions",
             "Source map resolution for minified JS",
           ]}
-          image={{ src: "/images/screenshot-2.png", alt: "Exception tracking interface" }}
-        />
-      </section>
-
-      {/* Issues ranked by what matters */}
-      <section className="wrap">
-        <FeatureRow
-          reverse
-          eyebrow="Ranking"
-          title="Issues ranked by what matters"
-          description="Stop triaging manually. Traceway ranks every issue by frequency, user impact, and recency so your team focuses on the problems that matter most. New regressions surface immediately."
-          bullets={[
-            "Impact-based ranking across endpoints",
-            "Regression detection on new releases",
-            "Frequency and recency scoring",
-          ]}
-          image={{ src: "/images/screenshot-3.png", alt: "Issue ranking dashboard" }}
+          image={{ src: "/images/exceptions-grouped-ranked.png", alt: "Exception tracking interface" }}
         />
       </section>
 
       {/* Intelligent grouping */}
       <section className="wrap">
         <FeatureRow
+          reverse
           eyebrow="Normalization"
           title={
             <>
@@ -89,14 +74,13 @@ export default function StackTracesPage() {
             "Cross-service deduplication",
             "Full context preserved on every occurrence",
           ]}
-          image={{ src: "/images/screenshot-4.png", alt: "Error grouping interface" }}
+          image={{ src: "/images/stack-trace.png", alt: "Error grouping interface" }}
         />
       </section>
 
       {/* Visual context — pair stack traces with session replay */}
       <section className="wrap">
         <FeatureRow
-          reverse
           eyebrow="Visual context"
           title={
             <>
@@ -110,7 +94,7 @@ export default function StackTracesPage() {
             "Jump from stack frame → exact frame of the replay",
             "Frontend + backend context in one pane",
           ]}
-          image={{ src: "/images/screenshot-2.png", alt: "Stack trace paired with session replay" }}
+          image={{ src: "/images/session-replay-viewer.png", alt: "Stack trace paired with session replay" }}
         />
       </section>
 
