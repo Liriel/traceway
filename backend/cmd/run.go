@@ -9,6 +9,7 @@ import (
 	"github.com/tracewayapp/traceway/backend/app/middleware"
 	"github.com/tracewayapp/traceway/backend/app/migrations"
 	"github.com/tracewayapp/traceway/backend/app/models"
+	"github.com/tracewayapp/traceway/backend/app/monitoring"
 	"github.com/tracewayapp/traceway/backend/app/notifications"
 	"github.com/tracewayapp/traceway/backend/app/services"
 	"github.com/tracewayapp/traceway/backend/app/storage"
@@ -131,6 +132,7 @@ func Run(opts ...Option) {
 			monitoringTracewayUrl,
 			tracewaygin.WithOnErrorRecording(tracewaygin.RecordingQuery|tracewaygin.RecordingBody|tracewaygin.RecordingHeader|tracewaygin.RecordingUrl),
 		))
+		monitoring.StartClickHouseReporter(ctx)
 	}
 
 	router.GET("/health", func(c *gin.Context) {

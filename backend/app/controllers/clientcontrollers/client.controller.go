@@ -16,6 +16,7 @@ import (
 	"github.com/tracewayapp/traceway/backend/app/middleware"
 	"github.com/tracewayapp/traceway/backend/app/models"
 	"github.com/tracewayapp/traceway/backend/app/models/clientmodels"
+	"github.com/tracewayapp/traceway/backend/app/monitoring"
 	"github.com/tracewayapp/traceway/backend/app/repositories"
 	"github.com/tracewayapp/traceway/backend/app/services"
 	"github.com/tracewayapp/traceway/backend/app/storage"
@@ -43,6 +44,7 @@ func (e clientController) Report(c *gin.Context) {
 	if project, exists := c.Get(middleware.ProjectContextKey); exists {
 		if p, ok := project.(*models.Project); ok && p.OrganizationId != nil {
 			if !hooks.CanReport(*p.OrganizationId) {
+				monitoring.RecordRateLimited(*p.OrganizationId)
 				c.AbortWithStatus(http.StatusTooManyRequests)
 				return
 			}
@@ -57,6 +59,8 @@ func (e clientController) Report(c *gin.Context) {
 		return
 	}
 	parseSpan.End()
+
+	convertStart := time.Now()
 
 	endpointsToInsert := []models.Endpoint{}
 	tasksToInsert := []models.Task{}
@@ -160,6 +164,9 @@ func (e clientController) Report(c *gin.Context) {
 	}
 	convertSpan.End()
 
+	convertMs := float64(time.Since(convertStart).Microseconds()) / 1000.0
+	insertStart := time.Now()
+
 	if len(endpointsToInsert) > 0 {
 		insertSpan := traceway.StartSpan(c, "report.insert.endpoints")
 		err := repositories.EndpointRepository.InsertAsync(c, endpointsToInsert)
@@ -210,6 +217,9 @@ func (e clientController) Report(c *gin.Context) {
 		c.AbortWithError(500, traceway.NewStackTraceErrorf("error inserting spansToInsert: %w", err))
 		return
 	}
+
+	insertMs := float64(time.Since(insertStart).Microseconds()) / 1000.0
+	totalSize := len(endpointsToInsert) + len(tasksToInsert) + len(spansToInsert) + len(exceptionStackTraceToInsert) + len(metricPointsToInsert)
 
 	var exceptionHashes []string
 	for _, est := range exceptionStackTraceToInsert {
