@@ -40,7 +40,7 @@ export function HeroEmailCTA({
           onChange={(e) => setEmail(e.target.value)}
           placeholder={placeholder}
           aria-label="Email address"
-          className="flex-1 px-4 py-2.5 rounded-md text-[15px] bg-transparent outline-none"
+          className="flex-1 min-w-0 px-3 sm:px-4 py-2.5 rounded-md text-[14px] sm:text-[15px] bg-transparent outline-none"
           style={{
             color: "var(--fg-0)",
             fontFamily: "var(--font-mono)",
@@ -48,7 +48,7 @@ export function HeroEmailCTA({
         />
         <button
           type="submit"
-          className="btn btn-accent whitespace-nowrap px-5"
+          className="btn btn-accent whitespace-nowrap shrink-0 px-3 sm:px-5"
           style={{ borderRadius: 8 }}
         >
           Start for free

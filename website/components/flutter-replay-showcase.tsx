@@ -189,13 +189,14 @@ export function FlutterReplayShowcase({
         <div className="pillar-wrap">
           <div className="pillar-wrap-body">
             {/* Issue header */}
-            <div className="mb-5">
+            <div className="mb-5 min-w-0">
               <h3
-                className="text-[20px] leading-tight"
+                className="text-[17px] sm:text-[20px] leading-tight break-words"
                 style={{
                   fontFamily: "var(--font-display)",
                   color: "var(--fg-0)",
                   letterSpacing: "-0.01em",
+                  overflowWrap: "anywhere",
                 }}
               >
                 _TypeError: type &apos;Null&apos; is not a subtype of type
@@ -209,10 +210,10 @@ export function FlutterReplayShowcase({
               </p>
             </div>
 
-            <div className="grid gap-5 md:grid-cols-[1.4fr_minmax(260px,0.8fr)]">
+            <div className="grid gap-5 md:grid-cols-[minmax(0,1.4fr)_minmax(260px,0.8fr)]">
               {/* LEFT — Flutter stack trace */}
               <div
-                className="rounded-[12px] p-5"
+                className="rounded-[12px] p-4 sm:p-5 min-w-0 overflow-hidden"
                 style={{
                   background:
                     "color-mix(in oklab, var(--ink-0) 50%, transparent)",
@@ -256,12 +257,14 @@ export function FlutterReplayShowcase({
                   1:53 AM · Total occurrences: 23 · Platform: Flutter 3.27.1
                 </p>
                 <div
-                  className="mt-4 rounded-md p-4 text-[12px] leading-[1.75]"
+                  className="mt-4 rounded-md p-3 sm:p-4 text-[11px] sm:text-[12px] leading-[1.75] min-w-0"
                   style={{
                     background:
                       "color-mix(in oklab, var(--ink-0) 80%, transparent)",
                     border: "1px solid var(--hair)",
                     fontFamily: "var(--font-mono)",
+                    overflowWrap: "anywhere",
+                    wordBreak: "break-word",
                     color: "var(--fg-1)",
                   }}
                 >
@@ -295,7 +298,7 @@ export function FlutterReplayShowcase({
               </div>
 
               {/* RIGHT — phone + control bar */}
-              <div className="flex flex-col items-center">
+              <div className="flex flex-col items-center min-w-0 w-full">
                 <h4
                   className="self-start text-[15px] mb-3"
                   style={{
