@@ -49,11 +49,14 @@ func (e clientController) Report(c *gin.Context) {
 		}
 	}
 
+	parseSpan := traceway.StartSpan(c, "report.parse_body")
 	var request ReportRequest
 	if err := c.ShouldBindBodyWithJSON(&request); err != nil {
+		parseSpan.End()
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	parseSpan.End()
 
 	endpointsToInsert := []models.Endpoint{}
 	tasksToInsert := []models.Task{}
@@ -73,6 +76,7 @@ func (e clientController) Report(c *gin.Context) {
 	// Map frontend sessionRecordingId → backend-generated exception UUID
 	recordingIdToExceptionId := map[string]uuid.UUID{}
 
+	convertSpan := traceway.StartSpan(c, "report.convert_frames")
 	for _, cf := range request.CollectionFrames {
 		for _, ct := range cf.Traces {
 			if ct.IsTask {
@@ -104,17 +108,20 @@ func (e clientController) Report(c *gin.Context) {
 
 		var sourceMaps *[]*models.SourceMap
 		if project != nil && isJsFramework(project.Framework) {
+			loadSpan := traceway.StartSpan(c, "report.load_source_maps")
 			sourceMapsLoaded, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.SourceMap, error) {
 				if request.AppVersion != "" {
 					return repositories.SourceMapRepository.FindByProjectAndVersion(tx, projectId, request.AppVersion)
 				}
 				return repositories.SourceMapRepository.FindLatestByProject(tx, projectId)
 			})
+			loadSpan.End()
 			if err == nil && len(sourceMapsLoaded) > 0 {
 				sourceMaps = &sourceMapsLoaded
 			}
 		}
 
+		resolveSpan := traceway.StartSpan(c, "report.resolve_stack_traces")
 		for _, cst := range cf.StackTraces {
 			resolvedStackTrace := cst.StackTrace
 			if sourceMaps != nil {
@@ -129,6 +136,7 @@ func (e clientController) Report(c *gin.Context) {
 			}
 			exceptionStackTraceToInsert = append(exceptionStackTraceToInsert, est)
 		}
+		resolveSpan.End()
 
 		for _, cm := range cf.Metrics {
 			mp := cm.ToMetricPoint(request.ServerName)
@@ -150,9 +158,12 @@ func (e clientController) Report(c *gin.Context) {
 			})
 		}
 	}
+	convertSpan.End()
 
 	if len(endpointsToInsert) > 0 {
+		insertSpan := traceway.StartSpan(c, "report.insert.endpoints")
 		err := repositories.EndpointRepository.InsertAsync(c, endpointsToInsert)
+		insertSpan.End()
 		if err != nil {
 			c.AbortWithError(500, traceway.NewStackTraceErrorf("error inserting endpointsToInsert: %w", err))
 			return
@@ -160,14 +171,18 @@ func (e clientController) Report(c *gin.Context) {
 	}
 
 	if len(tasksToInsert) > 0 {
+		insertSpan := traceway.StartSpan(c, "report.insert.tasks")
 		err := repositories.TaskRepository.InsertAsync(c, tasksToInsert)
+		insertSpan.End()
 		if err != nil {
 			c.AbortWithError(500, traceway.NewStackTraceErrorf("error inserting tasksToInsert: %w", err))
 			return
 		}
 	}
 
+	exceptionInsertSpan := traceway.StartSpan(c, "report.insert.exceptions")
 	err = repositories.ExceptionStackTraceRepository.InsertAsync(c, exceptionStackTraceToInsert)
+	exceptionInsertSpan.End()
 
 	if err != nil {
 		c.AbortWithError(500, traceway.NewStackTraceErrorf("error inserting exceptionStackTraceToInsert: %w", err))
@@ -175,7 +190,10 @@ func (e clientController) Report(c *gin.Context) {
 	}
 
 	if len(metricPointsToInsert) > 0 {
-		if err := repositories.MetricPointRepository.InsertAsync(c, metricPointsToInsert); err != nil {
+		insertSpan := traceway.StartSpan(c, "report.insert.metric_points")
+		err := repositories.MetricPointRepository.InsertAsync(c, metricPointsToInsert)
+		insertSpan.End()
+		if err != nil {
 			c.AbortWithError(500, traceway.NewStackTraceErrorf("error inserting metricPointsToInsert: %w", err))
 			return
 		}
@@ -184,7 +202,9 @@ func (e clientController) Report(c *gin.Context) {
 		go services.AutoRegisterMetrics(projectId, metricNames)
 	}
 
+	spanInsertSpan := traceway.StartSpan(c, "report.insert.spans")
 	err = repositories.SpanRepository.InsertAsync(c, spansToInsert)
+	spanInsertSpan.End()
 
 	if err != nil {
 		c.AbortWithError(500, traceway.NewStackTraceErrorf("error inserting spansToInsert: %w", err))
