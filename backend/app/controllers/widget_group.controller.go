@@ -317,8 +317,9 @@ func ensureDefaultWidgetGroups(tx *sql.Tx, projectId uuid.UUID) error {
 	isOtel := project != nil && otelFrameworks[project.Framework]
 
 	type widgetDef struct {
-		title string
-		name  string
+		title      string
+		name       string
+		widgetType string // optional; empty string falls back to "line_chart"
 	}
 	type groupDef struct {
 		name    string
@@ -336,39 +337,41 @@ func ensureDefaultWidgetGroups(tx *sql.Tx, projectId uuid.UUID) error {
 			groupDef{
 				name: "System",
 				widgets: []widgetDef{
-					{"CPU Utilization", "system.cpu.utilization"},
-					{"Memory Utilization", "system.memory.utilization"},
-					{"Memory Usage", "system.memory.usage"},
-					{"Load Avg (1m)", "system.cpu.load_average.1m"},
-					{"Load Avg (5m)", "system.cpu.load_average.5m"},
-					{"Load Avg (15m)", "system.cpu.load_average.15m"},
+					{title: "CPU Utilization", name: "system.cpu.utilization"},
+					{title: "Memory Utilization", name: "system.memory.utilization"},
+					// area_chart: filled region reads naturally as "consumed memory".
+					{title: "Memory Usage", name: "system.memory.usage", widgetType: "area_chart"},
+					{title: "Load Avg (1m)", name: "system.cpu.load_average.1m"},
+					{title: "Load Avg (5m)", name: "system.cpu.load_average.5m"},
+					{title: "Load Avg (15m)", name: "system.cpu.load_average.15m"},
 				},
 			},
 			groupDef{
 				name: "Storage",
 				widgets: []widgetDef{
-					{"Filesystem Utilization", "system.filesystem.utilization"},
-					{"Filesystem Usage", "system.filesystem.usage"},
-					{"Disk I/O", "system.disk.io"},
-					{"Disk IOPS", "system.disk.operations"},
-					{"Disk I/O Time", "system.disk.io_time"},
+					{title: "Filesystem Utilization", name: "system.filesystem.utilization"},
+					// area_chart: same reasoning as Memory Usage — filled = used disk.
+					{title: "Filesystem Usage", name: "system.filesystem.usage", widgetType: "area_chart"},
+					{title: "Disk I/O", name: "system.disk.io"},
+					{title: "Disk IOPS", name: "system.disk.operations"},
+					{title: "Disk I/O Time", name: "system.disk.io_time"},
 				},
 			},
 			groupDef{
 				name: "Network",
 				widgets: []widgetDef{
-					{"Network I/O", "system.network.io"},
-					{"Network Packets", "system.network.packets"},
-					{"Network Errors", "system.network.errors"},
-					{"Open Connections", "system.network.connections"},
+					{title: "Network I/O", name: "system.network.io"},
+					{title: "Network Packets", name: "system.network.packets"},
+					{title: "Network Errors", name: "system.network.errors"},
+					{title: "Open Connections", name: "system.network.connections"},
 				},
 			},
 			groupDef{
 				name: "Process",
 				widgets: []widgetDef{
-					{"Process CPU Time", "process.cpu.time"},
-					{"Process RSS", "process.memory.usage"},
-					{"Process Virtual", "process.memory.virtual"},
+					{title: "Process CPU Time", name: "process.cpu.time"},
+					{title: "Process RSS", name: "process.memory.usage"},
+					{title: "Process Virtual", name: "process.memory.virtual"},
 				},
 			},
 		)
@@ -377,10 +380,10 @@ func ensureDefaultWidgetGroups(tx *sql.Tx, projectId uuid.UUID) error {
 			groupDefs = append(groupDefs, groupDef{
 				name: "Application",
 				widgets: []widgetDef{
-					{"Go Routines", "go.go_routines"},
-					{"Heap Objects", "go.heap_objects"},
-					{"GC Cycles", "go.num_gc"},
-					{"GC Pause", "go.gc_pause"},
+					{title: "Go Routines", name: "go.go_routines"},
+					{title: "Heap Objects", name: "go.heap_objects"},
+					{title: "GC Cycles", name: "go.num_gc"},
+					{title: "GC Pause", name: "go.gc_pause"},
 				},
 			})
 		}
@@ -389,15 +392,15 @@ func ensureDefaultWidgetGroups(tx *sql.Tx, projectId uuid.UUID) error {
 			groupDef{
 				name: "Stats",
 				widgets: []widgetDef{
-					{"Memory Usage", "mem.used"},
-					{"Total Memory", "mem.total"},
+					{title: "Memory Usage", name: "mem.used"},
+					{title: "Total Memory", name: "mem.total"},
 				},
 			},
 			groupDef{
 				name: "CPU / Mem",
 				widgets: []widgetDef{
-					{"CPU Usage", "cpu.used_pcnt"},
-					{"Memory Usage", "mem.used"},
+					{title: "CPU Usage", name: "cpu.used_pcnt"},
+					{title: "Memory Usage", name: "mem.used"},
 				},
 			},
 		)
@@ -419,10 +422,14 @@ func ensureDefaultWidgetGroups(tx *sql.Tx, projectId uuid.UUID) error {
 
 		for i, w := range gd.widgets {
 			config := json.RawMessage(`{"sources":[{"type":"metric","name":"` + w.name + `","aggregation":"avg"}]}`)
+			widgetType := w.widgetType
+			if widgetType == "" {
+				widgetType = "line_chart"
+			}
 			widget := &models.WidgetGroupWidget{
 				WidgetGroupId: groupId,
 				Title:         w.title,
-				WidgetType:    "line_chart",
+				WidgetType:    widgetType,
 				Config:        config,
 				Position:      i,
 				CreatedAt:     now,
