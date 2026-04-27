@@ -68,4 +68,16 @@ func (r *widgetGroupRepository) DeleteWidget(tx *sql.Tx, id int) error {
 	return lit.DeleteNamed(db.Driver, tx, "DELETE FROM widget_group_widgets WHERE id = :id", lit.P{"id": id})
 }
 
+// DeleteWidgetsByGroup removes every widget belonging to the group. Use this
+// before WidgetGroupRepository.Delete so the group + child widgets disappear
+// together within the same transaction (rather than relying on the FK cascade
+// — explicit is cheaper to audit and makes the SQL log self-explanatory).
+func (r *widgetGroupRepository) DeleteWidgetsByGroup(tx *sql.Tx, widgetGroupId int) error {
+	return lit.DeleteNamed(
+		db.Driver, tx,
+		"DELETE FROM widget_group_widgets WHERE widget_group_id = :wg_id",
+		lit.P{"wg_id": widgetGroupId},
+	)
+}
+
 var WidgetGroupRepository = widgetGroupRepository{}

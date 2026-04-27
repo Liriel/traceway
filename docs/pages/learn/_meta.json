@@ -10,6 +10,7 @@
   "logs": "Logs",
   "alerts": "Alerts",
   "embedded-mode": "Embedded Mode",
+  "otel-agent": "OTel Agent",
   "build-tags": "Build Tags",
   "contributing": "Contributing"
 }

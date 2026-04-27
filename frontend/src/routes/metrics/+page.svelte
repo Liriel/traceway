@@ -399,10 +399,6 @@
 		}
 	}
 
-	const activeIsDefault = $derived(
-		widgetGroups.find((g) => String(g.id) === activeTabId)?.isDefault ?? false
-	);
-
 	const activeTabName = $derived(
 		widgetGroups.find((g) => String(g.id) === activeTabId)?.name ?? ''
 	);
@@ -492,7 +488,7 @@
 						{#each widgetGroups as group (group.id)}
 							<Tabs.Trigger value={String(group.id)}>
 								{group.name}
-								{#if !group.isDefault && String(group.id) === activeTabId}
+								{#if String(group.id) === activeTabId}
 									<DropdownMenu.Root>
 										<DropdownMenu.Trigger>
 											{#snippet child({ props })}
@@ -531,7 +527,7 @@
 				>
 					<Plus class="h-4 w-4" />
 				</button>
-				{#if hasOverflow && !activeIsDefault && activeTabId}
+				{#if hasOverflow && activeTabId}
 					<DropdownMenu.Root>
 						<DropdownMenu.Trigger
 							class="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"

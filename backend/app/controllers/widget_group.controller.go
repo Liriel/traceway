@@ -287,8 +287,12 @@ func (c *widgetGroupController) Delete(ctx *gin.Context) {
 		return
 	}
 
-	if existing.IsDefault {
-		ctx.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Default groups cannot be deleted."})
+	// Same transaction handles children + parent: delete child widgets first,
+	// then the group itself. Don't lean on the FK cascade — explicit deletes
+	// are easier to audit and survive future schema migrations that might
+	// drop or alter the cascade rule.
+	if err := repositories.WidgetGroupRepository.DeleteWidgetsByGroup(tx, id); err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to delete widget group widgets: %w", err))
 		return
 	}
 

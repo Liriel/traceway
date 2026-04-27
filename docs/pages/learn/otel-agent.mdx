@@ -1,0 +1,94 @@
+# OTel Agent
+
+import { Callout, Steps } from "nextra/components";
+
+The **Traceway OTel Agent** is a tiny, pre-configured OpenTelemetry Collector that pulls host metrics (CPU, memory, disk, filesystem, network, processes) from a server every 60 seconds and ships them to your Traceway project over OTLP/HTTP. Runs as a background service via `systemd`, `launchd`, or the Windows Service Manager — nothing to write, nothing to tune.
+
+<Callout type="info">
+  Full source, advanced config, and the contributor guide live at
+  [github.com/tracewayapp/traceway-otel-agent](https://github.com/tracewayapp/traceway-otel-agent).
+</Callout>
+
+## Install
+
+<Steps>
+
+### Grab a project token
+
+Open your Traceway dashboard → the project you want metrics to land in → **Settings** → copy the **project token**. You'll pass it to the installer on the next step.
+
+### Run the installer on your server
+
+**Linux / macOS** (requires `curl`, `tar`, `sudo` or root):
+
+```bash
+curl -fsSL https://install.tracewayapp.com/install.sh | TRACEWAY_TOKEN=<your-token> bash
+```
+
+**Windows** (PowerShell, run as Administrator):
+
+```powershell
+$env:TRACEWAY_TOKEN = "<your-token>"
+iwr -useb https://install.tracewayapp.com/install.ps1 | iex
+```
+
+</Steps>
+
+That's it. The installer downloads the agent, verifies its checksum, writes a systemd unit / launchd plist / Windows service, and starts it. Metrics begin arriving in your dashboard within about 60 seconds — the first scrape interval.
+
+## What gets captured
+
+Every 60 seconds the agent scrapes:
+
+- **CPU** — utilization (% per core per state), load averages (1m / 5m / 15m).
+- **Memory** — usage in bytes, utilization %.
+- **Disk** — throughput bytes, IOPS, I/O time per device.
+- **Filesystem** — usage bytes and utilization % per mount.
+- **Network** — throughput bytes, packets, errors, and open connections per interface.
+- **Process** — per-process CPU time, RSS, and virtual memory.
+
+Every signal is tagged with resource attributes so you can filter in the dashboard — `service.name`, `host.name`, `host.id`, `host.arch`, `os.type`, and on cloud VMs, `cloud.provider`, `cloud.region`, and `cloud.account.id` (EC2 / GCE / Azure are auto-detected).
+
+## Options
+
+Set these env vars alongside `TRACEWAY_TOKEN` before piping into the shell:
+
+| Var                     | Purpose                                                                                                |
+| ----------------------- | ------------------------------------------------------------------------------------------------------ |
+| `TRACEWAY_SERVICE_NAME` | `service.name` label for this host. Default: the machine's hostname.                                   |
+| `TRACEWAY_ENDPOINT`     | OTLP/HTTP base URL. Override when running against self-hosted Traceway.                                |
+| `TRACEWAY_LOG_PATHS`    | Comma-separated file globs to tail as logs (e.g. `/var/log/app/*.log`). Leave unset to ship metrics only. |
+
+Example — named host, app logs, self-hosted Traceway:
+
+```bash
+curl -fsSL https://install.tracewayapp.com/install.sh | \
+  TRACEWAY_TOKEN=<token> \
+  TRACEWAY_SERVICE_NAME=api-prod-eu-1 \
+  TRACEWAY_ENDPOINT=https://traceway.mycompany.com/api/otel \
+  TRACEWAY_LOG_PATHS="/var/log/app/*.log,/var/log/nginx/access.log" \
+  bash
+```
+
+Re-running the installer with the same env vars upgrades in place.
+
+## Uninstall
+
+**Linux / macOS:**
+
+```bash
+curl -fsSL https://install.tracewayapp.com/uninstall.sh | bash
+```
+
+**Windows** (admin PowerShell):
+
+```powershell
+Stop-Service TracewayOtelAgent; sc.exe delete TracewayOtelAgent
+Remove-Item -Recurse -Force 'C:\Program Files\TracewayOtelAgent', 'C:\ProgramData\TracewayOtelAgent'
+```
+
+Stops and removes the service, binary, and config directory. Your Traceway project data is untouched.
+
+---
+
+For deeper configuration — tuning the scrape interval, writing filelog operators, air-gapped and manual installs, signed releases, or contributing support for additional auth modes — see the agent repo: [github.com/tracewayapp/traceway-otel-agent](https://github.com/tracewayapp/traceway-otel-agent).
