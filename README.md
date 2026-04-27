@@ -221,6 +221,10 @@ Full documentation at **[docs.tracewayapp.com](https://docs.tracewayapp.com)**:
 - [**Concepts**](https://docs.tracewayapp.com/learn) — How tracing, exception grouping, metrics, and alerts work
 - [**Embedded Mode**](https://docs.tracewayapp.com/learn/embedded-mode) — Run Traceway inside your Go app
 
+## Contribute
+
+Contributions are welcome — pull requests get reviewed and merged. If you're not sure where to start or want to discuss an idea first, [open an issue](https://github.com/tracewayapp/traceway/issues) and we'll talk it through.
+
 ## Links
 
 - [Website](https://tracewayapp.com)
