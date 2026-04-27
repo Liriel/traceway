@@ -43,13 +43,13 @@ Plus: configurable alerts (Slack / GitHub / email / webhook), Apdex + Impact-Sco
 
 ## Why Traceway
 
-|                | Enterprise (Datadog / New Relic) | DIY OSS stack (Prometheus + Loki + Tempo + ...) | **Traceway**                    |
-| -------------- | -------------------------------- | ----------------------------------------------- | ------------------------------- |
-| **Pricing**    | Per-event, per-host, per-seat    | Free + ops time                                 | Self-host free, fixed cloud tiers |
-| **Setup**      | Vendor SDK per language          | Glue 6 tools together                           | `docker compose up -d`          |
-| **License**    | Proprietary                      | Mixed (some BSL / open-core)                    | **MIT — no asterisks**          |
-| **OTel**       | Wrapped in vendor SDK            | OTel Collector required                         | **Native OTLP/HTTP ingest**     |
-| **Replay + traces + AI** | 3 separate products    | Wire it yourself                                | One system, one trace ID        |
+|                          | Enterprise (Datadog / New Relic) | DIY OSS stack (Prometheus + Loki + Tempo + ...) | **Traceway**                      |
+| ------------------------ | -------------------------------- | ----------------------------------------------- | --------------------------------- |
+| **Pricing**              | Per-event, per-host, per-seat    | Free + ops time                                 | Self-host free, fixed cloud tiers |
+| **Setup**                | Vendor SDK per language          | Glue 6 tools together                           | `docker compose up -d`            |
+| **License**              | Proprietary                      | Mixed (some BSL / open-core)                    | **MIT — no asterisks**            |
+| **OTel**                 | Wrapped in vendor SDK            | OTel Collector required                         | **Native OTLP/HTTP ingest**       |
+| **Replay + traces + AI** | 3 separate products              | Wire it yourself                                | One system, one trace ID          |
 
 ## Quick Start
 
@@ -98,22 +98,22 @@ Traceway integrates with the tools you already use. Every integration ships trac
 <table width="100%">
 <tbody>
 <tr>
-<td align="center" width="25%"><a href="https://docs.tracewayapp.com/client/gin-middleware"><img src="./docs/public/gin.png" height="48" alt="Gin" /><br/><b>Gin</b></a></td>
-<td align="center" width="25%"><a href="https://docs.tracewayapp.com/client/chi-middleware"><img src="./docs/public/chi.png" height="48" alt="Chi" /><br/><b>Chi</b></a></td>
-<td align="center" width="25%"><a href="https://docs.tracewayapp.com/client/fiber-middleware"><img src="./docs/public/fiber.svg" height="48" alt="Fiber" /><br/><b>Fiber</b></a></td>
-<td align="center" width="25%"><a href="https://docs.tracewayapp.com/client/fasthttp-middleware"><img src="./docs/public/fasthttp.png" height="48" alt="FastHTTP" /><br/><b>FastHTTP</b></a></td>
+<td align="center" width="25%"><a href="https://docs.tracewayapp.com/client/gin-middleware"><img src="./docs/public/gin.png" height="28" alt="Gin" /><br/><b>Gin</b></a></td>
+<td align="center" width="25%"><a href="https://docs.tracewayapp.com/client/chi-middleware"><img src="./docs/public/chi.png" height="28" alt="Chi" /><br/><b>Chi</b></a></td>
+<td align="center" width="25%"><a href="https://docs.tracewayapp.com/client/fiber-middleware"><img src="./docs/public/fiber.svg" height="28" alt="Fiber" /><br/><b>Fiber</b></a></td>
+<td align="center" width="25%"><a href="https://docs.tracewayapp.com/client/fasthttp-middleware"><img src="./docs/public/fasthttp.png" height="28" alt="FastHTTP" /><br/><b>FastHTTP</b></a></td>
 </tr>
 <tr>
-<td align="center" width="25%"><a href="https://docs.tracewayapp.com/client/http-middleware"><img src="./docs/public/stdlib.png" height="48" alt="net/http" /><br/><b>net/http</b></a></td>
-<td align="center" width="25%"><a href="https://docs.tracewayapp.com/client/sdk"><img src="./docs/public/custom.png" height="48" alt="Go Generic" /><br/><b>Go Generic</b></a></td>
-<td align="center" width="25%"><a href="https://docs.tracewayapp.com/client/node-sdk"><img src="./docs/public/node.png" height="48" alt="Node.js" /><br/><b>Node.js</b></a></td>
-<td align="center" width="25%"><a href="https://docs.tracewayapp.com/client/nestjs"><img src="./docs/public/nestjs.png" height="48" alt="NestJS" /><br/><b>NestJS</b></a></td>
+<td align="center" width="25%"><a href="https://docs.tracewayapp.com/client/http-middleware"><img src="./docs/public/stdlib.png" height="28" alt="net/http" /><br/><b>net/http</b></a></td>
+<td align="center" width="25%"><a href="https://docs.tracewayapp.com/client/sdk"><img src="./docs/public/custom.png" height="28" alt="Go Generic" /><br/><b>Go Generic</b></a></td>
+<td align="center" width="25%"><a href="https://docs.tracewayapp.com/client/node-sdk"><img src="./docs/public/node.png" height="28" alt="Node.js" /><br/><b>Node.js</b></a></td>
+<td align="center" width="25%"><a href="https://docs.tracewayapp.com/client/nestjs"><img src="./docs/public/nestjs.png" height="28" alt="NestJS" /><br/><b>NestJS</b></a></td>
 </tr>
 <tr>
-<td align="center" width="25%"><a href="https://docs.tracewayapp.com/client/hono"><img src="./docs/public/hono.png" height="48" alt="Hono" /><br/><b>Hono</b></a></td>
-<td align="center" width="25%"><a href="https://docs.tracewayapp.com/client/symfony"><img src="./docs/public/symfony.png" height="48" alt="Symfony" /><br/><b>Symfony</b></a></td>
-<td align="center" width="25%"><a href="https://docs.tracewayapp.com/client/cloudflare"><img src="./docs/public/cloudflare.png" height="48" alt="Cloudflare Workers" /><br/><b>Cloudflare</b></a></td>
-<td align="center" width="25%"><a href="https://docs.tracewayapp.com/client/otel"><img src="./docs/public/otel.png" height="48" alt="OpenTelemetry" /><br/><b>OpenTelemetry</b></a></td>
+<td align="center" width="25%"><a href="https://docs.tracewayapp.com/client/hono"><img src="./docs/public/hono.png" height="28" alt="Hono" /><br/><b>Hono</b></a></td>
+<td align="center" width="25%"><a href="https://docs.tracewayapp.com/client/symfony"><img src="./docs/public/symfony.png" height="28" alt="Symfony" /><br/><b>Symfony</b></a></td>
+<td align="center" width="25%"><a href="https://docs.tracewayapp.com/client/cloudflare"><img src="./docs/public/cloudflare.png" height="28" alt="Cloudflare Workers" /><br/><b>Cloudflare</b></a></td>
+<td align="center" width="25%"><a href="https://docs.tracewayapp.com/client/otel"><img src="./docs/public/otel.png" height="28" alt="OpenTelemetry" /><br/><b>OpenTelemetry</b></a></td>
 </tr>
 </tbody>
 </table>
@@ -125,59 +125,65 @@ Traceway integrates with the tools you already use. Every integration ships trac
 <table width="100%">
 <tbody>
 <tr>
-<td align="center" width="16.66%"><a href="https://docs.tracewayapp.com/client/nextjs"><img src="./docs/public/nextjs.png" height="48" alt="Next.js" /><br/><b>Next.js</b></a></td>
-<td align="center" width="16.66%"><a href="https://docs.tracewayapp.com/client/react"><img src="./docs/public/react.png" height="48" alt="React" /><br/><b>React</b></a></td>
-<td align="center" width="16.66%"><a href="https://docs.tracewayapp.com/client/vue"><img src="./docs/public/vue.png" height="48" alt="Vue" /><br/><b>Vue</b></a></td>
-<td align="center" width="16.66%"><a href="https://docs.tracewayapp.com/client/svelte"><img src="./docs/public/svelte.png" height="48" alt="Svelte" /><br/><b>Svelte</b></a></td>
-<td align="center" width="16.66%"><a href="https://docs.tracewayapp.com/client/jquery"><img src="./docs/public/jquery.png" height="48" alt="jQuery" /><br/><b>jQuery</b></a></td>
-<td align="center" width="16.66%"><a href="https://docs.tracewayapp.com/client/js-sdk"><img src="./docs/public/javascript.png" height="48" alt="JavaScript" /><br/><b>JavaScript</b></a></td>
+<td align="center" width="16.66%"><a href="https://docs.tracewayapp.com/client/nextjs"><img src="./docs/public/nextjs.png" height="28" alt="Next.js" /><br/><b>Next.js</b></a></td>
+<td align="center" width="16.66%"><a href="https://docs.tracewayapp.com/client/react"><img src="./docs/public/react.png" height="28" alt="React" /><br/><b>React</b></a></td>
+<td align="center" width="16.66%"><a href="https://docs.tracewayapp.com/client/vue"><img src="./docs/public/vue.png" height="28" alt="Vue" /><br/><b>Vue</b></a></td>
+<td align="center" width="16.66%"><a href="https://docs.tracewayapp.com/client/svelte"><img src="./docs/public/svelte.png" height="28" alt="Svelte" /><br/><b>Svelte</b></a></td>
+<td align="center" width="16.66%"><a href="https://docs.tracewayapp.com/client/jquery"><img src="./docs/public/jquery.png" height="28" alt="jQuery" /><br/><b>jQuery</b></a></td>
+<td align="center" width="16.66%"><a href="https://docs.tracewayapp.com/client/js-sdk"><img src="./docs/public/javascript.png" height="28" alt="JavaScript" /><br/><b>JavaScript</b></a></td>
 </tr>
 </tbody>
 </table>
 
 ### Mobile
 
-<a href="https://docs.tracewayapp.com/client/flutter"><img src="./docs/public/flutter.png" height="48" alt="Flutter" /></a> &nbsp; **[Flutter](https://docs.tracewayapp.com/client/flutter)**
+<table>
+<tbody>
+<tr>
+<td align="center" width="16.66%"><a href="https://docs.tracewayapp.com/client/flutter"><img src="./docs/public/flutter.png" height="28" alt="Flutter" /><br/><b>Flutter</b></a></td>
+</tr>
+</tbody>
+</table>
 
 ### AI
 
-<a href="https://docs.tracewayapp.com/client/openrouter"><img src="./docs/public/openrouter.png" height="48" alt="OpenRouter" /></a> &nbsp; **[OpenRouter](https://docs.tracewayapp.com/client/openrouter)**
+<a href="https://docs.tracewayapp.com/client/openrouter"><img src="./docs/public/openrouter.png" height="28" alt="OpenRouter" /></a> &nbsp; **[OpenRouter](https://docs.tracewayapp.com/client/openrouter)**
 
 ## Screenshots
 
-|   |   |
-|---|---|
-| **Logs — trace-linked search**<br>![Logs](./website/public/images/logs-search-and-detail.png) | **Traces — cross-service**<br>![Traces](./website/public/images/traces-cross-service.png) |
-| **Span waterfall**<br>![Spans](./website/public/images/traces-spans-waterfall.png) | **Metrics — application dashboard**<br>![Metrics](./website/public/images/metrics-application-dashboard.png) |
-| **Session replay**<br>![Session Replay](./website/public/images/session-replay-viewer.png) | **Exceptions — grouped & ranked**<br>![Exceptions](./website/public/images/exceptions-grouped-ranked.png) |
-| **Endpoint impact (Apdex)**<br>![Performance](./website/public/images/performance-endpoints-impact-table.png) | **AI observability**<br>![AI Traces](./website/public/images/ai-traces-list.png) |
+|                                                                                                               |                                                                                                              |
+| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| **Logs — trace-linked search**<br>![Logs](./website/public/images/logs-search-and-detail.png)                 | **Traces — cross-service**<br>![Traces](./website/public/images/traces-cross-service.png)                    |
+| **Span waterfall**<br>![Spans](./website/public/images/traces-spans-waterfall.png)                            | **Metrics — application dashboard**<br>![Metrics](./website/public/images/metrics-application-dashboard.png) |
+| **Session replay**<br>![Session Replay](./website/public/images/session-replay-viewer.png)                    | **Exceptions — grouped & ranked**<br>![Exceptions](./website/public/images/exceptions-grouped-ranked.png)    |
+| **Endpoint impact (Apdex)**<br>![Performance](./website/public/images/performance-endpoints-impact-table.png) | **AI observability**<br>![AI Traces](./website/public/images/ai-traces-list.png)                             |
 
 ## Tech Stack
 
-| Component | Technology |
-|-----------|------------|
-| Backend | Go 1.25, Gin |
-| Frontend | SvelteKit 2, Svelte 5, Tailwind CSS v4 |
-| Telemetry DB | ClickHouse (standalone) or SQLite (embedded) |
-| Relational DB | PostgreSQL (standalone) or SQLite (embedded) |
-| Ingest | OTLP/HTTP (Protobuf + JSON) for traces, metrics, logs |
+| Component     | Technology                                            |
+| ------------- | ----------------------------------------------------- |
+| Backend       | Go 1.25, Gin                                          |
+| Frontend      | SvelteKit 2, Svelte 5, Tailwind CSS v4                |
+| Telemetry DB  | ClickHouse (standalone) or SQLite (embedded)          |
+| Relational DB | PostgreSQL (standalone) or SQLite (embedded)          |
+| Ingest        | OTLP/HTTP (Protobuf + JSON) for traces, metrics, logs |
 
 ## Project Structure
 
-| Directory | Description |
-|-----------|-------------|
-| `backend/` | Go/Gin API server — OTLP ingest, REST API, notifications, migrations |
-| `frontend/` | SvelteKit 2 dashboard SPA |
-| `docs/` | Documentation site (Nextra) |
+| Directory   | Description                                                                                                                                                                                                                             |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `backend/`  | Go/Gin API server — OTLP ingest, REST API, notifications, migrations                                                                                                                                                                    |
+| `frontend/` | SvelteKit 2 dashboard SPA                                                                                                                                                                                                               |
+| `docs/`     | Documentation site (Nextra)                                                                                                                                                                                                             |
 | `examples/` | Working examples — [embedded mode](./examples/embedded-backend-otel) and OTel-instrumented apps ([Express](./examples/express-otel), [NestJS](./examples/nestjs-otel), [Next.js](./examples/nextjs-otel), [Hono](./examples/hono-otel)) |
-| `website/` | Landing page |
+| `website/`  | Landing page                                                                                                                                                                                                                            |
 
 ## Build Tags
 
-| Tag | Purpose |
-|-----|---------|
-| *(none)* | SQLite storage — embedded mode, zero dependencies. This is the default. |
-| `pgch` | ClickHouse + PostgreSQL storage — standalone server mode. |
+| Tag         | Purpose                                                                                                         |
+| ----------- | --------------------------------------------------------------------------------------------------------------- |
+| _(none)_    | SQLite storage — embedded mode, zero dependencies. This is the default.                                         |
+| `pgch`      | ClickHouse + PostgreSQL storage — standalone server mode.                                                       |
 | `localdist` | Embeds frontend from `static/dist/` instead of `static/frontend/`. Used by traceway-cloud to inject billing UI. |
 
 ```bash
