@@ -116,7 +116,11 @@ docker stop traceway && docker rm traceway
 
 **2. Point Railway at `Dockerfile.sqlite`.** Open **Settings → Build** on the service and set **Custom Dockerfile Path** to `Dockerfile.sqlite`. Railway will use that Dockerfile for every deploy.
 
-**3. Add a volume at `/data`.** Open **Settings → Volumes**, add a new volume, and set the mount path to `/data`. Without this, your SQLite files and uploaded blobs get wiped on every redeploy.
+**3. Attach a volume at `/data`.** Right-click the service tile and pick **Attach volume**, then enter `/data` as the mount path. Without this, your SQLite files and uploaded blobs get wiped on every redeploy.
+
+<img src="/railway-attach-volume.png" alt="Railway service context menu with Attach volume highlighted" style={{ maxWidth: 280, height: 'auto', display: 'block', marginTop: '0.75rem' }} />
+
+<img src="/railway-volume-mount-path.png" alt="Railway volume mount path field set to /data" style={{ maxWidth: 320, height: 'auto', display: 'block', marginTop: '0.75rem' }} />
 
 **4. Set environment variables.** Open **Variables** and add:
 
