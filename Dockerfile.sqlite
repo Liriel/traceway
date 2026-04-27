@@ -62,7 +62,10 @@ ENV GIN_MODE=release \
     STORAGE_TYPE=local \
     STORAGE_PATH=/data/storage
 
-VOLUME ["/data"]
+# /data holds both SQLite files and local blob storage. Mount a host folder
+# or named volume there to persist state across restarts. We deliberately do
+# NOT declare a VOLUME here so the image stays compatible with platforms that
+# require platform-managed volumes (e.g. Railway).
 
 EXPOSE 80 8082
 
