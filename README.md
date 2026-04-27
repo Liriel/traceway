@@ -6,49 +6,66 @@
   </picture>
 </p>
 
-<h3 align="center">Open-source error tracking and performance monitoring for All applications</h3>
+<p align="center">
+  <sub>Built on <img src="./docs/public/otel.png" height="14" alt="OpenTelemetry" /> <b>OpenTelemetry</b></sub>
+</p>
+
+<h3 align="center">OpenTelemetry-native observability. Open source. Self-hosted in 90 seconds.</h3>
 
 <p align="center">
-  <a href="https://tracewayapp.com">Website</a> · <a href="https://docs.tracewayapp.com">Docs</a> · <a href="https://github.com/tracewayapp/go-client">Go Client SDK</a>
+  <a href="https://opentelemetry.io"><img alt="OTel-First" src="https://img.shields.io/badge/OTel--First-Native%20OTLP%2FHTTP-425CC7?logo=opentelemetry&logoColor=white" /></a>
+  <a href="https://github.com/tracewayapp/traceway/blob/main/LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/100%25%20Open%20Source-MIT-22c55e" /></a>
+  <a href="https://docs.tracewayapp.com/server/docker-compose"><img alt="Self-Host" src="https://img.shields.io/badge/Self--Host-docker%20compose%20up-2496ed?logo=docker&logoColor=white" /></a>
+</p>
+
+<p align="center">
+  <a href="https://tracewayapp.com">Website</a> · <a href="https://docs.tracewayapp.com">Docs</a> · <a href="https://cloud.tracewayapp.com">Cloud</a>
 </p>
 
 ---
 
-Traceway is a self-hosted observability platform that ingests OpenTelemetry traces and metrics, groups exceptions automatically, and gives you endpoint performance, distributed tracing, and alerts — all in a single binary. No OTel Collector or separate time-series database required.
+Traceway is an **OpenTelemetry-native** observability platform that stitches **logs, traces, metrics, session replay, exceptions, and AI tracing** together with one trace ID. Point an OTLP exporter at it and you're in business — no Collector, no glue code, no per-language vendor SDK.
 
-It can run as a standalone server with ClickHouse + PostgreSQL, or **embedded directly inside your Go application** with SQLite for zero-infrastructure local development.
+**MIT licensed. No BSL. No "open core."** Every feature is in the box. Self-host it for free, or run it on [Traceway Cloud](https://cloud.tracewayapp.com) if you'd rather not babysit infra.
 
 <img width="2452" height="1966" alt="Traceway Dashboard" src="https://github.com/user-attachments/assets/30a4fa24-7d08-4b36-a8f3-42abc73692fd" />
 
-## Features
+## What's in the box
 
-- **OTel-Native** — Accepts OTLP/HTTP traces and metrics directly, no Collector needed
-- **Embedded Mode** — Run Traceway inside your Go process with SQLite, zero external dependencies
-- **Issue Tracking** — Automatic exception grouping with normalized stack trace hashing and contextual tags
-- **Endpoint Performance** — P50, P95, P99 latency percentiles with Apdex scoring and impact scores
-- **AI Observability** — Monitor LLM costs, token usage, latency, and conversations across AI providers. Works with [OpenRouter](https://docs.tracewayapp.com/client/openrouter) and any OpenTelemetry-compatible AI gateway
-- **Distributed Tracing** — Full request traces with span breakdowns
-- **Alerts & Notifications** — Configurable rules (error rate, latency thresholds, Apdex drops, metric thresholds) with email, Slack, GitHub, and webhook delivery
-- **Session Replay** — Replay user sessions to see exactly what happened before an error
-- **System Metrics** — CPU, memory, goroutines, and GC monitoring with custom metric support
-- **Background Tasks** — Track and monitor async job performance
-- **Multi-Tenant** — Organization-based access control with owner, admin, user, and read-only roles
+- **Logs** — Structured, trace-linked, sub-second search. Native OTLP/HTTP ingest from any OTel SDK.
+- **Traces** — End-to-end span waterfalls across every service. Click a log, jump to its span.
+- **Metrics** — Host, runtime, and custom metrics. Any dimension, any chart, with custom widget groups.
+- **Exceptions** — SHA-256 normalized stack traces grouped into ranked issues. Source-mapped (webpack, esbuild, Vite).
+- **Session Replay** — Watch what the user did right before the error. Available for web (any JS framework) and Flutter.
+- **AI Observability** — LLM cost, tokens, latency, and full conversations across providers (OpenRouter and any OTel-compatible AI gateway).
+
+Plus: configurable alerts (Slack / GitHub / email / webhook), Apdex + Impact-Score endpoint ranking, multi-tenant orgs with role-based access, and a per-endpoint slow-threshold override.
+
+## Why Traceway
+
+|                | Enterprise (Datadog / New Relic) | DIY OSS stack (Prometheus + Loki + Tempo + ...) | **Traceway**                    |
+| -------------- | -------------------------------- | ----------------------------------------------- | ------------------------------- |
+| **Pricing**    | Per-event, per-host, per-seat    | Free + ops time                                 | Self-host free, fixed cloud tiers |
+| **Setup**      | Vendor SDK per language          | Glue 6 tools together                           | `docker compose up -d`          |
+| **License**    | Proprietary                      | Mixed (some BSL / open-core)                    | **MIT — no asterisks**          |
+| **OTel**       | Wrapped in vendor SDK            | OTel Collector required                         | **Native OTLP/HTTP ingest**     |
+| **Replay + traces + AI** | 3 separate products    | Wire it yourself                                | One system, one trace ID        |
 
 ## Quick Start
 
-### Docker (standalone server)
+### Self-host with Docker (recommended)
 
 ```bash
-docker compose up --build
+git clone https://github.com/tracewayapp/traceway
+cd traceway && docker compose up -d
+# ✓ dashboard at http://localhost
 ```
 
-Open `http://localhost` to access the dashboard.
+Point any OTel SDK at `http://localhost/api/otel/v1/traces` (or `/metrics`, `/logs`) and traces start flowing. See the [self-hosting docs](https://docs.tracewayapp.com/server/docker-compose) for production deployment, TLS, and storage configuration.
 
-See the [self-hosting docs](https://docs.tracewayapp.com/server/docker-compose) for configuration and deployment options.
+### Embedded mode (inside your Go app)
 
-### Embedded Mode (inside your Go app)
-
-Run Traceway inside your Go process — no Docker, no external databases:
+Run Traceway inside your Go process — no Docker, no external databases, SQLite under the hood:
 
 ```bash
 go get github.com/tracewayapp/traceway/backend
@@ -64,13 +81,55 @@ func main() {
         tracewaybackend.WithDefaultProject("My App", "go", "dev-token"),
     )
 
-    // ... start your app, point OTel exporter to http://localhost:8082/api/otel/v1/traces
+    // ... start your app, point its OTel exporter to http://localhost:8082/api/otel/v1/traces
 }
 ```
 
-Open `http://localhost:8082`, log in, and hit your app to see traces appear.
+Open `http://localhost:8082`, log in, and hit your app to see traces appear. Full walkthrough in the [embedded mode guide](https://docs.tracewayapp.com/learn/embedded-mode), or check the [working example](./examples/embedded-backend-otel).
 
-See the [embedded mode guide](https://docs.tracewayapp.com/learn/embedded-mode) for the full step-by-step setup with OpenTelemetry, or check the [working example](./examples/embedded-backend-otel).
+## Supported Integrations
+
+Traceway integrates with the tools you already use. Every integration ships traces, metrics, and logs over **OTLP/HTTP** — no proprietary SDK required.
+
+> View the full list in the [documentation](https://docs.tracewayapp.com/client). Missing a framework? [Open an issue](https://github.com/tracewayapp/traceway/issues) to request it.
+
+### Backend
+
+|  |  |  |  |
+|:---:|:---:|:---:|:---:|
+| <a href="https://docs.tracewayapp.com/client/gin-middleware"><img src="./docs/public/gin.png" width="48" alt="Gin" /><br/>**Gin**</a> | <a href="https://docs.tracewayapp.com/client/chi-middleware"><img src="./docs/public/chi.png" width="48" alt="Chi" /><br/>**Chi**</a> | <a href="https://docs.tracewayapp.com/client/fiber-middleware"><img src="./docs/public/fiber.svg" width="48" alt="Fiber" /><br/>**Fiber**</a> | <a href="https://docs.tracewayapp.com/client/fasthttp-middleware"><img src="./docs/public/fasthttp.png" width="48" alt="FastHTTP" /><br/>**FastHTTP**</a> |
+| <a href="https://docs.tracewayapp.com/client/http-middleware"><img src="./docs/public/stdlib.png" width="48" alt="net/http" /><br/>**net/http**</a> | <a href="https://docs.tracewayapp.com/client/sdk"><img src="./docs/public/custom.png" width="48" alt="Go Generic" /><br/>**Go Generic**</a> | <a href="https://docs.tracewayapp.com/client/node-sdk"><img src="./docs/public/node.png" width="48" alt="Node.js" /><br/>**Node.js**</a> | <a href="https://docs.tracewayapp.com/client/nestjs"><img src="./docs/public/nestjs.png" width="48" alt="NestJS" /><br/>**NestJS**</a> |
+| <a href="https://docs.tracewayapp.com/client/hono"><img src="./docs/public/hono.png" width="48" alt="Hono" /><br/>**Hono**</a> | <a href="https://docs.tracewayapp.com/client/symfony"><img src="./docs/public/symfony.png" width="48" alt="Symfony" /><br/>**Symfony**</a> | <a href="https://docs.tracewayapp.com/client/cloudflare"><img src="./docs/public/cloudflare.png" width="48" alt="Cloudflare Workers" /><br/>**Cloudflare**</a> | <a href="https://docs.tracewayapp.com/client/otel"><img src="./docs/public/otel.png" width="48" alt="OpenTelemetry" /><br/>**OpenTelemetry**</a> |
+
+### Frontend
+
+> Session Replay is included with every frontend integration — and with Flutter too.
+
+|  |  |  |  |
+|:---:|:---:|:---:|:---:|
+| <a href="https://docs.tracewayapp.com/client/nextjs"><img src="./docs/public/nextjs.png" width="48" alt="Next.js" /><br/>**Next.js**</a> | <a href="https://docs.tracewayapp.com/client/react"><img src="./docs/public/react.png" width="48" alt="React" /><br/>**React**</a> | <a href="https://docs.tracewayapp.com/client/vue"><img src="./docs/public/vue.png" width="48" alt="Vue" /><br/>**Vue**</a> | <a href="https://docs.tracewayapp.com/client/svelte"><img src="./docs/public/svelte.png" width="48" alt="Svelte" /><br/>**Svelte**</a> |
+| <a href="https://docs.tracewayapp.com/client/jquery"><img src="./docs/public/jquery.png" width="48" alt="jQuery" /><br/>**jQuery**</a> | <a href="https://docs.tracewayapp.com/client/js-sdk"><img src="./docs/public/javascript.png" width="48" alt="JavaScript" /><br/>**JavaScript**</a> |  |  |
+
+### Mobile
+
+|  |  |  |  |
+|:---:|:---:|:---:|:---:|
+| <a href="https://docs.tracewayapp.com/client/flutter"><img src="./docs/public/flutter.png" width="48" alt="Flutter" /><br/>**Flutter**</a> |  |  |  |
+
+### AI
+
+|  |  |  |  |
+|:---:|:---:|:---:|:---:|
+| <a href="https://docs.tracewayapp.com/client/openrouter"><img src="./docs/public/openrouter.png" width="48" alt="OpenRouter" /><br/>**OpenRouter**</a> |  |  |  |
+
+## Screenshots
+
+|   |   |
+|---|---|
+| **Logs — trace-linked search**<br>![Logs](./website/public/images/logs-search-and-detail.png) | **Traces — cross-service**<br>![Traces](./website/public/images/traces-cross-service.png) |
+| **Span waterfall**<br>![Spans](./website/public/images/traces-spans-waterfall.png) | **Metrics — application dashboard**<br>![Metrics](./website/public/images/metrics-application-dashboard.png) |
+| **Session replay**<br>![Session Replay](./website/public/images/session-replay-viewer.png) | **Exceptions — grouped & ranked**<br>![Exceptions](./website/public/images/exceptions-grouped-ranked.png) |
+| **Endpoint impact (Apdex)**<br>![Performance](./website/public/images/performance-endpoints-impact-table.png) | **AI observability**<br>![AI Traces](./website/public/images/ai-traces-list.png) |
 
 ## Tech Stack
 
@@ -80,24 +139,16 @@ See the [embedded mode guide](https://docs.tracewayapp.com/learn/embedded-mode) 
 | Frontend | SvelteKit 2, Svelte 5, Tailwind CSS v4 |
 | Telemetry DB | ClickHouse (standalone) or SQLite (embedded) |
 | Relational DB | PostgreSQL (standalone) or SQLite (embedded) |
-| Client SDKs | [Go](https://github.com/tracewayapp/go-client), OpenTelemetry (any language) |
-
-## Screenshots
-
-| | |
-|---|---|
-| ![Issues](./printscreens/issues.png) | ![Endpoints](./printscreens/endpoints.png) |
-| ![Spans](./printscreens/spans.png) | ![Metrics](./printscreens/metrics.png) |
-| ![Session Replay](./printscreens/session-replay.png) | ![Attributes](./printscreens/attributes.png) |
+| Ingest | OTLP/HTTP (Protobuf + JSON) for traces, metrics, logs |
 
 ## Project Structure
 
 | Directory | Description |
 |-----------|-------------|
-| `backend/` | Go/Gin API server — telemetry ingestion, REST API, notifications, migrations |
+| `backend/` | Go/Gin API server — OTLP ingest, REST API, notifications, migrations |
 | `frontend/` | SvelteKit 2 dashboard SPA |
 | `docs/` | Documentation site (Nextra) |
-| `examples/` | Working examples for embedded mode ([OTel](./examples/embedded-backend-otel), [Go client](./examples/embedded-backend-go-client)) |
+| `examples/` | Working examples — [embedded mode](./examples/embedded-backend-otel) and OTel-instrumented apps ([Express](./examples/express-otel), [NestJS](./examples/nestjs-otel), [Next.js](./examples/nextjs-otel), [Hono](./examples/hono-otel)) |
 | `website/` | Landing page |
 
 ## Build Tags
@@ -136,8 +187,8 @@ cd backend && go test -v -count=1 -args -update ./app/controllers/otelcontroller
 
 Full documentation at **[docs.tracewayapp.com](https://docs.tracewayapp.com)**:
 
-- [**Client SDKs**](https://docs.tracewayapp.com/client) — Go, Node.js, and OpenTelemetry integration guides
-- [**Self-Hosting**](https://docs.tracewayapp.com/server) — Docker Compose and deployment options
+- [**Client SDKs**](https://docs.tracewayapp.com/client) — OpenTelemetry, Go, Node.js, Python, and more
+- [**Self-Hosting**](https://docs.tracewayapp.com/server) — Docker Compose and production deployment
 - [**Concepts**](https://docs.tracewayapp.com/learn) — How tracing, exception grouping, metrics, and alerts work
 - [**Embedded Mode**](https://docs.tracewayapp.com/learn/embedded-mode) — Run Traceway inside your Go app
 
@@ -145,4 +196,4 @@ Full documentation at **[docs.tracewayapp.com](https://docs.tracewayapp.com)**:
 
 - [Website](https://tracewayapp.com)
 - [Documentation](https://docs.tracewayapp.com)
-- [Go Client SDK](https://github.com/tracewayapp/go-client)
+- [Traceway Cloud](https://cloud.tracewayapp.com) — managed hosting (same MIT code, run by us)
