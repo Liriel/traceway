@@ -12,10 +12,20 @@ import (
 
 type userRepository struct{}
 
+const userColumns = "id, email, name, password, created_at, oauth_provider, oauth_user_id, avatar_url"
+
 func (r *userRepository) FindByEmail(tx *sql.Tx, email string) (*models.User, error) {
 	return lit.SelectSingleNamed[models.User](
 		tx,
-		"SELECT id, email, name, password, created_at FROM users WHERE email = :email",
+		"SELECT "+userColumns+" FROM users WHERE email = :email",
+		lit.P{"email": email},
+	)
+}
+
+func (r *userRepository) FindByEmailIgnoreCase(tx *sql.Tx, email string) (*models.User, error) {
+	return lit.SelectSingleNamed[models.User](
+		tx,
+		"SELECT "+userColumns+" FROM users WHERE LOWER(email) = LOWER(:email)",
 		lit.P{"email": email},
 	)
 }
@@ -23,8 +33,16 @@ func (r *userRepository) FindByEmail(tx *sql.Tx, email string) (*models.User, er
 func (r *userRepository) FindById(tx *sql.Tx, id int) (*models.User, error) {
 	return lit.SelectSingleNamed[models.User](
 		tx,
-		"SELECT id, email, name, password, created_at FROM users WHERE id = :id",
+		"SELECT "+userColumns+" FROM users WHERE id = :id",
 		lit.P{"id": id},
+	)
+}
+
+func (r *userRepository) FindByOAuth(tx *sql.Tx, provider string, providerUserId string) (*models.User, error) {
+	return lit.SelectSingleNamed[models.User](
+		tx,
+		"SELECT "+userColumns+" FROM users WHERE oauth_provider = :provider AND oauth_user_id = :uid",
+		lit.P{"provider": provider, "uid": providerUserId},
 	)
 }
 
@@ -43,6 +61,54 @@ func (r *userRepository) Create(tx *sql.Tx, email string, name string, hashedPas
 	user.Id = id
 
 	return user, nil
+}
+
+func (r *userRepository) CreateOAuth(tx *sql.Tx, email, name, provider, providerUserId, avatarUrl string) (*models.User, error) {
+	var avatar *string
+	if avatarUrl != "" {
+		avatar = &avatarUrl
+	}
+	user := &models.User{
+		Email:         email,
+		Name:          name,
+		Password:      "",
+		CreatedAt:     time.Now().UTC(),
+		OauthProvider: &provider,
+		OauthUserId:   &providerUserId,
+		AvatarUrl:     avatar,
+	}
+
+	id, err := lit.Insert(tx, user)
+	if err != nil {
+		return nil, err
+	}
+	user.Id = id
+
+	return user, nil
+}
+
+func (r *userRepository) LinkOAuth(tx *sql.Tx, userId int, provider, providerUserId, avatarUrl string) error {
+	q, a, err := lit.ParseNamedQuery(
+		db.Driver,
+		"UPDATE users SET oauth_provider = :provider, oauth_user_id = :uid, avatar_url = COALESCE(:avatar, avatar_url) WHERE id = :id",
+		lit.P{
+			"provider": provider,
+			"uid":      providerUserId,
+			"avatar":   nullIfEmpty(avatarUrl),
+			"id":       userId,
+		},
+	)
+	if err != nil {
+		return err
+	}
+	return lit.UpdateNative(tx, q, a...)
+}
+
+func nullIfEmpty(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
 }
 
 func (r *userRepository) EmailExists(tx *sql.Tx, email string) (bool, error) {
@@ -79,7 +145,7 @@ func (r *userRepository) ClearPasswordResetToken(tx *sql.Tx, userId int) error {
 func (r *userRepository) FindByPasswordResetToken(tx *sql.Tx, token string) (*models.User, error) {
 	return lit.SelectSingleNamed[models.User](
 		tx,
-		"SELECT id, email, name, password, created_at, password_reset_token, password_reset_expires_at, password_reset_requested_at FROM users WHERE password_reset_token = :token",
+		"SELECT "+userColumns+", password_reset_token, password_reset_expires_at, password_reset_requested_at FROM users WHERE password_reset_token = :token",
 		lit.P{"token": token},
 	)
 }

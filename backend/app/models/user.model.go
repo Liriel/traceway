@@ -13,6 +13,9 @@ type User struct {
 	PasswordResetToken       *string    `json:"-"`
 	PasswordResetExpiresAt   *time.Time `json:"-"`
 	PasswordResetRequestedAt *time.Time `json:"-"`
+	OauthProvider            *string    `json:"-"`
+	OauthUserId              *string    `json:"-"`
+	AvatarUrl                *string    `json:"avatarUrl,omitempty"`
 }
 
 type UserResponse struct {
