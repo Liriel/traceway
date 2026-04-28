@@ -65,13 +65,13 @@ export default function MetricsPage() {
           title="CPU, memory, disk, network — one line to install"
           description={
             <>
-              The <Link href="https://github.com/tracewayapp/traceway-otel-agent" style={{ color: "var(--a2)", textDecoration: "underline" }}>Traceway OTel Agent</Link> is a pre-built OpenTelemetry Collector distribution that scrapes host metrics every 30 seconds and ships them to your project over OTLP/HTTP. Install with a single curl, no config file required.
+              The <Link href="https://github.com/tracewayapp/traceway-otel-agent" style={{ color: "var(--a2)", textDecoration: "underline" }}>Traceway OTel Agent</Link> is a pre-built OpenTelemetry Collector distribution that scrapes host metrics every 60 seconds and ships them to your project over OTLP/HTTP. Install with a single curl, no config file required.
             </>
           }
           bullets={[
             "One-line install on Linux (systemd), macOS (launchd), or Windows",
-            "CPU, memory, load, disk, filesystem, network, process",
-            "30-second collection interval via hostmetricsreceiver",
+            "CPU, memory, load, disk, filesystem, network",
+            "60-second collection interval via hostmetricsreceiver",
             "Runs alongside your apps — no code changes",
             "Also tails any log files you point it at (opt-in)",
           ]}
@@ -152,10 +152,12 @@ export default function MetricsPage() {
                         </Link>{" "}
                         is a pre-built OpenTelemetry Collector distribution that
                         you install on the host with a single curl. It scrapes
-                        CPU, memory, load, disk, filesystem, network, and
-                        per-process metrics via the upstream{" "}
-                        <code>hostmetricsreceiver</code> every 30 seconds and
+                        CPU, memory, load, disk, filesystem, and network
+                        metrics via the upstream{" "}
+                        <code>hostmetricsreceiver</code> every 60 seconds and
                         ships them to your Traceway project over OTLP/HTTP.
+                        Per-process metrics are opt-in via{" "}
+                        <code>TRACEWAY_PROCESS_NAMES</code>.
                       </p>
                       <p>
                         No config file to write — you set{" "}

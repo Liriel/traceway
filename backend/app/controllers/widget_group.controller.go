@@ -333,10 +333,9 @@ func ensureDefaultWidgetGroups(tx *sql.Tx, projectId uuid.UUID) error {
 	var groupDefs []groupDef
 
 	if isOtel {
-		// Defaults track what `traceway-otel-agent` emits out-of-the-box from
-		// hostmetricsreceiver (cpu/memory/load/disk/filesystem/network/process
-		// scrapers, with *.utilization opt-ins). See config/default.yaml in
-		// traceway-otel-agent for the source set.
+		// Defaults track what `traceway-otel-agent` emits out-of-the-box. The
+		// `process` scraper is opt-in (TRACEWAY_PROCESS_NAMES) as of v0.5.0
+		// and intentionally excluded here — seeding it produced empty tabs.
 		groupDefs = append(groupDefs,
 			groupDef{
 				name: "System",
@@ -368,14 +367,6 @@ func ensureDefaultWidgetGroups(tx *sql.Tx, projectId uuid.UUID) error {
 					{title: "Network Packets", name: "system.network.packets"},
 					{title: "Network Errors", name: "system.network.errors"},
 					{title: "Open Connections", name: "system.network.connections"},
-				},
-			},
-			groupDef{
-				name: "Process",
-				widgets: []widgetDef{
-					{title: "Process CPU Time", name: "process.cpu.time"},
-					{title: "Process RSS", name: "process.memory.usage"},
-					{title: "Process Virtual", name: "process.memory.virtual"},
 				},
 			},
 		)
