@@ -202,4 +202,42 @@ func (a authController) Register(c *gin.Context) {
 	})
 }
 
+func (a authController) LoginBundle(c *gin.Context) {
+	tx := middleware.GetTx(c)
+
+	userId := middleware.GetUserId(c)
+	if userId == 0 {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	user, err := repositories.UserRepository.FindById(tx, userId)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("LoginBundle: load user: %w", err))
+		return
+	}
+	if user == nil {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	projects, err := repositories.ProjectRepository.FindAllWithBackendUrlByUserId(tx, user.Id)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("LoginBundle: load projects: %w", err))
+		return
+	}
+
+	organizations, err := repositories.OrganizationRepository.FindByUserIdWithRoles(tx, user.Id)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("LoginBundle: load orgs: %w", err))
+		return
+	}
+
+	c.JSON(http.StatusOK, &models.LoginResponse{
+		User:          user.ToResponse(),
+		Projects:      projects,
+		Organizations: organizations,
+	})
+}
+
 var AuthController = authController{}

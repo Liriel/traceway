@@ -14,6 +14,7 @@
     import { toast } from 'svelte-sonner';
     import FrameworkCombobox from '$lib/components/framework-combobox.svelte';
     import TurnstileWidget from '$lib/components/turnstile-widget.svelte';
+    import OauthButtons from '$lib/components/oauth-buttons.svelte';
 
     const DEFAULT_FRAMEWORK: Framework = 'gin';
 
@@ -145,6 +146,7 @@
                     </AlertDescription>
                 </Alert>
             {/if}
+            <OauthButtons />
             <form onsubmit={(e) => { e.preventDefault(); handleRegister(); }} class="grid w-full items-center gap-4">
                 <div class="flex flex-col space-y-1.5">
                     <Label for="email">Email</Label>

@@ -41,6 +41,12 @@ type Cfg struct {
 	APIOnly               string
 	Ports                 string
 	TurnstileSecretKey    string
+
+	GoogleClientID     string
+	GoogleClientSecret string
+	GitHubClientID     string
+	GitHubClientSecret string
+	OAuthSessionSecret string
 }
 
 var Config *Cfg
@@ -87,5 +93,11 @@ func LoadFromEnv() *Cfg {
 		APIOnly:               os.Getenv("API_ONLY"),
 		Ports:                 os.Getenv("PORTS"),
 		TurnstileSecretKey:    os.Getenv("TURNSTILE_SECRET_KEY"),
+
+		GoogleClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
+		GoogleClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+		GitHubClientID:     os.Getenv("GITHUB_CLIENT_ID"),
+		GitHubClientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),
+		OAuthSessionSecret: os.Getenv("OAUTH_SESSION_SECRET"),
 	}
 }

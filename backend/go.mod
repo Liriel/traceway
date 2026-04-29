@@ -9,7 +9,9 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.96.0
 	github.com/coreos/go-systemd/v22 v22.6.0
 	github.com/golang-jwt/jwt/v5 v5.3.0
+	github.com/gorilla/sessions v1.4.0
 	github.com/lib/pq v1.10.9
+	github.com/markbates/goth v1.82.0
 	github.com/tracewayapp/lit/v2 v2.0.2
 	go.tracewayapp.com v1.0.2
 	go.tracewayapp.com/tracewaygin v1.0.2
@@ -17,9 +19,14 @@ require (
 )
 
 require (
+	cloud.google.com/go/compute/metadata v0.8.0 // indirect
+	github.com/go-chi/chi/v5 v5.2.2 // indirect
+	github.com/gorilla/mux v1.7.4 // indirect
+	github.com/gorilla/securecookie v1.1.2 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.2 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0 // indirect
+	golang.org/x/oauth2 v0.30.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250825161204-c5933d9347a5 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250825161204-c5933d9347a5 // indirect
 	google.golang.org/grpc v1.75.1 // indirect

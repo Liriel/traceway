@@ -11,9 +11,17 @@
     import { projectsState } from '$lib/state/projects.svelte';
     import { themeState } from '$lib/state/theme.svelte';
 	import { toast } from 'svelte-sonner';
+    import OauthButtons from '$lib/components/oauth-buttons.svelte';
+
+    const ERROR_MESSAGES: Record<string, string> = {
+        oauth_failed: 'Sign-in failed. Please try again.',
+        oauth_no_email: "We couldn't read an email address from that account. Please make sure it has a verified email and try again.",
+        invite_required: 'This server is invite-only. Ask an admin to invite you.',
+    };
 
     let email = $state(page.url.searchParams.get('email') ?? '');
     let password = $state(page.url.searchParams.get('password') ?? '');
+    const initialError = page.url.searchParams.get('error');
 
     if (page.url.searchParams.has('email') || page.url.searchParams.has('password')) {
         const cleanUrl = new URL(window.location.href);
@@ -22,8 +30,14 @@
         window.history.replaceState({}, '', cleanUrl.pathname + cleanUrl.search);
     }
 
-    let error = $state('');
+    let error = $state(initialError ? (ERROR_MESSAGES[initialError] ?? 'Sign-in failed. Please try again.') : '');
     let loading = $state(false);
+
+    if (initialError) {
+        const cleanUrl = new URL(window.location.href);
+        cleanUrl.searchParams.delete('error');
+        window.history.replaceState({}, '', cleanUrl.pathname + cleanUrl.search);
+    }
 
     // Get returnTo parameter for redirecting after login
     const returnTo = $derived(page.url.searchParams.get('returnTo'));
@@ -109,6 +123,7 @@
                     </AlertDescription>
                 </Alert>
             {/if}
+            <OauthButtons />
             <form onsubmit={(e) => { e.preventDefault(); handleLogin(); }} class="grid w-full items-center gap-4">
                 <div class="flex flex-col space-y-1.5">
                     <Label for="email">Email</Label>

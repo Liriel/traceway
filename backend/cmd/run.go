@@ -112,6 +112,7 @@ func Run(opts ...Option) {
 
 	services.InitEmail()
 	services.InitTurnstile()
+	services.InitOAuth()
 
 	for _, hook := range PostStartupHooks {
 		hook(ctx)
