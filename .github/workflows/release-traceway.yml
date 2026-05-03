@@ -7,6 +7,26 @@ on:
         description: "Release version (X.Y.Z, no leading v)"
         required: true
         type: string
+      change_1:
+        description: "Changelog item 1 (optional)"
+        required: false
+        type: string
+      change_2:
+        description: "Changelog item 2 (optional)"
+        required: false
+        type: string
+      change_3:
+        description: "Changelog item 3 (optional)"
+        required: false
+        type: string
+      change_4:
+        description: "Changelog item 4 (optional)"
+        required: false
+        type: string
+      change_5:
+        description: "Changelog item 5 (optional)"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -40,7 +60,9 @@ jobs:
         with:
           node-version: "latest"
           cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: |
+            frontend/package-lock.json
+            website/package-lock.json
 
       - name: Configure git
         run: |
@@ -70,9 +92,35 @@ jobs:
           mkdir -p backend/static/frontend
           cp -r frontend/build/. backend/static/frontend/
 
+      - name: Generate blog post
+        env:
+          C1: ${{ inputs.change_1 }}
+          C2: ${{ inputs.change_2 }}
+          C3: ${{ inputs.change_3 }}
+          C4: ${{ inputs.change_4 }}
+          C5: ${{ inputs.change_5 }}
+        run: |
+          mkdir -p website/content/blog
+          POST="website/content/blog/v${{ inputs.version }}.mdx"
+          {
+            echo "---"
+            echo "title: \"Backend v${{ inputs.version }}\""
+            echo "date: \"$(date -u +%Y-%m-%d)\""
+            echo "version: \"${{ inputs.version }}\""
+            echo "---"
+            echo ""
+            for C in "$C1" "$C2" "$C3" "$C4" "$C5"; do
+              if [ -n "$C" ]; then
+                echo "- $C"
+              fi
+            done
+          } > "$POST"
+          echo "Generated $POST:"
+          cat "$POST"
+
       - name: Commit release
         run: |
-          git add backend/static/frontend/
+          git add backend/static/frontend/ website/content/blog/
           git add -A backend/
           git commit -m "release: backend v${{ inputs.version }}"
 
@@ -83,6 +131,44 @@ jobs:
         run: |
           git push origin HEAD:${{ github.ref_name }}
           git push origin "backend/v${{ inputs.version }}"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          C1: ${{ inputs.change_1 }}
+          C2: ${{ inputs.change_2 }}
+          C3: ${{ inputs.change_3 }}
+          C4: ${{ inputs.change_4 }}
+          C5: ${{ inputs.change_5 }}
+        run: |
+          NOTES=""
+          for C in "$C1" "$C2" "$C3" "$C4" "$C5"; do
+            if [ -n "$C" ]; then
+              NOTES="${NOTES}- ${C}"$'\n'
+            fi
+          done
+          if [ -z "$NOTES" ]; then
+            NOTES="Backend v${{ inputs.version }}"
+          fi
+          gh release create "backend/v${{ inputs.version }}" \
+            --title "Backend v${{ inputs.version }}" \
+            --notes "$NOTES"
+
+      - name: Install website dependencies
+        working-directory: website
+        run: npm ci
+
+      - name: Build website
+        working-directory: website
+        run: npm run build
+
+      - name: Deploy website to Cloudflare
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: website
+          command: deploy
 
       - name: Summary
         run: |
