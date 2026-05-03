@@ -60,9 +60,7 @@ jobs:
         with:
           node-version: "latest"
           cache: "npm"
-          cache-dependency-path: |
-            frontend/package-lock.json
-            website/package-lock.json
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Configure git
         run: |
@@ -154,24 +152,10 @@ jobs:
             --title "Backend v${{ inputs.version }}" \
             --notes "$NOTES"
 
-      - name: Install website dependencies
-        working-directory: website
-        run: npm ci
-
-      - name: Build website
-        working-directory: website
-        run: npm run build
-
-      - name: Deploy website to Cloudflare
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: website
-          command: deploy
-
       - name: Summary
         run: |
           echo "Released backend/v${{ inputs.version }}" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "Users can now: \`go get github.com/tracewayapp/traceway/backend@v${{ inputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Website and docs deploys will run automatically on release publish." >> "$GITHUB_STEP_SUMMARY"
