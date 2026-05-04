@@ -8,7 +8,7 @@ const FRAMEWORKS = [
     description: "AI observability for OpenRouter with automatic OTLP trace export.",
     icon: "/openrouter.png",
     href: "/client/openrouter",
-    badge: "new",
+    badge: "production",
   },
   {
     value: "otel",
@@ -16,7 +16,7 @@ const FRAMEWORKS = [
     description: "Send traces and metrics from any OTel-instrumented app to Traceway.",
     icon: "/otel.png",
     href: "/client/otel",
-    badge: "new",
+    badge: "production",
   },
   {
     value: "cloudflare",
@@ -24,7 +24,7 @@ const FRAMEWORKS = [
     description: "Cloudflare Workers with automatic request tracing via OTLP.",
     icon: "/cloudflare.png",
     href: "/client/cloudflare",
-    badge: "new",
+    badge: "production",
   },
   {
     value: "php-symfony",
@@ -32,7 +32,7 @@ const FRAMEWORKS = [
     description: "Symfony framework with OpenTelemetry auto-instrumentation.",
     icon: "/symfony.png",
     href: "/client/symfony",
-    badge: "new",
+    badge: "production",
   },
   {
     value: "go-gin",
@@ -118,7 +118,7 @@ const FRAMEWORKS = [
     description: "Lightweight multi-runtime framework with OpenTelemetry.",
     icon: "/hono.png",
     href: "/client/hono",
-    badge: "new",
+    badge: "production",
   },
   {
     value: "js-react",
@@ -158,7 +158,7 @@ const FRAMEWORKS = [
     description: "Framework-agnostic JavaScript SDK for browsers.",
     icon: "/javascript.png",
     href: "/client/js-sdk",
-    badge: "new",
+    badge: "production",
   },
   {
     value: "flutter",
@@ -166,7 +166,7 @@ const FRAMEWORKS = [
     description: "Flutter mobile apps with automatic error capture and screen recording.",
     icon: "/flutter.png",
     href: "/client/flutter",
-    badge: "new",
+    badge: "production",
   },
   {
     value: "android",
@@ -174,6 +174,14 @@ const FRAMEWORKS = [
     description: "Native Android (Kotlin/Java) apps with automatic exception capture, logs, HTTP, and navigation breadcrumbs.",
     icon: "/android.png",
     href: "/client/android",
+    badge: "new",
+  },
+  {
+    value: "react-native",
+    label: "React Native",
+    description: "React Native and Expo apps with automatic exception, fetch / XHR, and console capture. Works in Expo Go.",
+    icon: "/react.png",
+    href: "/client/react-native",
     badge: "new",
   },
 ];

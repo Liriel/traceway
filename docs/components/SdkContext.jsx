@@ -23,11 +23,15 @@ export const SDK_OPTIONS = [
   { value: 'php-symfony', label: 'Symfony' },
   { value: 'flutter', label: 'Flutter' },
   { value: 'android', label: 'Android' },
+  { value: 'react-native', label: 'React Native' },
 ]
 
 const STORAGE_KEY = 'traceway-docs-sdk'
 const VALID_VALUES = new Set(SDK_OPTIONS.map((o) => o.value))
 
+// IMPORTANT: longer/more-specific path segments must come before any shorter
+// substring that would otherwise match first. `react-native` must precede
+// `react`, otherwise `/client/react-native` would match `/react` first.
 const PATH_SDK_MAP = {
   'gin-middleware': 'go-gin',
   'chi-middleware': 'go-chi',
@@ -37,6 +41,7 @@ const PATH_SDK_MAP = {
   'node-sdk': 'js-node',
   'nestjs': 'js-nestjs',
   'hono': 'js-hono',
+  'react-native': 'react-native',
   'react': 'js-react',
   'vue': 'js-vue',
   'svelte': 'js-svelte',

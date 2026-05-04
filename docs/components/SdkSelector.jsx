@@ -24,6 +24,7 @@ const SDK_QUICK_START = {
   'php-symfony': '/client/symfony',
   'flutter': '/client/flutter',
   'android': '/client/android',
+  'react-native': '/client/react-native',
 }
 
 export default function SdkSelector() {

@@ -1,0 +1,267 @@
+# React Native Quick Start
+
+Integrate Traceway into your React Native or Expo application with the [`@tracewayapp/react-native`](https://www.npmjs.com/package/@tracewayapp/react-native) package. Plain JavaScript — no native modules, no `pod install`, no Gradle changes — works in Expo Go, in bare React Native CLI projects, and in EAS builds.
+
+## Installation
+
+```bash
+npm install @tracewayapp/react-native
+```
+
+## Setup
+
+Wrap your app in `TracewayProvider` from your entry component (typically `App.tsx`). Mounting the provider runs `init(...)` once, which installs RN's `ErrorUtils` global handler, the `fetch` / `XMLHttpRequest` wrappers, and the `console.*` mirror:
+
+```tsx
+import { TracewayProvider, TracewayErrorBoundary } from "@tracewayapp/react-native";
+
+export default function App() {
+  return (
+    <TracewayProvider
+      connectionString="your-token@https://traceway.example.com/api/report"
+      options={{ version: "1.0.0" }}
+    >
+      <TracewayErrorBoundary fallback={<CrashScreen />}>
+        <RootNavigator />
+      </TracewayErrorBoundary>
+    </TracewayProvider>
+  );
+}
+```
+
+That's it. Every uncaught throw, unhandled promise rejection, render-time error inside `<TracewayErrorBoundary>`, and `fetch` call is captured automatically.
+
+> **No screen recording.** Unlike the browser SDK ([`@tracewayapp/frontend`](/client/js-sdk?sdk=js-generic)), this package does not record the screen. The `rrweb` recorder is intentionally absent — nothing in the bundle reaches into a DOM that doesn't exist.
+
+## Capture Errors Manually
+
+```tsx
+import { useTraceway } from "@tracewayapp/react-native";
+import { captureException, captureMessage, flush } from "@tracewayapp/react-native";
+
+// Inside a component — get scoped helpers from the hook:
+function CheckoutButton() {
+  const { captureException, recordAction } = useTraceway();
+  // ...
+}
+
+// Or import directly anywhere (after the provider has mounted):
+try {
+  riskyOperation();
+} catch (e) {
+  captureException(e as Error);
+}
+
+captureMessage("User completed checkout");
+
+// Force send pending events (e.g. before app goes to background):
+await flush();
+```
+
+## With Options
+
+All field names mirror the browser, Android, and Flutter SDKs so existing config can be ported as-is.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `version` | `string` | `""` | App version string, attached to every report |
+| `debug` | `boolean` | `false` | Print debug info to the console |
+| `debounceMs` | `number` | `1500` | Milliseconds before flushing batched events |
+| `retryDelayMs` | `number` | `10000` | Retry delay on failed uploads |
+| `ignoreErrors` | `Array<string \| RegExp>` | sensible defaults | Drop exceptions whose stack/message match any pattern |
+| `beforeCapture` | `(exception) => boolean` | — | Return `false` to suppress an exception |
+| `captureLogs` | `boolean` | `true` | Mirror `console.{debug,log,info,warn,error}` into the rolling log buffer |
+| `captureNetwork` | `boolean` | `true` | Record `fetch` / `XMLHttpRequest` calls as network actions |
+| `captureNavigation` | `boolean` | `true` | Record manual `recordNavigation()` calls into the action buffer |
+| `captureDeviceInfo` | `boolean` | `true` | Auto-collect `os.name`, `os.version`, screen, locale, runtime engine and attach to every report |
+| `eventsWindowMs` | `number` | `10000` | Rolling window kept in the log/action buffers (ms) |
+| `eventsMaxCount` | `number` | `200` | Hard cap applied independently to logs and actions |
+
+```tsx
+<TracewayProvider
+  connectionString="your-token@https://traceway.example.com/api/report"
+  options={{
+    debug: true,
+    version: "2.1.0",
+    debounceMs: 2000,
+    captureNavigation: true,
+  }}
+>
+```
+
+The `DEFAULT_IGNORE_PATTERNS` export contains the built-in `ignoreErrors` list (`Network request failed`, `Failed to fetch`, generic 4xx, etc.) — you can extend it rather than replace it.
+
+## Logs & Actions
+
+Every captured exception ships with the last ~10 seconds of session context, attached to a `sessionRecordings[]` entry on the wire — the same shape every other Traceway SDK uses. Two independent rolling buffers — **logs** and **actions** — are kept in memory, each capped at 200 entries by default.
+
+### Logs
+
+Every `console.{debug, log, info, warn, error}` call is mirrored into the log buffer. The original `console` output is preserved — the SDK only piggybacks on the call.
+
+Disable with `captureLogs: false`.
+
+### Actions
+
+Three kinds of actions are collected:
+
+- **Network** — every `fetch` and `XMLHttpRequest` call (method, URL, status, duration, byte counts) is recorded automatically. RN polyfills XHR (and `fetch` is implemented on top of it on some platforms) — both paths are covered. Calls to the Traceway endpoint itself are skipped to avoid recursion.
+
+- **Navigation** — RN has no `window.history` to auto-instrument. Wire `recordNavigation` into whatever navigation library you use:
+
+  ```tsx
+  import { useNavigationContainerRef } from "@react-navigation/native";
+  import { recordNavigation } from "@tracewayapp/react-native";
+
+  const navigationRef = useNavigationContainerRef();
+  const prevRoute = useRef<string | null>(null);
+
+  return (
+    <NavigationContainer
+      ref={navigationRef}
+      onStateChange={() => {
+        const next = navigationRef.getCurrentRoute()?.name ?? "unknown";
+        recordNavigation(prevRoute.current ?? "(initial)", next);
+        prevRoute.current = next;
+      }}
+    >
+      {/* ... */}
+    </NavigationContainer>
+  );
+  ```
+
+  For [Expo Router](https://docs.expo.dev/router/) drop the same call into a `useEffect` keyed on `usePathname()`.
+
+- **Custom** — anything you record explicitly:
+
+  ```tsx
+  import { recordAction } from "@tracewayapp/react-native";
+
+  recordAction("cart", "add_item", { sku: "SKU-123", qty: 2 });
+  ```
+
+### Wire shape
+
+Logs and actions are kept in two separate rolling buffers, each capped at 200 entries / 10 seconds. They ship inside `sessionRecordings[].logs` and `sessionRecordings[].actions` on the wire, with `startedAt` / `endedAt` ISO 8601 timestamps spanning the captured window — the same shape the Flutter and Android SDKs use:
+
+```json
+{
+  "sessionRecordings": [
+    {
+      "exceptionId": "...",
+      "startedAt": "2026-04-28T14:30:53.011Z",
+      "endedAt":   "2026-04-28T14:31:02.314Z",
+      "logs": [
+        {"type": "log", "timestamp": "2026-04-28T14:30:54.508Z", "level": "info", "message": "user tapped pay"}
+      ],
+      "actions": [
+        {"type": "navigation", "action": "push", "from": "Home", "to": "Cart", "timestamp": "2026-04-28T14:30:53.011Z"},
+        {"type": "network", "method": "GET", "url": "...", "statusCode": 200, "durationMs": 86, "timestamp": "2026-04-28T14:30:54.422Z"},
+        {"type": "custom", "category": "cart", "name": "add_item", "data": {"sku": "SKU-1"}, "timestamp": "2026-04-28T14:30:54.605Z"}
+      ]
+    }
+  ]
+}
+```
+
+### Disabling channels
+
+Each channel can be turned off individually via `TracewayProvider`'s `options`:
+
+```tsx
+<TracewayProvider
+  connectionString={DSN}
+  options={{
+    captureLogs: false,
+    captureNetwork: false,
+    captureNavigation: false,
+  }}
+>
+```
+
+## Attributes (device info & globals)
+
+Every captured exception ships with an `attributes` map. Two layers contribute:
+
+1. **Device info** — auto-collected at `init()` from React Native core APIs (no native modules required, works in Expo Go). The keys mirror what the Flutter and Android SDKs emit so the dashboard renders them consistently across platforms:
+
+   | Key | Source |
+   |---|---|
+   | `os.name` | `Platform.OS` (`ios` / `android` / `web`) |
+   | `os.version` | `Platform.Version` |
+   | `screen.resolution` | `Dimensions.get("screen")` (whole pixels) |
+   | `screen.density` | `PixelRatio.get()` |
+   | `device.locale` | `Intl.DateTimeFormat().resolvedOptions().locale` |
+   | `runtime.engine` | `hermes` / `javascriptcore` |
+
+2. **Per-call attributes** via `captureExceptionWithAttributes(error, attrs)` — these win on key collision.
+
+To replace or extend the auto-collected map at runtime (e.g. add a `tenant`, `build_channel`, or info from `expo-device` / `react-native-device-info` you've installed yourself):
+
+```ts
+import { setDeviceAttributes, collectSyncDeviceInfo } from "@tracewayapp/react-native";
+import * as Device from "expo-device";
+
+setDeviceAttributes({
+  ...collectSyncDeviceInfo(),
+  "device.model": Device.modelName ?? "",
+  "device.manufacturer": Device.manufacturer ?? "",
+  tenant: "acme-corp",
+  build_channel: process.env.EXPO_PUBLIC_BUILD_CHANNEL ?? "dev",
+});
+```
+
+The same hook is exposed on `useTraceway()`:
+
+```tsx
+const { setDeviceAttributes } = useTraceway();
+```
+
+To opt out of the device info collection entirely, pass `captureDeviceInfo: false` in `options`.
+
+## What Gets Captured Automatically
+
+- **Uncaught throws** on the JS thread via `ErrorUtils.setGlobalHandler` — RN's equivalent of `window.onerror`. The red-box dev overlay still appears; we forward to the previous handler.
+- **Unhandled promise rejections** — `Promise.reject(...)` without a `.catch()` reaches the same `ErrorUtils` handler.
+- **Render errors** — when wrapped in `<TracewayErrorBoundary>`, exceptions thrown during render or in lifecycle methods are captured.
+- **`fetch` calls** — wrapped at `init()`, recorded with method, URL, status, duration, byte counts.
+- **`XMLHttpRequest` calls** — RN polyfills XHR (and `fetch` is implemented on top of it on some platforms); both paths are covered.
+- **Console output** — `console.{debug,log,info,warn,error}` is mirrored into the log buffer that rides along the next exception.
+
+## Test Your Integration
+
+Add a button that throws an exception to verify everything is wired up:
+
+```tsx
+import { Button } from "react-native";
+import { useTraceway } from "@tracewayapp/react-native";
+
+function TestButton() {
+  const { captureException } = useTraceway();
+  return (
+    <Button
+      title="Send test error"
+      onPress={() => {
+        try {
+          throw new Error("Test error from Traceway");
+        } catch (e) {
+          captureException(e as Error);
+        }
+      }}
+    />
+  );
+}
+```
+
+Tap the button and check your Traceway dashboard to verify the error appears with its full stack trace.
+
+## Platform Support
+
+| Platform | Error Tracking | Screen Recording |
+|----------|----------------|------------------|
+| iOS (RN ≥ 0.72) | Yes | No |
+| Android (RN ≥ 0.72) | Yes | No |
+| Expo (SDK 49+) | Yes — works in Expo Go | No |
+| Web (via React Native Web) | Yes | No |
+
+For native Android-only apps without React Native, use the [Android SDK](/client/android?sdk=android). For Flutter apps, use the [Flutter SDK](/client/flutter?sdk=flutter). For browser apps, use the [React SDK](/client/react?sdk=js-react) or [generic JS SDK](/client/js-sdk?sdk=js-generic).

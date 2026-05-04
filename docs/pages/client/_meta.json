@@ -25,5 +25,6 @@
   "cloudflare": "Cloudflare Workers",
   "symfony": "Symfony",
   "flutter": "Flutter",
-  "android": "Android"
+  "android": "Android",
+  "react-native": "React Native"
 }
