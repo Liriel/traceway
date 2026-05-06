@@ -1,8 +1,4 @@
-import {
-  init,
-  setAttribute,
-  setAttributes,
-} from "@tracewayapp/jquery";
+import { init, setAttribute, setAttributes } from "@tracewayapp/jquery";
 
 init("frontend-dev-token@http://localhost:8082/api/report", {
   recordAllSessions: true,
@@ -50,7 +46,10 @@ $(function () {
             (traceId || "not present"),
         );
         if (jqXHR.status >= 400) {
-          addLog("Exception auto-captured by @tracewayapp/jquery with distributedTraceId=" + traceId);
+          addLog(
+            "Exception auto-captured by @tracewayapp/jquery with distributedTraceId=" +
+              traceId,
+          );
         }
       },
     });
@@ -84,16 +83,21 @@ $(function () {
   });
 
   $("#btn-network").on("click", function () {
-    addLog("Firing 4 network requests (mix of fetch + jQuery, success + 404) ...");
+    addLog(
+      "Firing 4 network requests (mix of fetch + jQuery, success + 404) ...",
+    );
 
-    fetch("/api/test-success")
-      .then(function (r) { addLog("fetch GET /api/test-success -> " + r.status); });
+    fetch("/api/test-success").then(function (r) {
+      addLog("fetch GET /api/test-success -> " + r.status);
+    });
 
-    fetch("/api/test-log-levels")
-      .then(function (r) { addLog("fetch GET /api/test-log-levels -> " + r.status); });
+    fetch("/api/test-log-levels").then(function (r) {
+      addLog("fetch GET /api/test-log-levels -> " + r.status);
+    });
 
-    fetch("/api/does-not-exist")
-      .then(function (r) { addLog("fetch GET /api/does-not-exist -> " + r.status); });
+    fetch("/api/does-not-exist").then(function (r) {
+      addLog("fetch GET /api/does-not-exist -> " + r.status);
+    });
 
     $.ajax({
       url: "/api/test-spans-with-logs",
