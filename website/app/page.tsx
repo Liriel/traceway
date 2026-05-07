@@ -62,10 +62,6 @@ export default function Home() {
                   priority
                 />
               </span>
-              <span className="pillar-wrap-tag">
-                <span className="dot" aria-hidden />
-                observability · live
-              </span>
             </div>
             <div className="pillar-wrap-body">
               <div className="pillars-all">
@@ -227,7 +223,8 @@ export default function Home() {
               style={{
                 background:
                   "radial-gradient(500px 280px at 90% 0%, color-mix(in oklab, var(--ok) 14%, transparent), transparent 60%), linear-gradient(180deg, var(--ink-3), var(--ink-2))",
-                border: "1px solid color-mix(in oklab, var(--ok) 30%, var(--hair-2))",
+                border:
+                  "1px solid color-mix(in oklab, var(--ok) 30%, var(--hair-2))",
                 boxShadow:
                   "0 20px 40px -20px color-mix(in oklab, var(--ok) 30%, transparent)",
               }}
@@ -289,7 +286,10 @@ export default function Home() {
                 See pricing
                 <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link href="https://docs.tracewayapp.com" className="btn btn-ghost">
+              <Link
+                href="https://docs.tracewayapp.com"
+                className="btn btn-ghost"
+              >
                 Self-host for free
               </Link>
             </div>
@@ -315,8 +315,8 @@ export default function Home() {
             </h2>
             <p className="muted mt-4 max-w-[460px]">
               MIT licensed. No BSL. No &ldquo;open core.&rdquo; Every feature
-              Traceway Cloud has, your cluster has. Point an OTLP exporter at
-              it and you&apos;re in business.
+              Traceway Cloud has, your cluster has. Point an OTLP exporter at it
+              and you&apos;re in business.
             </p>
             <StatsStrip
               stats={[
@@ -334,7 +334,8 @@ export default function Home() {
                 type: "tx",
                 content: (
                   <>
-                    <span className="cmd">$</span> git clone github.com/tracewayapp/traceway
+                    <span className="cmd">$</span> git clone
+                    github.com/tracewayapp/traceway
                   </>
                 ),
               },
@@ -343,13 +344,22 @@ export default function Home() {
                 type: "tx",
                 content: (
                   <>
-                    <span className="cmd">$</span> cd traceway &amp;&amp; docker compose up -d
+                    <span className="cmd">$</span> cd traceway &amp;&amp; docker
+                    compose up -d
                   </>
                 ),
               },
               { ln: "3", type: "mute", content: "# pulling images…" },
-              { ln: "4", type: "mute", content: "# starting clickhouse · postgres · collector" },
-              { ln: "5", type: "ok", content: "# ✓ dashboard at http://localhost:3000" },
+              {
+                ln: "4",
+                type: "mute",
+                content: "# starting clickhouse · postgres · collector",
+              },
+              {
+                ln: "5",
+                type: "ok",
+                content: "# ✓ dashboard at http://localhost:3000",
+              },
               {
                 ln: "6",
                 type: "tx",

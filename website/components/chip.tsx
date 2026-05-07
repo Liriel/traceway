@@ -11,7 +11,6 @@ export function Chip({
 }) {
   return (
     <span className={cn("chip", variant !== "default" && variant, className)}>
-      <span className="dot" aria-hidden />
       {children}
     </span>
   );
