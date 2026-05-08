@@ -33,6 +33,9 @@ The `docker-compose.yml` in the repository root is ready to use out of the box. 
 | `POSTGRES_SSLMODE` | `disable` | PostgreSQL SSL mode |
 | `JWT_SECRET` | `change-this-to-a-secure-secret-at-least-32-chars` | JWT signing secret (min 32 chars) |
 | `APP_BASE_URL` | *(none)* | Public URL of your Traceway instance (e.g. `https://traceway.example.com`). Used for SDK setup instructions, email links, and OAuth callback URLs. |
+| `SESSION_RECORDING_RETENTION_DAYS` | `30` | Days to keep session recording files on disk under `STORAGE_PATH/recordings/`. A worker deletes older files hourly and on startup. No effect when `STORAGE_TYPE=s3`. Set to `0` to disable. |
+
+> ClickHouse table TTLs (`metric_points`, `log_records`, etc.) are managed at the schema level; this stack does not run the SQLite retention worker.
 
 ## SSO (optional)
 

@@ -45,6 +45,7 @@ All have working defaults for the all-in-one image. Override as needed:
 | `POSTGRES_SSLMODE` | `disable` | PostgreSQL SSL mode |
 | `JWT_SECRET` | *(built-in default)* | JWT signing secret (min 32 chars) |
 | `GIN_MODE` | `release` | Gin framework mode |
+| `SESSION_RECORDING_RETENTION_DAYS` | `30` | Days to keep on-disk session recordings under `STORAGE_PATH/recordings/`. Worker runs hourly and on startup. `0` disables; no effect when `STORAGE_TYPE=s3`. |
 
 ### Access Points
 
@@ -82,6 +83,7 @@ docker build -f Dockerfile.minimal -t traceway:minimal .
 | `POSTGRES_PASSWORD` | PostgreSQL password | `password` |
 | `POSTGRES_SSLMODE` | PostgreSQL SSL mode | `disable` |
 | `JWT_SECRET` | JWT signing secret (min 32 chars) | `your-secret-here` |
+| `SESSION_RECORDING_RETENTION_DAYS` | Optional. Days to keep on-disk session recordings (default `30`, `0` disables, no effect when `STORAGE_TYPE=s3`). | `30` |
 
 ### Run
 
@@ -125,6 +127,8 @@ services:
       POSTGRES_PASSWORD: "traceway"
       POSTGRES_SSLMODE: "disable"
       JWT_SECRET: "change-this-to-a-secure-secret-at-least-32-chars"
+      # Optional. Days to keep on-disk session recordings (default 30, 0 disables, no effect when STORAGE_TYPE=s3).
+      # SESSION_RECORDING_RETENTION_DAYS: "30"
     depends_on:
       clickhouse:
         condition: service_healthy

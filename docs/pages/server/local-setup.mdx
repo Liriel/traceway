@@ -79,6 +79,8 @@ POSTGRES_SSLMODE=disable
 | `GITHUB_CLIENT_ID` | Optional. GitHub OAuth App client ID. Setting both GitHub variables enables the **Continue with GitHub** button. See the [SSO guide](/learn/sso). |
 | `GITHUB_CLIENT_SECRET` | Optional. GitHub OAuth App client secret. |
 | `OAUTH_SESSION_SECRET` | Optional. Cookie signing secret for the OAuth round-trip. Falls back to `JWT_SECRET` when unset. |
+| `SESSION_RECORDING_RETENTION_DAYS` | Optional. Days to keep session recording files on disk under `STORAGE_PATH/recordings/`. Defaults to `30`. Worker runs hourly and on startup. `0` disables; no effect when `STORAGE_TYPE=s3`. |
+| `SQLITE_RETENTION_DAYS` | Optional. Days to keep SQLite telemetry rows. Defaults to `30`. `0` disables. Only applies when running with `DB_TYPE=sqlite`. |
 
 For local OAuth testing, register the provider's callback URL as `http://localhost:5173/api/auth/callback/github` (or `.../google`).
 

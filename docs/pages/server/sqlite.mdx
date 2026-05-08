@@ -62,6 +62,8 @@ If `STORAGE_TYPE` is unset (or set to `local`), blobs are written to `/data/stor
 | `S3_ENDPOINT` | *(unset)* | Optional. Set for S3-compatible providers (MinIO, R2, Spaces). Enables path-style URLs |
 | `PORTS` | `80,8082` | Comma-separated list of HTTP ports the server should listen on |
 | `GIN_MODE` | `release` | Gin runtime mode |
+| `SQLITE_RETENTION_DAYS` | `30` | Days to keep telemetry rows (endpoints, exceptions, spans, metrics, logs, sessions, recordings, fired notifications, notification history). A background worker prunes older rows once at startup and then every hour. Set to `0` to disable. |
+| `SESSION_RECORDING_RETENTION_DAYS` | `30` | Days to keep session recording files on disk under `STORAGE_PATH/recordings/`. Files older than the TTL are deleted hourly and on startup; empty subdirectories are removed. No effect when `STORAGE_TYPE=s3`. Set to `0` to disable. |
 
 ## SSO (optional)
 

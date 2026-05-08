@@ -47,6 +47,7 @@ After starting, open `http://localhost/register` to create your first account.
 | `POSTGRES_SSLMODE` | PostgreSQL SSL mode | `disable` |
 | `JWT_SECRET` | JWT signing secret (min 32 chars) | `your-secret-here` |
 | `APP_BASE_URL` | Public URL of your instance. Used for SDK setup instructions, email links, and OAuth callback URLs. | `https://traceway.example.com` |
+| `SESSION_RECORDING_RETENTION_DAYS` | Days to keep on-disk session recordings under `STORAGE_PATH/recordings/`. Defaults to `30`. Worker runs hourly and on startup. `0` disables; no effect when `STORAGE_TYPE=s3`. | `30` |
 
 ## SSO (optional)
 

@@ -40,6 +40,9 @@ All environment variables have working defaults, no configuration required. Over
 | `JWT_SECRET` | *(built-in default)* | JWT signing secret (min 32 chars) |
 | `GIN_MODE` | `release` | Gin framework mode |
 | `APP_BASE_URL` | *(none)* | Public URL of your Traceway instance (e.g. `https://traceway.example.com`). Used for SDK setup instructions, email links, and OAuth callback URLs. |
+| `SESSION_RECORDING_RETENTION_DAYS` | `30` | Days to keep session recording files on disk under `STORAGE_PATH/recordings/`. Files older than the TTL are deleted hourly and on startup. No effect when `STORAGE_TYPE=s3`. Set to `0` to disable. |
+
+> ClickHouse data retention is controlled per-table at the schema level (TTLs on `metric_points`, `metric_points_1m`, `metric_points_1h`, `log_records`); other telemetry tables are retained indefinitely until you drop monthly partitions manually. The `SQLITE_RETENTION_DAYS` setting only applies in SQLite mode and has no effect in this image.
 
 ## SSO (optional)
 

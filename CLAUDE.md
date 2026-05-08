@@ -244,6 +244,10 @@ POSTGRES_DATABASE=traceway
 POSTGRES_USERNAME=traceway
 POSTGRES_PASSWORD=
 POSTGRES_SSLMODE=disable
+
+# Retention (see "Data Retention" section below)
+SQLITE_RETENTION_DAYS=30              # 0 to disable; only applies in SQLite mode
+SESSION_RECORDING_RETENTION_DAYS=30   # 0 to disable; only applies when STORAGE_TYPE=local
 ```
 
 ---
@@ -652,7 +656,9 @@ func (c *ReportController) Report(ctx *gin.Context) {
 | `metric_records` | Time-series system metrics | Monthly |
 | `endpoints` | Endpoint aggregates (materialized) | None |
 | `archived_exceptions` | Archived/resolved exceptions | None |
-| `log_records` | OTel logs with 3 attribute maps (resource/scope/log), 30-day TTL | Daily (`toDate(timestamp)`) |
+| `log_records` | OTel logs with 3 attribute maps (resource/scope/log) | Daily (`toDate(timestamp)`) |
+
+> Data retention/TTLs are documented separately under **Data Retention** below.
 
 #### Tables (PostgreSQL)
 | Table | Purpose |
@@ -715,6 +721,46 @@ for _, item := range items {
 - `SQLiteTime` — implements `sql.Scanner`/`driver.Valuer` for `time.Time` ↔ SQLite TEXT
 - `SQLiteJSONMap` — implements `sql.Scanner`/`driver.Valuer` for `map[string]string` ↔ SQLite JSON TEXT
 - Row types (e.g., `endpointRow`, `taskRow`) wrap domain models with these types for lit compatibility
+
+#### Data Retention
+
+Retention is handled in three different ways depending on the deployment.
+
+**1. ClickHouse — `TTL` clauses on the table itself.** Only a few tables have a TTL; everything else is kept indefinitely (operators can drop monthly partitions manually if needed).
+
+| Table | Retention | Source migration |
+|-------|-----------|------------------|
+| `metric_points` (raw) | **7 days** | `0034_add_ttl_metric_points.up.sql` |
+| `metric_points_1m` (1-min rollup) | **30 days** | `0035_add_ttl_metric_points_1m.up.sql` |
+| `metric_points_1h` (1-hour rollup) | **1 year** | `0036_add_ttl_metric_points_1h.up.sql` |
+| `log_records` | **30 days** | `0045_create_log_records.up.sql` |
+| All other CH tables (`transactions`, `exception_stack_traces`, `tasks`, `spans`, `sessions`, `ai_traces`, `session_recordings`, `fired_notifications`, `archived_exceptions`, `slow_endpoints`, `endpoints`, etc.) | **No TTL — retained indefinitely** | — |
+
+**2. SQLite — `retention.Start` worker** (`backend/app/retention/sqlite.go`). In SQLite mode, neither `db.DB` nor `db.TelemetryDB` has any built-in expiry, so a background worker fires once at startup and then every hour and runs a `DELETE FROM <table> WHERE <time_column> < cutoff` against each telemetry table plus `notification_history`.
+
+| Variable | Default | Notes |
+|----------|---------|-------|
+| `SQLITE_RETENTION_DAYS` | `30` | TTL in days. Set to `0` to disable the worker entirely. Has no effect outside SQLite mode. |
+
+Tables it prunes (and the column used):
+
+| Database | Table | Time column |
+|----------|-------|-------------|
+| Telemetry (`db.TelemetryDB`) | `endpoints`, `tasks`, `exception_stack_traces`, `spans`, `metric_points`, `session_recordings`, `ai_traces` | `recorded_at` |
+| Telemetry | `log_records` | `timestamp` |
+| Telemetry | `sessions` | `started_at` |
+| Telemetry | `fired_notifications` | `fired_at` |
+| Main (`db.DB`) | `notification_history` | `created_at` |
+
+`archived_exceptions` (per-hash flags) and `slow_endpoints` (per-endpoint config) are intentionally skipped — they are not time-series data.
+
+**3. On-disk session recordings — `retention.Start` worker** (`backend/app/retention/recordings.go`). Session recordings written to local disk (`STORAGE_TYPE=local`) accumulate under `<STORAGE_PATH>/recordings/`. A second worker walks that directory once at startup and then every hour and removes files whose `mtime` is older than the TTL, then prunes any directories left empty. The worker is a no-op when `STORAGE_TYPE=s3`.
+
+| Variable | Default | Notes |
+|----------|---------|-------|
+| `SESSION_RECORDING_RETENTION_DAYS` | `30` | TTL in days. Set to `0` to disable the worker. Only runs when `STORAGE_TYPE=local` (default). |
+
+The DB rows in `session_recordings` are pruned by the SQLite retention worker (above) or by ClickHouse TTL — they are intentionally not coupled to the disk cleanup. Controllers that read recordings already log a non-fatal `traceway.CaptureException` when a referenced file is missing.
 
 #### Organization Roles
 | Role | Description |
