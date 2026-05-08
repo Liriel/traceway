@@ -50,6 +50,8 @@ func startRecordingDiskCleanup(ctx context.Context, days int) {
 	config.Logf("Starting session recording disk cleanup worker (TTL: %d days, dir: %s)", days, recordingsDir)
 
 	go func() {
+		defer traceway.Recover()
+
 		runRecordingDiskCleanup(recordingsDir, days)
 
 		ticker := time.NewTicker(tickInterval)

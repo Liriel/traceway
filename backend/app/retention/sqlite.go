@@ -46,6 +46,8 @@ func startSQLiteRetention(ctx context.Context, days int) {
 	config.Logf("Starting SQLite retention worker (TTL: %d days, interval: %s)", days, tickInterval)
 
 	go func() {
+		defer traceway.Recover()
+
 		runSQLiteRetention(ctx, days)
 
 		ticker := time.NewTicker(tickInterval)

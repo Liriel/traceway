@@ -63,6 +63,8 @@ func dispatch(rule *models.NotificationRuleWithChannel, msg Message) {
 
 func recordFiredNotification(rule *models.NotificationRuleWithChannel, msg Message, status string, errorMsg string) {
 	go func() {
+		defer traceway.Recover()
+
 		err := repositories.FiredNotificationRepository.Insert(context.Background(), repositories.FiredNotification{
 			ProjectId:   rule.ProjectId,
 			RuleId:      rule.Id,

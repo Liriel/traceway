@@ -21,6 +21,8 @@ func StartEvaluator(ctx context.Context) {
 }
 
 func startPolledLoop(ctx context.Context) {
+	defer traceway.Recover()
+
 	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
 

@@ -25,6 +25,7 @@ import (
 	"github.com/coreos/go-systemd/v22/daemon"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	traceway "go.tracewayapp.com"
 	tracewaygin "go.tracewayapp.com/tracewaygin"
 )
 
@@ -187,6 +188,8 @@ func Run(opts ...Option) {
 				continue
 			}
 			go func() {
+				defer traceway.Recover()
+
 				port := ":" + portsList[i]
 				config.Logln("Starting server on " + port)
 				if err := router.Run(port); err != nil {
@@ -211,6 +214,8 @@ func notifySystemd() {
 	}
 
 	go func() {
+		defer traceway.Recover()
+
 		ticker := time.NewTicker(15 * time.Second)
 		defer ticker.Stop()
 		for range ticker.C {

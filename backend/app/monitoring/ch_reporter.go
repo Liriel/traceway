@@ -26,6 +26,8 @@ var telemetryTables = []string{
 
 func StartClickHouseReporter(ctx context.Context) {
 	go func() {
+		defer traceway.Recover()
+
 		ticker := time.NewTicker(reportInterval)
 		defer ticker.Stop()
 

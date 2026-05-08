@@ -30,6 +30,8 @@ func registerReportHook() {
 }
 
 func evaluateEventRules(event hooks.ReportEvent) {
+	defer traceway.Recover()
+
 	rules, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.NotificationRuleWithChannel, error) {
 		return repositories.NotificationRuleRepository.FindEnabledEventRules(tx, event.ProjectId)
 	})

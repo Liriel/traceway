@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	traceway "go.tracewayapp.com"
 )
 
 type cooldownTracker struct {
@@ -62,6 +64,8 @@ func (m *dedupTracker) purgeExpired(maxAge time.Duration) {
 
 func startDedupPurger(ctx context.Context) {
 	go func() {
+		defer traceway.Recover()
+
 		ticker := time.NewTicker(10 * time.Minute)
 		defer ticker.Stop()
 		for {

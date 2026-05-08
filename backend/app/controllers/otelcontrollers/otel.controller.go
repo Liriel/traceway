@@ -88,6 +88,8 @@ func (o otelController) ExportTraces(c *gin.Context) {
 		if len(aiConversations) > 0 {
 			convs := aiConversations
 			go func() {
+				defer traceway.Recover()
+
 				for _, conv := range convs {
 					if err := storage.Store.Write(context.Background(), conv.StorageKey, conv.Content); err != nil {
 						traceway.CaptureException(fmt.Errorf("failed to write AI trace conversation (key=%s): %w", conv.StorageKey, err))
