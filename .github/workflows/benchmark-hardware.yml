@@ -58,7 +58,6 @@ jobs:
       matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
     env:
       HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
-      BENCHMARK_SSH_KEY: ${{ runner.temp }}/benchmark-key
       BENCH_LOCATION: ${{ github.event.inputs.location }}
     steps:
       - uses: actions/checkout@v4
@@ -74,7 +73,9 @@ jobs:
       - name: Materialize SSH key
         run: |
           umask 077
-          printf '%s\n' "${{ secrets.BENCHMARK_SSH_PRIVATE_KEY }}" > "${BENCHMARK_SSH_KEY}"
+          key="$RUNNER_TEMP/benchmark-key"
+          printf '%s\n' "${{ secrets.BENCHMARK_SSH_PRIVATE_KEY }}" > "$key"
+          echo "BENCHMARK_SSH_KEY=$key" >> "$GITHUB_ENV"
 
       - uses: actions/setup-go@v5
         with:
