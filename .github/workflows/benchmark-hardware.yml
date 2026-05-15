@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       tiers:
-        description: 'Comma-separated Hetzner tiers (e.g. ccx13,ccx23,ccx33,ccx43)'
+        description: 'Comma-separated Hetzner tiers. ccx13=2 cores, ccx23=4, ccx33=8, ccx43=16. With max-parallel:1 the quota cap is per-tier; ccx43 needs ≥16 dedicated vCPUs.'
         required: true
-        default: 'ccx13,ccx23,ccx33,ccx43'
+        default: 'ccx13,ccx23,ccx33'
       modes:
         description: 'Comma-separated DB modes (sqlite,pgch)'
         required: true
@@ -54,7 +54,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      max-parallel: 2
+      # Serialized for now: new Hetzner accounts cap dedicated cores low enough
+      # that even 2 × ccx23 in parallel can hit the quota when combined with
+      # other usage. Raise once the account is out of the new-user cool-down.
+      max-parallel: 1
       matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
     env:
       HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
