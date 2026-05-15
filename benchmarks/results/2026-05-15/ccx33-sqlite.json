@@ -1,0 +1,178 @@
+{
+  "tier": "ccx33",
+  "mode": "sqlite",
+  "startedAt": "2026-05-15T04:13:47Z",
+  "endedAt": "2026-05-15T04:43:47Z",
+  "maxSustainableEps": 199.99987467007853,
+  "steps": [
+    {
+      "step": 1,
+      "targetEps": 100,
+      "actualEps": 100.8322801267231,
+      "ingest": {
+        "p50": 8.246686,
+        "p95": 23.582696,
+        "p99": 29.123089,
+        "ok": 1210,
+        "errors": 0,
+        "errRate": 0
+      },
+      "reads": {
+        "dashboard_overview": {
+          "p50": 242.81492,
+          "p95": 481.20035,
+          "p99": 507.818369,
+          "ok": 119,
+          "errors": 0,
+          "errRate": 0
+        },
+        "endpoints_grouped": {
+          "p50": 232.413017,
+          "p95": 495.28945600000003,
+          "p99": 511.347915,
+          "ok": 119,
+          "errors": 0,
+          "errRate": 0
+        },
+        "exceptions_grouped": {
+          "p50": 5.728182,
+          "p95": 9.086526,
+          "p99": 9.770601000000001,
+          "ok": 119,
+          "errors": 0,
+          "errRate": 0
+        },
+        "logs": {
+          "p50": 3.463626,
+          "p95": 6.765374,
+          "p99": 7.810744,
+          "ok": 119,
+          "errors": 0,
+          "errRate": 0
+        },
+        "session_recording": {
+          "p50": 3.366628,
+          "p95": 7.612306,
+          "p99": 8.699848,
+          "ok": 119,
+          "errors": 0,
+          "errRate": 0
+        }
+      },
+      "passed": true
+    },
+    {
+      "step": 2,
+      "targetEps": 200,
+      "actualEps": 199.99987467007853,
+      "ingest": {
+        "p50": 10.748746,
+        "p95": 19.982831,
+        "p99": 27.770218,
+        "ok": 2400,
+        "errors": 0,
+        "errRate": 0
+      },
+      "reads": {
+        "dashboard_overview": {
+          "p50": 1022.904463,
+          "p95": 1662.6297000000002,
+          "p99": 1741.4247010000001,
+          "ok": 100,
+          "errors": 0,
+          "errRate": 0
+        },
+        "endpoints_grouped": {
+          "p50": 1089.877851,
+          "p95": 1738.066457,
+          "p99": 1862.042994,
+          "ok": 98,
+          "errors": 0,
+          "errRate": 0
+        },
+        "exceptions_grouped": {
+          "p50": 3.7268380000000003,
+          "p95": 7.592028,
+          "p99": 8.371334,
+          "ok": 120,
+          "errors": 0,
+          "errRate": 0
+        },
+        "logs": {
+          "p50": 2.713549,
+          "p95": 6.245546,
+          "p99": 6.925963,
+          "ok": 120,
+          "errors": 0,
+          "errRate": 0
+        },
+        "session_recording": {
+          "p50": 2.788983,
+          "p95": 6.247018,
+          "p99": 6.9528300000000005,
+          "ok": 120,
+          "errors": 0,
+          "errRate": 0
+        }
+      },
+      "passed": true
+    },
+    {
+      "step": 3,
+      "targetEps": 400,
+      "actualEps": 399.9975335918747,
+      "ingest": {
+        "p50": 10.044364,
+        "p95": 21.119263999999998,
+        "p99": 31.082504,
+        "ok": 4800,
+        "errors": 0,
+        "errRate": 0
+      },
+      "reads": {
+        "dashboard_overview": {
+          "p50": 3031.4569699999997,
+          "p95": 4170.258171,
+          "p99": 4188.965641000001,
+          "ok": 40,
+          "errors": 0,
+          "errRate": 0
+        },
+        "endpoints_grouped": {
+          "p50": 3053.400582,
+          "p95": 4336.175943,
+          "p99": 4481.414226,
+          "ok": 38,
+          "errors": 0,
+          "errRate": 0
+        },
+        "exceptions_grouped": {
+          "p50": 3.431165,
+          "p95": 5.992551,
+          "p99": 6.481336,
+          "ok": 120,
+          "errors": 0,
+          "errRate": 0
+        },
+        "logs": {
+          "p50": 1.902143,
+          "p95": 4.30821,
+          "p99": 4.842937,
+          "ok": 120,
+          "errors": 0,
+          "errRate": 0
+        },
+        "session_recording": {
+          "p50": 1.92403,
+          "p95": 4.23285,
+          "p99": 4.962383,
+          "ok": 121,
+          "errors": 0,
+          "errRate": 0
+        }
+      },
+      "passed": false,
+      "failReason": "read endpoint \"endpoints_grouped\" p99 = 4481ms \u003e 3000ms threshold"
+    }
+  ]
+}
