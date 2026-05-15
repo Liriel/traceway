@@ -133,6 +133,15 @@ jobs:
           set -euo pipefail
           git config user.name "traceway-bot"
           git config user.email "bot@tracewayapp.com"
+
+          # The benchmark run takes 2-3 hours, so by the time we get here our
+          # checkout is almost always behind main. Sync to whatever main looks
+          # like *right now* before committing. The result files are untracked,
+          # so a hard reset to origin/main leaves them in place.
+          echo "syncing checkout to latest origin/main before committing"
+          git fetch origin main
+          git reset --hard origin/main
+
           git add "${{ steps.stage.outputs.dst }}"
           if git diff --cached --quiet; then
             echo "nothing to commit"
