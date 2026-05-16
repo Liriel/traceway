@@ -42,21 +42,41 @@ The rest of this doc assumes option B, so swap `/tmp/bench-venv` for
 
 ## Pick a backend mode
 
-Two compose stacks, each pinned to one of the project's existing Dockerfiles:
+Three compose stacks, each pinned to one of the project's existing Dockerfiles:
 
 | Mode | Compose file | Image | What it tests |
 |------|--------------|-------|---------------|
 | `sqlite` | `benchmarks/compose/docker-compose.sqlite.yml` | `Dockerfile.sqlite` | Single-binary backend with embedded SQLite. Fast to bring up, lower ceiling. |
 | `pgch` | `benchmarks/compose/docker-compose.pgch.yml` | `Dockerfile.minimal` + clickhouse + postgres | Full prod-shape stack. Slower first build, much higher ceiling. |
+| `managed-ch` | `benchmarks/compose/docker-compose.managed-ch.yml` | `Dockerfile.minimal` + postgres (CH is external) | Same `Dockerfile.minimal` as pgch but pointed at an external managed ClickHouse via env vars. |
 
-Both expose port **8087** on the host (override with `BENCH_PORT=8088 docker
+All expose port **8087** on the host (override with `BENCH_PORT=8088 docker
 compose -f ... up`).
 
 First-time builds:
 - `sqlite` mode: ~3–6 min (npm install + Go build).
 - `pgch` mode: ~6–10 min (above + ClickHouse + Postgres image pulls).
+- `managed-ch` mode: ~3–5 min (same as pgch without the CH pull).
 
 Subsequent runs reuse the Docker layer cache and start in seconds.
+
+### Extra setup for `managed-ch`
+
+Before running `--mode managed-ch`, export the ClickHouse credentials in your
+shell (preflight will fail loudly if they're missing):
+
+```bash
+export CLICKHOUSE_SERVER='your-cluster.region.aws.clickhouse.cloud:9440'
+export CLICKHOUSE_USERNAME='bench'
+export CLICKHOUSE_PASSWORD='••••••'
+# Optional:
+export CLICKHOUSE_DATABASE='traceway'         # default: traceway
+export BENCH_CH_HTTPS_PORT='8443'             # default: 8443 (CH Cloud); some hosts 8123
+```
+
+The orchestrator wipes (`DROP DATABASE IF EXISTS` + `CREATE DATABASE`) the
+configured database before each matrix entry — **use a dedicated database**
+or other tables in the same DB will be lost.
 
 ---
 
@@ -94,69 +114,90 @@ If this loops for more than ~3 min, something is wrong. Inspect:
 docker compose -f benchmarks/compose/docker-compose.sqlite.yml logs --tail=80 traceway
 ```
 
-### 3. Register a fresh user + project; capture creds
+### 3. Register a fresh user + project; capture the project token
 
 ```bash
 eval "$(benchmarks/scripts/seed-project.sh http://localhost:8087 \
-  | jq -r '"export JWT=\(.jwt) PROJECT_TOKEN=\(.projectToken) PROJECT_ID=\(.projectId)"')"
-echo "PROJECT_ID=$PROJECT_ID"
+  | jq -r '"export PROJECT_TOKEN=\(.projectToken)"')"
+echo "PROJECT_TOKEN=$PROJECT_TOKEN"
 ```
 
 `seed-project.sh` hits `/api/register`. On self-hosted backends only one
-organization is allowed, so this only works on a **fresh** DB — step 1's `down
--v` is what guarantees that.
+organization is allowed, so this only works on a **fresh** DB — step 1's
+`down -v` is what guarantees that. The OTLP-only loadgen no longer needs the
+JWT or project ID, so we extract only the project token.
 
-### 4. Run the loadgen
-
-Pick numbers appropriate for the mode you booted in step 1:
-
-**SQLite (laptop):**
+### 4. Build and run the loadgen, one signal at a time
 
 ```bash
+(cd benchmarks/loadgen && go build -o loadgen .)
 mkdir -p /tmp/bench-localhost && rm -f /tmp/bench-localhost/*.json
-benchmarks/loadgen/loadgen \
-  --target http://localhost:8087 \
-  --token "$PROJECT_TOKEN" --jwt "$JWT" --project-id "$PROJECT_ID" \
-  --duration 5m --step-duration 45s \
-  --initial-eps 100 --max-eps 800 \
-  --report-out /tmp/bench-localhost/local-sqlite.json \
-  --tier local --mode sqlite
+```
+
+Pick numbers appropriate for the mode you booted in step 1. The two-phase
+ramp first grows batch size at a fixed low request rate, then grows request
+rate at the winning batch size.
+
+**SQLite (laptop) — quick smoke per signal:**
+
+```bash
+for sig in spans metrics logs; do
+  benchmarks/loadgen/loadgen \
+    --target http://localhost:8087 \
+    --token "$PROJECT_TOKEN" \
+    --signal "$sig" \
+    --duration 5m --step-duration 30s \
+    --phase1-batch-sizes 256,1024,4096 \
+    --phase2-request-rates 1,5,20 \
+    --report-out "/tmp/bench-localhost/local-sqlite-${sig}.json" \
+    --tier local --mode sqlite
+done
 ```
 
 **pgch (laptop):**
 
 ```bash
-benchmarks/loadgen/loadgen \
-  --target http://localhost:8087 \
-  --token "$PROJECT_TOKEN" --jwt "$JWT" --project-id "$PROJECT_ID" \
-  --duration 5m --step-duration 45s \
-  --initial-eps 500 --max-eps 4000 \
-  --report-out /tmp/bench-localhost/local-pgch.json \
-  --tier local --mode pgch
+for sig in spans metrics logs; do
+  benchmarks/loadgen/loadgen \
+    --target http://localhost:8087 \
+    --token "$PROJECT_TOKEN" \
+    --signal "$sig" \
+    --duration 8m --step-duration 45s \
+    --phase1-batch-sizes 256,1024,4096,8192 \
+    --phase2-request-rates 1,5,20,50 \
+    --report-out "/tmp/bench-localhost/local-pgch-${sig}.json" \
+    --tier local --mode pgch
+done
 ```
 
-On stderr you'll see one line per step like:
+On stderr you'll see two-phase progress like:
 
 ```
-step 1: target=300 actual=306 ingest_p99=92ms ingest_err=0.00% passed=true
-step 2: target=600 actual=600 ingest_p99=17ms ingest_err=0.00% passed=false read endpoint "endpoints_grouped" p99 = 3268ms > 3000ms threshold
-wrote /tmp/bench-localhost/local-sqlite.json: max sustainable EPS = 306 (2 step(s))
+phase1 step 1: batch=256 rate=5.0 items/s=1280 p99=12ms err=0.00% passed=true
+phase1 step 2: batch=1024 rate=5.0 items/s=5120 p99=18ms err=0.00% passed=true
+phase1 step 3: batch=4096 rate=5.0 items/s=20480 p99=42ms err=0.00% passed=true
+phase2 step 1: batch=4096 rate=1.0 items/s=4096 p99=15ms err=0.00% passed=true
+phase2 step 2: batch=4096 rate=5.0 items/s=20480 p99=21ms err=0.00% passed=true
+phase2 step 3: batch=4096 rate=20.0 items/s=81920 p99=180ms err=0.00% passed=true
+wrote /tmp/bench-localhost/local-sqlite-spans.json: signal=spans max sustainable spans/sec = 81920
 ```
 
-The run finishes when either (a) a step fails the breaking-point check, (b)
-`--max-eps` is exceeded, or (c) `--duration` expires.
+A run finishes when either (a) a step fails the error threshold, (b) all
+configured steps pass, or (c) `--duration` expires.
 
-### 5. Render the chart + summary
+### 5. Render the charts + summary
 
 ```bash
 .venv-bench/bin/python benchmarks/scripts/chart.py /tmp/bench-localhost/
-open /tmp/bench-localhost/chart.png
-open /tmp/bench-localhost/chart-detail.png
+open /tmp/bench-localhost/chart-spans.png
+open /tmp/bench-localhost/chart-metrics.png
+open /tmp/bench-localhost/chart-logs.png
 cat /tmp/bench-localhost/summary.md
 ```
 
 A one-entry result renders fine; it just won't have multiple bars/lines to
-compare against.
+compare against. Old pre-OTLP-split JSONs (without a `signal` field) are
+skipped with a log line.
 
 ### 6. Tear down
 
@@ -170,127 +211,68 @@ The `-v` deletes the named volume so the next run is guaranteed clean.
 
 ## Reading the output
 
-Each step record in the JSON looks like:
+Each result JSON has two phases:
 
 ```json
 {
-  "step": 1,
-  "targetEps":  300,            // Synthetic event units the ramp asked for. NOT requests/sec — see "What an EPS is" below.
-  "actualEps":  306.6,          // What the loadgen actually pushed on the wire (same unit).
-  "ingest": {                    // Latency/errors for /api/report + OTLP combined
-    "p50": 3.8, "p95": 12.5, "p99": 92.3,
-    "ok": 1380, "errors": 0, "errRate": 0
+  "tier": "local", "mode": "sqlite", "signal": "spans",
+  "startedAt": "2026-05-15T...",  "endedAt": "...",
+  "phase1": {
+    "kind": "batch-size-ramp",
+    "fixedRequestRate": 5,
+    "steps": [
+      {
+        "step": 1, "batchSize": 256, "requestRate": 5,
+        "attemptedItemsPerSec": 1280, "actualItemsPerSec": 1280, "rejected": 0,
+        "ingest": { "p50": 8, "p95": 14, "p99": 22, "ok": 150, "errors": 0, "errRate": 0 },
+        "passed": true
+      }
+    ],
+    "maxBatchSize": 8192
   },
-  "reads": {                     // Per dashboard read endpoint
-    "endpoints_grouped":  { "p50": 1120, "p95": 1462, "p99": 1509, "ok": 36,  ... },
-    "dashboard_overview": { ... },
-    "exceptions_grouped": { ... },
-    "logs":               { ... },
-    "session_recording":  { ... }
+  "phase2": {
+    "kind": "request-rate-ramp",
+    "fixedBatchSize": 8192,
+    "steps": [ ... ],
+    "maxRequestRate": 100
   },
-  "passed": true,
-  "failReason": ""               // populated when passed=false
+  "maxSustainableItemsPerSec": 819200
 }
 ```
 
-**A step passes** when *all three* hold:
-1. Ingest error rate ≤ 5% (5xx, timeouts).
-2. Every read endpoint p99 < 3000 ms.
-3. SUT was reachable for the whole step.
+**A step passes** when the combined error rate (HTTP failures + OTLP
+`PartialSuccess` rejected items) is ≤ `--ingest-err-threshold` (default 5%).
+Read endpoints are not probed in this benchmark.
 
-`maxSustainableEps` in the JSON is the `actualEps` of the **last passing
-step** — that's the headline number for this configuration.
-
-If `target` and `actual` diverge a lot on a passing step, the backend is
-already saturated even though it's not erroring yet. The next step usually
-fails.
-
-If reads degrade before ingest, that's expected: aggregation reads
-(`endpoints_grouped`, `dashboard_overview`) compete with write locks/IO and
-will be the first to cliff on SQLite. Point lookups (`logs`,
-`session_recording`, `exceptions_grouped`) typically stay fast right up until
-the SUT gives up.
+`maxSustainableItemsPerSec = phase2.fixedBatchSize × phase2.maxRequestRate`,
+where `maxRequestRate` is the rate of the last passing Phase 2 step.
 
 ---
 
-## What an EPS is (and isn't)
+## What an "item" is
 
-`EPS` in the loadgen is **synthetic event units**, not requests/sec and not
-DB rows/sec. The conversion:
+Each signal counts a different unit:
 
-```
-requests/sec = EPS / 10        # because tracesPerFrame = 10
-```
-
-So `--max-eps 800` actually means "push up to 80 HTTP requests/sec." The
-factor-of-10 fudge keeps the rate-limiter math clean (each `/api/report`
-frame carries 10 traces; the loadgen counts EPS as traces).
-
-### What goes in each request
-
-Each "frame" the loadgen sends is one HTTP POST, routed by `--report-share`
-(default 0.7 → 70 % go to `/api/report`, 30 % to OTLP).
-
-**`/api/report` frame** — gzipped JSON, built by `buildFrame()` in
-`benchmarks/loadgen/report.go`:
-
-| Field | Count per request | Notes |
+| Signal | Unit | OTLP request |
 |---|---|---|
-| `traces` | **10 (fixed)** | One row per `transactions` |
-| `spans` (nested in traces) | **20–50** (each trace gets 2–5) | Random duration 1–200 ms, name from `{db.query, http.call, cache.get, render, json.encode}` |
-| `metrics` | **5 (fixed)** | `bench.metric.{cpu,mem,qps,lat,errs}`, random value 0–100 |
-| `sessions` | 0 / 1 — 5 % with recording, 16 % session-only | Random uuid + StartedAt |
-| `sessionRecordings` | 0 / 1 — 5 % chance | ~100 KB synthetic rrweb-shaped blob |
-| `stackTraces` | 0 / 1 — 2 % chance | Hardcoded short stack trace |
+| `spans` | one span (one row in `spans` / one trace fan-out) | `POST /api/otel/v1/traces` with `ExportTraceServiceRequest` |
+| `metrics` | one Gauge data point (one row in `metric_points`) | `POST /api/otel/v1/metrics` with `ExportMetricsServiceRequest` |
+| `logs` | one `LogRecord` (one row in `log_records`) | `POST /api/otel/v1/logs` with `ExportLogsServiceRequest` |
 
-Trace fields: random endpoint from a fixed 13-item list (`GET /api/users`,
-`POST /api/orders`, `GET /api/products/:id`, …), duration 10–1000 ms, random
-status code, body size 200–8200 bytes.
-
-**OTLP frame** — protobuf, built by `sendOTLPTraces()` in
-`benchmarks/loadgen/otlp.go`:
-
-| Field | Count per request | Notes |
-|---|---|---|
-| `spans` | **20 (fixed, `otlpSpansPerRequest`)** | Random 16-byte traceId + 8-byte spanId, http.method=GET, status code, route from the same 13-endpoint pool |
-
-No metrics, sessions, or exceptions on this path.
-
-### Row growth per second at 400 EPS
-
-At 400 EPS the loadgen fires **40 requests/sec total**: ~28 to `/api/report`,
-~12 to OTLP. That fans out into:
-
-| Table | Rows/sec |
-|---|---|
-| `transactions` | ~280 (28 × 10) |
-| `spans` (from `/api/report`) | ~980 (28 × ~35) |
-| `spans` (from OTLP) | ~240 (12 × 20) |
-| `metric_points` | ~140 (28 × 5) |
-| `sessions` | ~6 (28 × 21 %) |
-| `session_recordings` | ~1.4 (28 × 5 %) |
-| `exception_stack_traces` | ~0.56 (28 × 2 %) |
-
-So **"400 EPS" ≈ 1,500 rows/sec** across the database, not 400. Keep this
-mapping in mind when comparing the chart's headline number to your real
-workload.
+All bodies are protobuf, gzipped. The loadgen is OTLP-only — no `/api/report`.
 
 ### Data variety
 
 Everything is uniform random within bounded ranges — deliberately flat:
 
-- 13 distinct endpoint paths → `GROUP BY endpoint` aggregations always
-  produce ~13 groups
-- 5 span names, 5 metric names
-- All UUIDs are fresh per record (no hash clustering)
-- Durations: uniform 10–1000 ms → percentile queries hit a smooth
-  distribution
-- No diurnal traffic, no power-law endpoint skew, no correlated bursts
+- **Spans:** 13 endpoint paths, status codes 200/201/404/500, durations 10–1000 ms
+- **Metrics:** 10 metric names (`bench.metric.{cpu,mem,qps,lat,errs,disk,net,heap,gc,fd}`), Gauge type, low-cardinality `host` attr
+- **Logs:** severity INFO/WARN/ERROR (weighted toward INFO), random 120-char body, 5 attrs incl. synthetic trace_id
 
-This isolates the backend's raw throughput from traffic-shape noise. It is
-**not** representative of real production telemetry; don't read the numbers
-as "this is what users will experience" — they're "this is the floor the
-backend can sustain on synthetic, evenly-distributed load."
+This isolates raw throughput from traffic-shape noise. It is **not**
+representative of real production telemetry; don't read the numbers as "this
+is what users will experience" — they're "this is the floor the backend can
+sustain on synthetic, evenly-distributed load."
 
 ---
 
@@ -298,18 +280,18 @@ backend can sustain on synthetic, evenly-distributed load."
 
 | Flag | Default | When to change |
 |------|---------|----------------|
-| `--initial-eps` | 100 | Raise close to the expected ceiling so you don't waste the first few steps far below saturation. |
-| `--max-eps` | 50000 | Lower it to bound runtime; raise to find the ceiling on a beefier box. |
-| `--step-duration` | 2m | Shorten for smoke checks (45s), keep at 2m for real measurements. |
+| `--signal` | (required) | One of `spans`, `metrics`, `logs`. |
+| `--phase1-batch-sizes` | `256,1024,4096,8192,16384` | Drop the lower steps on beefy boxes to save time; raise the cap to find the per-request decode/insert ceiling. |
+| `--phase2-request-rates` | `1,5,25,100,400` | Raise the cap to find the request-rate ceiling on big boxes; lower for cheap smoke tests. |
+| `--phase1-fixed-rate` | 5 | Per-second request rate held constant during Phase 1. Small enough that batch size is the only variable. |
+| `--phase2-batch-cap` | 8192 | Cap on Phase 2 batch size (matches OTel collector default `send_batch_size`). Phase 2 uses `min(this, Phase 1 winner)`. |
+| `--step-duration` | 2m | Shorten for smoke checks (15–30s), keep at 2m for real measurements. |
 | `--duration` | 30m | Hard cap on total wall time. |
-| `--report-share` | 0.7 | Fraction of ingest sent via `/api/report` vs OTLP. Lower it to test OTLP-heavy workloads. |
-| `--read-rps` | 1 | Read traffic per endpoint per second. Raise to model a busier dashboard. |
-| `--ingest-err-threshold` | 0.05 | Allowed ingest error rate before a step fails. |
-| `--read-p99-threshold-ms` | 3000 | The dashboard latency budget. |
+| `--ingest-err-threshold` | 0.05 | Combined HTTP error + OTLP rejected rate that fails a step. |
 
-The ramp doubles target each step (100→200→400→800→…), so the cliff
-resolution is coarse by design — for a precise number, run a second pass with
-`--initial-eps` set near the known cliff and shorter steps.
+The ramp is geometric (256 → 1024 → 4096 → …), so cliff resolution is coarse
+by design — for a precise number, run a second pass with a narrower band of
+values around the known cliff.
 
 ---
 
@@ -319,11 +301,9 @@ resolution is coarse by design — for a precise number, run a second pass with
   Previous run was killed mid-write and the SQLite WAL didn't recover. Run
   step 1 again with `down -v`.
 
-- **`actual` is ~10× lower than `target` on every step.**
-  You're running an older loadgen binary. Rebuild:
-  ```bash
-  (cd benchmarks/loadgen && go build -o loadgen .)
-  ```
+- **`actualItemsPerSec` is much lower than `batchSize × requestRate`.**
+  Items are being dropped — either HTTP failures or OTLP `PartialSuccess`
+  rejections. Check `rejected` and `ingest.errors` for the culprit.
 
 - **`seed-project.sh` returns `409 Conflict: organization already exists`.**
   The DB isn't fresh — go back to step 1 with `down -v`.
@@ -349,11 +329,14 @@ Once the local run works end-to-end, move to the Hetzner ladder:
 # Validate Hetzner credentials, no money spent
 ./benchmarks/scripts/run-local.sh --dry-run
 
-# ~5 min, ~€0.02 — one tier, one mode, on real Hetzner
+# ~5 min, ~€0.02 — one tier, one mode, one signal, on real Hetzner
 ./benchmarks/scripts/run-local.sh --smoke
 
-# Full matrix — 4 tiers x 2 modes, ~1 h, ~€1.20
+# Full matrix — 4 tiers x 2 modes x 3 signals, ~3 h, ~€3.60
 ./benchmarks/scripts/run-local.sh
+
+# Subset: one signal only across all tiers/modes
+./benchmarks/scripts/run-local.sh --signal spans
 ```
 
 Prereqs and detail in [README.md](./README.md). The same `run-matrix-entry.sh`

@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
-"""Render hardware-vs-breaking-point charts from a directory of loadgen JSONs.
+"""Render per-signal benchmark charts from a directory of loadgen JSONs.
 
 Inputs: a directory containing N JSON files (one per matrix entry), each in
-the schema emitted by benchmarks/loadgen/. Order-independent.
+the schema emitted by benchmarks/loadgen/. Files without a "signal" field
+(old pre-OTLP-split format) are skipped with a log line.
 
-Outputs (written into the same directory):
-  - chart.png         Bar: max sustainable EPS per tier, two bars per tier
-                      (sqlite vs pgch). The headline.
-  - chart-detail.png  Lines: read P99 (ms) vs ingest EPS, one line per
-                      (tier, mode). Shows how reads degrade as ingest climbs.
-  - summary.md        Markdown table for human consumption / docs source.
+Outputs depend on which scenarios are present in the directory:
+  Throughput scenario:
+    - chart-spans.png / chart-metrics.png / chart-logs.png   bar: max items/sec
+    - chart-detail-<sig>.png                                  line: ingest p99 vs request rate
+  Read-probe scenario:
+    - chart-readprobe-<sig>.png                               line: read latency vs fill level
+  Always:
+    - summary.md                                              tables per signal/scenario
 """
 
 import json
 import sys
-from collections import defaultdict
 from pathlib import Path
 
 import matplotlib
@@ -22,11 +24,20 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-# Stable left-to-right ordering of tiers regardless of how the matrix runs.
 TIER_ORDER = ["ccx13", "ccx23", "ccx33", "ccx43"]
 MODE_ORDER = ["sqlite", "pgch"]
+SIGNALS = ["spans", "metrics", "logs"]
 MODE_COLORS = {"sqlite": "#4f9fff", "pgch": "#ff9f4f"}
-READ_P99_BUDGET_MS = 3000
+ITEM_LABEL = {
+    "spans": "spans/sec",
+    "metrics": "data points/sec",
+    "logs": "log records/sec",
+}
+ROW_LABEL = {
+    "spans": "spans rows",
+    "metrics": "metric_points rows",
+    "logs": "log_records rows",
+}
 
 
 def load_runs(results_dir: Path) -> list[dict]:
@@ -34,6 +45,16 @@ def load_runs(results_dir: Path) -> list[dict]:
     for p in sorted(results_dir.glob("*.json")):
         with p.open() as fh:
             doc = json.load(fh)
+        if "signal" not in doc:
+            print(f"skipping {p.name}: missing 'signal' field (pre-OTLP-split format)", file=sys.stderr)
+            continue
+        if doc["signal"] not in SIGNALS:
+            print(f"skipping {p.name}: unknown signal {doc['signal']!r}", file=sys.stderr)
+            continue
+        doc.setdefault("scenario", "throughput")
+        if doc["scenario"] not in ("throughput", "read-probe"):
+            print(f"skipping {p.name}: unknown scenario {doc['scenario']!r}", file=sys.stderr)
+            continue
         doc["_path"] = p
         runs.append(doc)
     return runs
@@ -47,7 +68,11 @@ def mode_rank(m: str) -> int:
     return MODE_ORDER.index(m) if m in MODE_ORDER else len(MODE_ORDER)
 
 
-def render_bar(runs: list[dict], out: Path) -> None:
+def render_throughput_bar(runs: list[dict], signal: str, out: Path) -> None:
+    runs = [r for r in runs if r["signal"] == signal and r["scenario"] == "throughput"]
+    if not runs:
+        return
+
     fig, ax = plt.subplots(figsize=(9, 5))
     tiers_present = sorted({r["tier"] for r in runs}, key=tier_rank)
     modes_present = sorted({r["mode"] for r in runs}, key=mode_rank)
@@ -59,7 +84,7 @@ def render_bar(runs: list[dict], out: Path) -> None:
         ys = []
         for tier in tiers_present:
             match = [r for r in runs if r["tier"] == tier and r["mode"] == mode]
-            ys.append(match[0]["maxSustainableEps"] if match else 0)
+            ys.append(match[0].get("maxSustainableItemsPerSec", 0) if match else 0)
         offsets = [xi + (mi - (len(modes_present) - 1) / 2) * width for xi in x]
         bars = ax.bar(offsets, ys, width=width, label=mode, color=MODE_COLORS.get(mode, "#777"))
         for b, y in zip(bars, ys):
@@ -69,9 +94,9 @@ def render_bar(runs: list[dict], out: Path) -> None:
 
     ax.set_xticks(x)
     ax.set_xticklabels(tiers_present)
-    ax.set_ylabel("Max sustainable traces/sec")
-    ax.set_title("Traceway: max sustainable ingest by hardware tier\n"
-                 f"(failure = ingest err > 5% OR any read p99 > {READ_P99_BUDGET_MS}ms)")
+    ax.set_ylabel(f"Max sustainable {ITEM_LABEL[signal]}")
+    ax.set_title(f"Traceway: max sustainable {signal} ingest by hardware tier\n"
+                 "(failure = combined HTTP error + OTLP rejected > 5%)")
     ax.legend(title="DB mode")
     ax.grid(axis="y", linestyle=":", alpha=0.4)
     fig.tight_layout()
@@ -79,26 +104,30 @@ def render_bar(runs: list[dict], out: Path) -> None:
     plt.close(fig)
 
 
-def render_detail(runs: list[dict], out: Path) -> None:
+def render_throughput_detail(runs: list[dict], signal: str, out: Path) -> None:
+    runs = [r for r in runs if r["signal"] == signal and r["scenario"] == "throughput"]
+    if not runs:
+        return
+
     fig, ax = plt.subplots(figsize=(10, 6))
+    plotted = False
 
     for run in sorted(runs, key=lambda r: (tier_rank(r["tier"]), mode_rank(r["mode"]))):
-        xs, ys = [], []
-        for s in run.get("steps", []):
-            if not s.get("reads"):
-                continue
-            xs.append(s["actualEps"])
-            # Worst read p99 across all read endpoints — that's what defines the cliff.
-            ys.append(max((rd.get("p99", 0) for rd in s["reads"].values()), default=0))
-        if xs:
-            label = f"{run['tier']} / {run['mode']}"
-            ax.plot(xs, ys, marker="o", label=label)
+        steps = (run.get("phase2") or {}).get("steps") or []
+        xs = [s["requestRate"] for s in steps if s.get("ingest")]
+        ys = [s["ingest"]["p99"] for s in steps if s.get("ingest")]
+        if not xs:
+            continue
+        ax.plot(xs, ys, marker="o", label=f"{run['tier']} / {run['mode']}")
+        plotted = True
 
-    ax.axhline(READ_P99_BUDGET_MS, linestyle="--", color="#cc3333", alpha=0.6,
-               label=f"P99 budget ({READ_P99_BUDGET_MS}ms)")
-    ax.set_xlabel("Actual ingest rate (traces/sec)")
-    ax.set_ylabel("Worst read endpoint P99 (ms)")
-    ax.set_title("Read latency degradation under increasing ingest load")
+    if not plotted:
+        plt.close(fig)
+        return
+
+    ax.set_xlabel("Phase 2 request rate (req/sec)")
+    ax.set_ylabel("Ingest P99 latency (ms)")
+    ax.set_title(f"Ingest latency vs request rate — {signal}")
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.grid(True, which="both", linestyle=":", alpha=0.4)
@@ -108,30 +137,116 @@ def render_detail(runs: list[dict], out: Path) -> None:
     plt.close(fig)
 
 
+def render_readprobe(runs: list[dict], signal: str, out: Path) -> None:
+    runs = [r for r in runs if r["signal"] == signal and r["scenario"] == "read-probe"]
+    if not runs:
+        return
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    plotted = False
+    threshold_ms = 5000
+
+    for run in sorted(runs, key=lambda r: (tier_rank(r["tier"]), mode_rank(r["mode"]))):
+        rp = run.get("readProbe") or {}
+        threshold_ms = rp.get("readThresholdMs", threshold_ms)
+        steps = rp.get("steps") or []
+        xs = [s["rowsIngested"] for s in steps]
+        ys = [s["readLatencyMs"] for s in steps]
+        if not xs:
+            continue
+        ax.plot(xs, ys, marker="o", label=f"{run['tier']} / {run['mode']}")
+        plotted = True
+
+    if not plotted:
+        plt.close(fig)
+        return
+
+    ax.axhline(threshold_ms, linestyle="--", color="#cc3333", alpha=0.7,
+               label=f"threshold ({threshold_ms}ms)")
+    ax.set_xlabel(f"{ROW_LABEL[signal]} (ingested before probe)")
+    ax.set_ylabel(f"Read latency on {readPathForSignal(signal)} (ms)")
+    ax.set_title(f"Read latency vs ingested rows — {signal}")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.grid(True, which="both", linestyle=":", alpha=0.4)
+    ax.legend(loc="upper left", fontsize=9)
+    fig.tight_layout()
+    fig.savefig(out, dpi=130)
+    plt.close(fig)
+
+
+def readPathForSignal(signal: str) -> str:
+    return {
+        "spans": "/api/endpoints/grouped",
+        "metrics": "/api/metrics/application",
+        "logs": "/api/logs",
+    }.get(signal, "")
+
+
 def render_summary(runs: list[dict], out: Path) -> None:
     lines = ["# Traceway hardware benchmark — summary", ""]
     lines.append(f"Runs analyzed: {len(runs)}")
     lines.append("")
-    lines.append("| Tier | Mode | Max EPS | Ingest p99 @max (ms) | Worst read p99 @max (ms) | Steps |")
-    lines.append("|------|------|---------|----------------------|---------------------------|-------|")
 
-    for run in sorted(runs, key=lambda r: (tier_rank(r["tier"]), mode_rank(r["mode"]))):
-        max_eps = int(run.get("maxSustainableEps", 0))
-        last_pass = None
-        for s in reversed(run.get("steps", [])):
-            if s.get("passed"):
-                last_pass = s
-                break
-        ingest_p99 = int(last_pass["ingest"]["p99"]) if last_pass else 0
-        worst_read = 0
-        if last_pass and last_pass.get("reads"):
-            worst_read = int(max(rd.get("p99", 0) for rd in last_pass["reads"].values()))
-        lines.append(f"| {run['tier']} | {run['mode']} | {max_eps:,} | {ingest_p99} | {worst_read} | {len(run.get('steps', []))} |")
+    throughput_runs = [r for r in runs if r["scenario"] == "throughput"]
+    if throughput_runs:
+        lines.append("## Throughput scenario")
+        lines.append("")
+        lines.append("Failure threshold: combined HTTP error rate + OTLP rejected items > 5% of attempted.")
+        lines.append("")
+        for signal in SIGNALS:
+            sig_runs = [r for r in throughput_runs if r["signal"] == signal]
+            if not sig_runs:
+                continue
+            lines.append(f"### {signal.capitalize()}")
+            lines.append("")
+            lines.append(f"| Tier | Mode | Max {ITEM_LABEL[signal]} | Phase 1 max batch | Phase 2 max req/sec | Ingest P99 @ max (ms) |")
+            lines.append("|------|------|---------|-------------------|---------------------|------------------------|")
+            for run in sorted(sig_runs, key=lambda r: (tier_rank(r["tier"]), mode_rank(r["mode"]))):
+                max_items = int(run.get("maxSustainableItemsPerSec", 0))
+                max_batch = (run.get("phase1") or {}).get("maxBatchSize", 0)
+                max_rate = (run.get("phase2") or {}).get("maxRequestRate", 0)
+                last_pass = None
+                for s in reversed((run.get("phase2") or {}).get("steps") or []):
+                    if s.get("passed"):
+                        last_pass = s
+                        break
+                ingest_p99 = int(last_pass["ingest"]["p99"]) if last_pass else 0
+                lines.append(f"| {run['tier']} | {run['mode']} | {max_items:,} | {max_batch:,} | {max_rate:g} | {ingest_p99} |")
+            lines.append("")
 
-    lines.append("")
-    lines.append("Generated by `benchmarks/scripts/chart.py`. "
-                 "Failure thresholds: ingest error rate > 5%, OR any read endpoint p99 > "
-                 f"{READ_P99_BUDGET_MS}ms.")
+    readprobe_runs = [r for r in runs if r["scenario"] == "read-probe"]
+    if readprobe_runs:
+        lines.append("## Read-probe scenario")
+        lines.append("")
+        lines.append("Failure: a read probe exceeded the configured threshold (default 5000ms) or returned an error. "
+                     "Max fill level passed is the largest row count at which the read still came back in time.")
+        lines.append("")
+        for signal in SIGNALS:
+            sig_runs = [r for r in readprobe_runs if r["signal"] == signal]
+            if not sig_runs:
+                continue
+            lines.append(f"### {signal.capitalize()} — probing `{readPathForSignal(signal)}`")
+            lines.append("")
+            lines.append(f"| Tier | Mode | Max {ROW_LABEL[signal]} passed | Read latency @ max (ms) | First failing fill | Read latency @ failing (ms) |")
+            lines.append("|------|------|----------------|-------------------|--------------------|------------------------|")
+            for run in sorted(sig_runs, key=lambda r: (tier_rank(r["tier"]), mode_rank(r["mode"]))):
+                rp = run.get("readProbe") or {}
+                steps = rp.get("steps") or []
+                max_passed = run.get("maxFillLevelPassed", 0)
+                latency_at_max = 0
+                first_fail = ""
+                latency_at_fail = ""
+                for s in steps:
+                    if s.get("passed"):
+                        latency_at_max = int(s.get("readLatencyMs", 0))
+                    elif not first_fail:
+                        first_fail = f"{int(s.get('rowsIngested', 0)):,}"
+                        latency_at_fail = f"{int(s.get('readLatencyMs', 0))}"
+                lines.append(f"| {run['tier']} | {run['mode']} | {int(max_passed):,} | {latency_at_max} | {first_fail or '—'} | {latency_at_fail or '—'} |")
+            lines.append("")
+
+    lines.append("Generated by `benchmarks/scripts/chart.py`.")
     out.write_text("\n".join(lines) + "\n")
 
 
@@ -146,13 +261,15 @@ def main() -> int:
 
     runs = load_runs(results_dir)
     if not runs:
-        print(f"no *.json files in {results_dir}", file=sys.stderr)
+        print(f"no usable *.json files in {results_dir}", file=sys.stderr)
         return 1
 
-    render_bar(runs, results_dir / "chart.png")
-    render_detail(runs, results_dir / "chart-detail.png")
+    for signal in SIGNALS:
+        render_throughput_bar(runs, signal, results_dir / f"chart-{signal}.png")
+        render_throughput_detail(runs, signal, results_dir / f"chart-detail-{signal}.png")
+        render_readprobe(runs, signal, results_dir / f"chart-readprobe-{signal}.png")
     render_summary(runs, results_dir / "summary.md")
-    print(f"wrote {results_dir}/chart.png, chart-detail.png, summary.md")
+    print(f"wrote charts and summary.md into {results_dir}")
     return 0
 
 

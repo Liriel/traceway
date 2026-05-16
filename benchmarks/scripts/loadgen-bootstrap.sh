@@ -3,7 +3,7 @@
 # project on the SUT, run the loadgen pointed at the SUT's private IP, and pull
 # the result JSON back.
 #
-# Usage: loadgen-bootstrap.sh <loadgen-public-ip> <sut-private-ip> <sut-public-ip> <duration> <tier> <mode> <out-path> [extra-loadgen-args...]
+# Usage: loadgen-bootstrap.sh <loadgen-public-ip> <sut-private-ip> <sut-public-ip> <duration> <tier> <mode> <signal> <out-path> [extra-loadgen-args...]
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -11,12 +11,12 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 # shellcheck source=_ssh.sh
 source "${SCRIPT_DIR}/_ssh.sh"
 
-if [[ $# -lt 7 ]]; then
-    echo "usage: $0 <loadgen-public-ip> <sut-private-ip> <sut-public-ip> <duration> <tier> <mode> <out-path> [extra-loadgen-args...]" >&2
+if [[ $# -lt 8 ]]; then
+    echo "usage: $0 <loadgen-public-ip> <sut-private-ip> <sut-public-ip> <duration> <tier> <mode> <signal> <out-path> [extra-loadgen-args...]" >&2
     exit 2
 fi
-LG_IP="$1"; SUT_PRIVATE_IP="$2"; SUT_PUBLIC_IP="$3"; DURATION="$4"; TIER="$5"; MODE="$6"; OUT_PATH="$7"
-shift 7
+LG_IP="$1"; SUT_PRIVATE_IP="$2"; SUT_PUBLIC_IP="$3"; DURATION="$4"; TIER="$5"; MODE="$6"; SIGNAL="$7"; OUT_PATH="$8"
+shift 8
 
 # 1. Seed a project on the SUT (over its PUBLIC IP from the orchestrator). The
 #    project token + JWT + project id are then handed to the loadgen, which
@@ -52,13 +52,16 @@ bench_ssh "${LG_IP}" "chmod +x /root/loadgen/loadgen"
 
 # 4. Run the benchmark, streaming stderr back so progress is visible. The
 #    loadgen writes JSON to /root/loadgen/result.json on the loadgen box;
-#    we scp it home afterwards.
-echo "running loadgen on ${LG_IP} -> http://${SUT_PRIVATE_IP} (tier=${TIER} mode=${MODE} duration=${DURATION})" >&2
+#    we scp it home afterwards. JWT and project ID are passed unconditionally
+#    so the read-probe scenario can hit dashboard endpoints; the throughput
+#    scenario ignores them.
+echo "running loadgen on ${LG_IP} -> http://${SUT_PRIVATE_IP} (tier=${TIER} mode=${MODE} signal=${SIGNAL} duration=${DURATION})" >&2
 bench_ssh "${LG_IP}" /root/loadgen/loadgen \
     --target "http://${SUT_PRIVATE_IP}" \
     --token "${TOKEN}" \
     --jwt "${JWT}" \
     --project-id "${PROJECT_ID}" \
+    --signal "${SIGNAL}" \
     --duration "${DURATION}" \
     --tier "${TIER}" \
     --mode "${MODE}" \

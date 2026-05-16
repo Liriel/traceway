@@ -9,9 +9,10 @@
 #                         SSH key named 'benchmark-key'.
 #
 # Common usage:
-#   run-local.sh                        # full matrix (4 tiers x 2 modes)
-#   run-local.sh --smoke                # 1 tier, 1 mode, short steps (~5 min)
-#   run-local.sh --tier ccx13 --mode sqlite
+#   run-local.sh                        # full matrix (4 tiers x 2 modes x 3 signals), throughput
+#   run-local.sh --scenario read-probe  # same matrix but ingest-and-probe-reads
+#   run-local.sh --smoke                # 1 tier, 1 mode, 1 signal, short steps (~5 min)
+#   run-local.sh --tier ccx13 --mode sqlite --signal spans
 #   run-local.sh --dry-run              # validate env + print plan, no provisioning
 #   run-local.sh --commit               # drop the "-local" suffix on the output dir
 set -euo pipefail
@@ -21,36 +22,49 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 TIERS="ccx13,ccx23,ccx33,ccx43"
 MODES="sqlite,pgch"
+SIGNALS="spans,metrics,logs"
+SCENARIO="throughput"
 DURATION="30m"
 SMOKE=0
 DRY_RUN=0
 COMMIT=0
 
 usage() {
-    sed -n '1,16p' "$0"; exit 2
+    sed -n '1,17p' "$0"; exit 2
 }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --tier)    TIERS="$2"; shift 2 ;;
-        --mode)    MODES="$2"; shift 2 ;;
+        --tier)     TIERS="$2"; shift 2 ;;
+        --mode)     MODES="$2"; shift 2 ;;
+        --signal)   SIGNALS="$2"; shift 2 ;;
+        --scenario) SCENARIO="$2"; shift 2 ;;
         --duration) DURATION="$2"; shift 2 ;;
-        --smoke)   SMOKE=1; shift ;;
-        --dry-run) DRY_RUN=1; shift ;;
-        --commit)  COMMIT=1; shift ;;
-        -h|--help) usage ;;
+        --smoke)    SMOKE=1; shift ;;
+        --dry-run)  DRY_RUN=1; shift ;;
+        --commit)   COMMIT=1; shift ;;
+        -h|--help)  usage ;;
         *) echo "unknown flag: $1" >&2; usage ;;
     esac
 done
 
+case "${SCENARIO}" in
+    throughput|read-probe) ;;
+    *) echo "invalid --scenario '${SCENARIO}' (expected throughput|read-probe)" >&2; exit 2 ;;
+esac
+export BENCH_SCENARIO="${SCENARIO}"
+
 if [[ "${SMOKE}" -eq 1 ]]; then
     TIERS="ccx13"
     MODES="sqlite"
+    SIGNALS="spans"
     DURATION="3m"
-    echo "smoke mode: tier=ccx13 mode=sqlite duration=${DURATION} stepped 100->400 eps" >&2
+    echo "smoke mode: tier=ccx13 mode=sqlite signal=spans scenario=${SCENARIO} duration=${DURATION} (one short run)" >&2
 fi
 
-# Preflight first — fail fast on missing tooling.
+# Preflight first — fail fast on missing tooling. Pass the chosen modes so
+# managed-ch can demand CH credentials before we burn a single euro.
+export BENCH_MODES_PLAN="${MODES}"
 "${SCRIPT_DIR}/preflight.sh"
 
 date_tag="$(date -u +%Y-%m-%d)"
@@ -62,17 +76,20 @@ fi
 mkdir -p "${OUT_DIR}"
 echo "results dir: ${OUT_DIR}" >&2
 
-# Plan: explode tiers x modes.
+# Plan: explode tiers x modes x signals.
 plan=()
 IFS=',' read -ra TIER_ARR <<<"${TIERS}"
 IFS=',' read -ra MODE_ARR <<<"${MODES}"
+IFS=',' read -ra SIGNAL_ARR <<<"${SIGNALS}"
 for t in "${TIER_ARR[@]}"; do
     for m in "${MODE_ARR[@]}"; do
-        plan+=("${t}|${m}")
+        for s in "${SIGNAL_ARR[@]}"; do
+            plan+=("${t}|${m}|${s}")
+        done
     done
 done
 
-echo "plan (${#plan[@]} entries):" >&2
+echo "plan (${#plan[@]} entries, scenario=${SCENARIO}):" >&2
 for e in "${plan[@]}"; do
     echo "  - ${e//|/ x }" >&2
 done
@@ -90,10 +107,10 @@ smoke_arg=""
 
 failures=()
 for e in "${plan[@]}"; do
-    tier="${e%%|*}"; mode="${e##*|}"
-    if ! "${SCRIPT_DIR}/run-matrix-entry.sh" "${tier}" "${mode}" "${DURATION}" "${OUT_DIR}" "${smoke_arg}"; then
-        echo "FAIL: ${tier}/${mode}" >&2
-        failures+=("${tier}/${mode}")
+    IFS='|' read -r tier mode signal <<<"${e}"
+    if ! "${SCRIPT_DIR}/run-matrix-entry.sh" "${tier}" "${mode}" "${signal}" "${DURATION}" "${OUT_DIR}" "${smoke_arg}"; then
+        echo "FAIL: ${tier}/${mode}/${signal}" >&2
+        failures+=("${tier}/${mode}/${signal}")
     fi
 done
 

@@ -57,6 +57,22 @@ if command -v hcloud >/dev/null 2>&1 && [[ -n "${HCLOUD_TOKEN:-}" ]]; then
     fi
 fi
 
+# --- Managed ClickHouse credentials (only if managed-ch is in the plan) -----
+#
+# run-local.sh sets BENCH_MODES_PLAN before invoking preflight so this check
+# fires only for runs that actually include managed-ch. CI's workflow can set
+# the same var; if neither sets it we fall back to checking BENCH_MODES from
+# the environment.
+
+modes_plan="${BENCH_MODES_PLAN:-${BENCH_MODES:-}}"
+if [[ ",${modes_plan}," == *",managed-ch,"* ]]; then
+    for v in CLICKHOUSE_SERVER CLICKHOUSE_USERNAME CLICKHOUSE_PASSWORD; do
+        if [[ -z "${!v:-}" ]]; then
+            err "${v} not set; required when modes includes 'managed-ch'. Add the BENCH_CH_* repository secret or export the var locally."
+        fi
+    done
+fi
+
 if [[ "${fail}" -ne 0 ]]; then
     echo >&2
     echo "preflight failed. fix the issues above before running." >&2

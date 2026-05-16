@@ -24,9 +24,15 @@ SUT_IP="$1"
 MODE="$2"
 
 case "${MODE}" in
-    sqlite|pgch) ;;
-    *) echo "mode must be sqlite or pgch, got: ${MODE}" >&2; exit 2 ;;
+    sqlite|pgch|managed-ch) ;;
+    *) echo "mode must be sqlite, pgch, or managed-ch, got: ${MODE}" >&2; exit 2 ;;
 esac
+
+if [[ "${MODE}" == "managed-ch" ]]; then
+    : "${CLICKHOUSE_SERVER:?CLICKHOUSE_SERVER required for managed-ch mode}"
+    : "${CLICKHOUSE_USERNAME:?CLICKHOUSE_USERNAME required for managed-ch mode}"
+    : "${CLICKHOUSE_PASSWORD:?CLICKHOUSE_PASSWORD required for managed-ch mode}"
+fi
 
 echo "waiting for ssh on ${SUT_IP}" >&2
 wait_for_ssh "${SUT_IP}"
@@ -55,8 +61,32 @@ bench_rsync \
     --exclude 'backend/storage' \
     "${REPO_ROOT}/" "root@${SUT_IP}:/opt/traceway/"
 
+compose_args=( -f "benchmarks/compose/docker-compose.${MODE}.yml" )
+
+if [[ "${MODE}" == "managed-ch" ]]; then
+    # Wipe the managed CH database so this entry starts on an empty cluster.
+    # The script runs locally (orchestrator-side); the SUT itself never needs
+    # the curl + CH credentials.
+    "${SCRIPT_DIR}/reset-managed-ch.sh"
+
+    # Ship CH credentials to the SUT via a tempfile + --env-file. Inline env
+    # via ssh would have to survive two layers of shell quoting; the file is
+    # simpler and safe for arbitrary password characters.
+    env_tmp="$(mktemp)"
+    trap 'rm -f "${env_tmp}"' EXIT
+    cat > "${env_tmp}" <<EOF
+CLICKHOUSE_SERVER=${CLICKHOUSE_SERVER}
+CLICKHOUSE_USERNAME=${CLICKHOUSE_USERNAME}
+CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD}
+CLICKHOUSE_DATABASE=${CLICKHOUSE_DATABASE:-traceway}
+CLICKHOUSE_TLS=${CLICKHOUSE_TLS:-true}
+EOF
+    bench_scp "${env_tmp}" "root@${SUT_IP}:/opt/traceway/benchmarks/compose/managed-ch.env"
+    compose_args=( --env-file benchmarks/compose/managed-ch.env "${compose_args[@]}" )
+fi
+
 echo "bringing up compose stack (mode=${MODE}) on ${SUT_IP}" >&2
-bench_ssh "${SUT_IP}" "cd /opt/traceway && BENCH_PORT=80 docker compose -f benchmarks/compose/docker-compose.${MODE}.yml up -d --build"
+bench_ssh "${SUT_IP}" "cd /opt/traceway && BENCH_PORT=80 docker compose ${compose_args[*]} up -d --build"
 
 echo "polling /health on ${SUT_IP}" >&2
 deadline=$(( $(date +%s) + 600 ))   # cold compose build can hit 10 min on small tiers

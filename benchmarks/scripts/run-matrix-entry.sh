@@ -4,26 +4,39 @@
 # GitHub workflow; treat this as the single source of truth for matrix-entry
 # orchestration.
 #
-# Usage: run-matrix-entry.sh <tier> <mode> <duration> <out-dir> [smoke]
+# Usage: run-matrix-entry.sh <tier> <mode> <signal> <duration> <out-dir> [smoke]
 #   <tier>      ccx13 | ccx23 | ccx33 | ccx43
 #   <mode>      sqlite | pgch
+#   <signal>    spans | metrics | logs
 #   <duration>  Loadgen total runtime, e.g. 30m, 3m
-#   <out-dir>   Directory to write <tier>-<mode>.json into
-#   [smoke]     "smoke" to enable short-step overrides (--initial-eps 100
-#               --max-eps 400 --step-duration 1m). Optional.
+#   <out-dir>   Directory to write <tier>-<mode>-<signal>.json into
+#   [smoke]     "smoke" to enable short-step overrides (--phase1-batch-sizes
+#               256,1024 --phase2-request-rates 1,5 --step-duration 15s).
+#               Optional.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-if [[ $# -lt 4 ]]; then
-    echo "usage: $0 <tier> <mode> <duration> <out-dir> [smoke]" >&2
+if [[ $# -lt 5 ]]; then
+    echo "usage: $0 <tier> <mode> <signal> <duration> <out-dir> [smoke]" >&2
     exit 2
 fi
-TIER="$1"; MODE="$2"; DURATION="$3"; OUT_DIR="$4"; SMOKE="${5:-}"
+TIER="$1"; MODE="$2"; SIGNAL="$3"; DURATION="$4"; OUT_DIR="$5"; SMOKE="${6:-}"
 LOCATION="${BENCH_LOCATION:-nbg1}"
+SCENARIO="${BENCH_SCENARIO:-throughput}"
 
-RUN_ID="$(date -u +%Y%m%d-%H%M%S)-${TIER}-${MODE}-$RANDOM"
-echo "=== run-matrix-entry tier=${TIER} mode=${MODE} duration=${DURATION} run_id=${RUN_ID} ===" >&2
+case "${SIGNAL}" in
+    spans|metrics|logs) ;;
+    *) echo "invalid signal '${SIGNAL}' (expected spans|metrics|logs)" >&2; exit 2 ;;
+esac
+
+case "${SCENARIO}" in
+    throughput|read-probe) ;;
+    *) echo "invalid BENCH_SCENARIO '${SCENARIO}' (expected throughput|read-probe)" >&2; exit 2 ;;
+esac
+
+RUN_ID="$(date -u +%Y%m%d-%H%M%S)-${TIER}-${MODE}-${SIGNAL}-${SCENARIO}-$RANDOM"
+echo "=== run-matrix-entry tier=${TIER} mode=${MODE} signal=${SIGNAL} scenario=${SCENARIO} duration=${DURATION} run_id=${RUN_ID} ===" >&2
 
 mkdir -p "${OUT_DIR}"
 
@@ -48,12 +61,16 @@ LOADGEN_PUBLIC_IP=$(printf '%s' "${INFRA_JSON}" | jq -r '.loadgenPublicIp')
 "${SCRIPT_DIR}/sut-bootstrap.sh" "${SUT_PUBLIC_IP}" "${MODE}"
 
 # 3. Run the loadgen, pulling JSON back into OUT_DIR.
-extra_args=()
+extra_args=( --scenario "${SCENARIO}" )
 if [[ "${SMOKE}" == "smoke" ]]; then
-    extra_args+=( --initial-eps 100 --max-eps 400 --step-duration 1m )
+    if [[ "${SCENARIO}" == "read-probe" ]]; then
+        extra_args+=( --fill-levels 100000,1000000 --settle-seconds 5s )
+    else
+        extra_args+=( --phase1-batch-sizes 256,1024 --phase2-request-rates 1,5 --step-duration 15s )
+    fi
 fi
 
-OUT_PATH="${OUT_DIR}/${TIER}-${MODE}.json"
+OUT_PATH="${OUT_DIR}/${TIER}-${MODE}-${SIGNAL}-${SCENARIO}.json"
 "${SCRIPT_DIR}/loadgen-bootstrap.sh" \
     "${LOADGEN_PUBLIC_IP}" \
     "${SUT_PRIVATE_IP}" \
@@ -61,8 +78,9 @@ OUT_PATH="${OUT_DIR}/${TIER}-${MODE}.json"
     "${DURATION}" \
     "${TIER}" \
     "${MODE}" \
+    "${SIGNAL}" \
     "${OUT_PATH}" \
     "${extra_args[@]}"
 
 # Trap handles teardown — no explicit call needed.
-echo "matrix entry ${TIER}-${MODE} complete -> ${OUT_PATH}" >&2
+echo "matrix entry ${TIER}-${MODE}-${SIGNAL}-${SCENARIO} complete -> ${OUT_PATH}" >&2

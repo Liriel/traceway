@@ -1,21 +1,28 @@
 # benchmarks/
 
-Hardware-vs-breaking-point benchmark for the Traceway backend. Provisions
-Hetzner Cloud servers, hammers the backend with realistic ingest while
-measuring read latency, and produces a chart of sustainable throughput per
-hardware tier and DB mode.
+Hardware-vs-throughput benchmark for the Traceway backend. Provisions
+Hetzner Cloud servers, runs OTLP ingest in realistic batch shapes (one signal
+per matrix entry), and produces per-signal charts of sustainable throughput
+per hardware tier and DB mode.
 
 ## What it answers
 
-> On hardware tier **X** with DB config **Y**, you can sustain **N** traces +
-> spans + session-replays per second while reads remain responsive.
+> On hardware tier **X** with DB config **Y**, you can sustain **N** spans/sec,
+> **M** metric data points/sec, and **P** log records/sec via OTLP under
+> collector-shaped batch traffic (gzipped protobuf, batches up to 8192).
 
-Two DB modes are tested:
+Three signals are tested in separate matrix entries:
+- **spans** → `POST /api/otel/v1/traces` (`ExportTraceServiceRequest`)
+- **metrics** → `POST /api/otel/v1/metrics` (`ExportMetricsServiceRequest`, Gauge data points)
+- **logs** → `POST /api/otel/v1/logs` (`ExportLogsServiceRequest`)
+
+Three DB modes are supported:
 - **sqlite** — single-binary Traceway with embedded SQLite (`Dockerfile.sqlite`).
-- **pgch** — full ClickHouse + Postgres stack (`Dockerfile.minimal`).
+- **pgch** — full ClickHouse + Postgres stack, all in Docker on the SUT (`Dockerfile.minimal`).
+- **managed-ch** — `Dockerfile.minimal` pointed at an externally-hosted ClickHouse (ClickHouse Cloud, Aiven, Altinity, etc.) via env vars. Postgres still runs locally in the SUT's Docker. See [Running against managed ClickHouse](#running-against-managed-clickhouse).
 
 Four hardware tiers, all Hetzner CCX (dedicated vCPU) so neighbor noise doesn't
-pollute the read-latency signal:
+pollute the latency signal:
 
 | Tier  | vCPU | RAM   | Disk        |
 |-------|------|-------|-------------|
@@ -24,26 +31,42 @@ pollute the read-latency signal:
 | CCX33 | 8    | 32 GB | 240 GB NVMe |
 | CCX43 | 16   | 64 GB | 360 GB NVMe |
 
+## Not measured here
+
+This benchmark is **ingest-only** — it does not probe dashboard read latency.
+A separate future benchmark will pre-load N events (100k, 1M, 10M, 100M) and
+measure read endpoint P99 at each fill level. Don't read the numbers here as
+"the dashboard stays usable at N items/sec" — they're "the SUT keeps swallowing
+items at N items/sec without erroring or rejecting."
+
 ## How a run works
 
-Per matrix entry (one tier × one mode):
+Per matrix entry (one tier × one mode × one signal):
 
 1. `hetzner-up.sh` provisions a SUT box + a CAX11 loadgen box on a private network (override with `LOADGEN_TIER`).
 2. `sut-bootstrap.sh` rsyncs the repo, installs Docker, brings up the right
    `docker-compose.<mode>.yml`, waits for `/health`.
-3. `seed-project.sh` registers a fresh user + project, captures the JWT and
-   project token.
-4. `loadgen-bootstrap.sh` cross-compiles the loadgen for linux/amd64, pushes
-   it to the loadgen box, runs it against the SUT's *private* IP.
-5. The loadgen ramps target ingest in doubling steps (100 -> 200 -> 400 -> ...)
-   while a constant read mix probes the dashboard endpoints. Each step holds
-   for `--step-duration` (default 2 min).
-6. A step "fails" when ingest error rate > 5%, OR any read endpoint P99 > 3000ms.
-   Max sustainable EPS is the actual rate of the last passing step.
+3. `seed-project.sh` registers a fresh user + project, captures the project
+   bearer token.
+4. `loadgen-bootstrap.sh` cross-compiles the loadgen, pushes it to the
+   loadgen box, runs it with `--signal <spans|metrics|logs>` against the
+   SUT's *private* IP.
+5. The loadgen runs a two-phase ramp:
+   - **Phase 1 — batch-size ramp.** Single client at a fixed 5 req/sec.
+     Batch sizes step through `256,1024,4096,8192,16384`. Each step holds for
+     `--step-duration` (default 2 min). Stops at the first failing step.
+   - **Phase 2 — request-rate ramp.** Batch size fixed at
+     `min(Phase 1 winner, --phase2-batch-cap=8192)`. Request rates step
+     through `1,5,25,100,400`.
+6. A step "fails" when combined error rate (HTTP failures + OTLP
+   `PartialSuccess` rejected items) exceeds `--ingest-err-threshold`
+   (default 5%). The headline is
+   `maxSustainableItemsPerSec = batchSize × maxRequestRate`.
 7. `hetzner-down.sh` deletes everything via a bash `trap` — even on Ctrl-C.
 
-After all matrix entries finish, `chart.py` renders `chart.png` (bar) +
-`chart-detail.png` (line: read P99 vs ingest EPS) + `summary.md`.
+After all matrix entries finish, `chart.py` renders three bar charts
+(`chart-spans.png`, `chart-metrics.png`, `chart-logs.png`), three detail
+charts (`chart-detail-<signal>.png`), and a combined `summary.md`.
 
 ## Running from your laptop
 
@@ -76,16 +99,16 @@ After all matrix entries finish, `chart.py` renders `chart.png` (bar) +
 ./benchmarks/scripts/run-local.sh --smoke
 ```
 
-One tier (ccx13), one mode (sqlite), short steps. If this works the full
-matrix works.
+One tier (ccx13), one mode (sqlite), one signal (spans), short steps. If this
+works, the full matrix works.
 
-### Full matrix (~1 h, ~€1.20)
+### Full matrix (~3 h, ~€3.60)
 
 ```bash
 ./benchmarks/scripts/run-local.sh
 ```
 
-4 tiers × 2 modes, default `--duration 30m`. Output goes to
+4 tiers × 2 modes × 3 signals, default `--duration 30m`. Output goes to
 `benchmarks/results/<YYYY-MM-DD>-local/` — the `-local` suffix exists so
 dev runs never get confused with CI runs and never get accidentally committed.
 
@@ -95,8 +118,14 @@ dev runs never get confused with CI runs and never get accidentally committed.
 # Validate environment without provisioning anything (free)
 ./benchmarks/scripts/run-local.sh --dry-run
 
-# Re-run just one tier with default duration
+# Re-run just one tier/mode across all signals
 ./benchmarks/scripts/run-local.sh --tier ccx23 --mode pgch
+
+# One signal only across all tiers/modes
+./benchmarks/scripts/run-local.sh --signal spans
+
+# A single matrix cell
+./benchmarks/scripts/run-local.sh --tier ccx13 --mode sqlite --signal logs
 
 # Override the per-entry runtime
 ./benchmarks/scripts/run-local.sh --tier ccx13 --duration 10m
@@ -122,6 +151,49 @@ After the matrix completes, an `aggregate` job downloads all artifacts, runs
 `chart.py`, and commits `benchmarks/results/<YYYY-MM-DD>/` to `main` via a bot
 commit. No PR — it's a generated artifact.
 
+## Running against managed ClickHouse
+
+Setting `modes=managed-ch` in the workflow dispatch (or `--mode managed-ch`
+locally) points the SUT's Traceway container at an externally-hosted
+ClickHouse. Postgres still runs locally in the SUT's Docker — this benchmark
+is about ClickHouse characteristics.
+
+Required GitHub repository secrets (Settings → Secrets and variables → Actions):
+
+| Secret | Example | Notes |
+|---|---|---|
+| `BENCH_CH_SERVER` | `your-cluster.us-east-1.aws.clickhouse.cloud:9440` | Native TCP endpoint with TLS port (usually `9440`) |
+| `BENCH_CH_USERNAME` | `default` | A dedicated bench user is wiser than `default` |
+| `BENCH_CH_PASSWORD` | `••••••` | |
+| `BENCH_CH_DATABASE` | `traceway` | Optional, defaults to `traceway` |
+| `BENCH_CH_HTTPS_PORT` | `8443` | Optional, defaults to `8443` (CH Cloud); some hosts use `8123` for plain HTTP |
+
+The bench user needs `DROP DATABASE` and `CREATE DATABASE` privileges — between
+every matrix entry the orchestrator runs `reset-managed-ch.sh`, which wipes and
+recreates the bench database via the HTTPS interface so each (tier × signal ×
+scenario) cell starts on an empty cluster. ~5–10s of overhead per entry. If
+you're running on a shared cluster, **point the bench at a dedicated database**
+or you will lose other data.
+
+Locally: export the same vars (`CLICKHOUSE_SERVER`, `CLICKHOUSE_USERNAME`,
+`CLICKHOUSE_PASSWORD`, optional `CLICKHOUSE_DATABASE`, `BENCH_CH_HTTPS_PORT`)
+before invoking `run-local.sh --mode managed-ch`. Preflight will fail early if
+they're missing.
+
+### Caveats specific to managed CH
+
+- **Network RTT dominates.** Hetzner `nbg1` to ClickHouse Cloud `us-east-1` is
+  ~100ms each way; that's a wall the cluster can't climb. Match regions
+  (`nbg1`/`fsn1`/`hel1` → CH Cloud EU; `ash`/`hil` → CH Cloud US) for numbers
+  comparable to local-CH `pgch`.
+- **Bandwidth matters too.** At 8192-span gzipped OTLP batches × 400 req/sec
+  you push ~30–80 MB/s outbound from the SUT. Hetzner's egress is generous;
+  the managed cluster's ingress quota is the more likely cap.
+- **Read-probe is the more interesting scenario on managed CH.** Throughput
+  often gets bottlenecked on the SUT→cluster pipe before the cluster's actual
+  ingest path. Read-probe surfaces the cluster's read scaling, which is what
+  you actually buy from a managed offering.
+
 ## Layout
 
 ```
@@ -129,13 +201,15 @@ benchmarks/
   compose/                       # SUT-side docker compose, one per mode
     docker-compose.sqlite.yml
     docker-compose.pgch.yml
-  loadgen/                       # The Go binary that generates load
+    docker-compose.managed-ch.yml  # External CH; Postgres still local
+  loadgen/                       # The Go binary that generates load (OTLP-only)
     main.go                      # CLI + orchestration
-    ingest.go                    # Stream A — stepped ingest worker pool
-    report.go                    # /api/report JSON+gzip sender
-    otlp.go                      # OTLP/HTTP protobuf sender
-    reads.go                     # Stream B — constant read mix
-    ramp.go                      # Step controller + breaking-point logic
+    ingest.go                    # Worker pool driving the selected signal sender
+    otlp_common.go               # Shared OTLP helpers + signalSender interface
+    otlp_spans.go                # ExportTraceServiceRequest builder
+    otlp_metrics.go              # ExportMetricsServiceRequest builder (Gauge)
+    otlp_logs.go                 # ExportLogsServiceRequest builder
+    ramp.go                      # Two-phase ramp (batch size, then request rate)
     stats.go                     # Latency tracker (percentiles via sort)
     util.go, log.go              # Misc helpers
   scripts/
@@ -145,9 +219,10 @@ benchmarks/
     hetzner-up.sh                # hcloud server create
     hetzner-down.sh              # hcloud server delete (idempotent)
     sut-bootstrap.sh             # Installs Docker, brings up backend
+    reset-managed-ch.sh          # Wipes the managed CH DB between matrix entries
     loadgen-bootstrap.sh         # Cross-compiles + runs loadgen
     seed-project.sh              # /api/register -> JWT + project token JSON
-    chart.py                     # matplotlib renderer
+    chart.py                     # matplotlib renderer (per-signal charts)
     _ssh.sh                      # Shared ssh/rsync helpers
   results/                       # Committed bench results live here
 ```
@@ -167,6 +242,7 @@ benchmarks/
   up --build` on a CCX13 takes 5–8 minutes (npm install + Go build).
   `sut-bootstrap.sh` waits up to 10 minutes for `/health` before giving up.
   Subsequent runs reuse the Docker layer cache via the persistent volumes.
-- **All steps pass on the highest tier.** Increase `--max-eps` (default 50000)
+- **All steps pass on the highest tier.** Raise the upper end of
+  `--phase2-request-rates` (default `1,5,25,100,400`) — e.g. add `1000,2000` —
   if you want to find the ceiling on big boxes. The default is meant to keep
-  one-tier runs bounded; on CCX43 with PG/CH the ceiling can be well above 10k EPS.
+  one-tier runs bounded.

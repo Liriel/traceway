@@ -7,118 +7,196 @@ import (
 )
 
 type stepResult struct {
-	Step       int                        `json:"step"`
-	TargetEPS  float64                    `json:"targetEps"`
-	ActualEPS  float64                    `json:"actualEps"`
-	Ingest     latencySnapshot            `json:"ingest"`
-	Reads      map[string]latencySnapshot `json:"reads"`
-	Passed     bool                       `json:"passed"`
-	FailReason string                     `json:"failReason,omitempty"`
+	Step                 int             `json:"step"`
+	BatchSize            int             `json:"batchSize"`
+	RequestRate          float64         `json:"requestRate"`
+	AttemptedItemsPerSec float64         `json:"attemptedItemsPerSec"`
+	ActualItemsPerSec    float64         `json:"actualItemsPerSec"`
+	Rejected             int64           `json:"rejected"`
+	Ingest               latencySnapshot `json:"ingest"`
+	Passed               bool            `json:"passed"`
+	FailReason           string          `json:"failReason,omitempty"`
+}
+
+type phaseResult struct {
+	Kind             string       `json:"kind"`
+	FixedRequestRate float64      `json:"fixedRequestRate,omitempty"`
+	FixedBatchSize   int          `json:"fixedBatchSize,omitempty"`
+	Steps            []stepResult `json:"steps"`
+	MaxBatchSize     int          `json:"maxBatchSize,omitempty"`
+	MaxRequestRate   float64      `json:"maxRequestRate,omitempty"`
 }
 
 type finalReport struct {
-	Tier               string       `json:"tier"`
-	Mode               string       `json:"mode"`
-	StartedAt          string       `json:"startedAt"`
-	EndedAt            string       `json:"endedAt"`
-	MaxSustainableEPS  float64      `json:"maxSustainableEps"`
-	Steps              []stepResult `json:"steps"`
+	Tier                      string           `json:"tier"`
+	Mode                      string           `json:"mode"`
+	Signal                    string           `json:"signal"`
+	Scenario                  string           `json:"scenario"`
+	StartedAt                 string           `json:"startedAt"`
+	EndedAt                   string           `json:"endedAt"`
+	Phase1                    *phaseResult     `json:"phase1,omitempty"`
+	Phase2                    *phaseResult     `json:"phase2,omitempty"`
+	ReadProbe                 *readProbeResult `json:"readProbe,omitempty"`
+	MaxSustainableItemsPerSec float64          `json:"maxSustainableItemsPerSec,omitempty"`
+	MaxFillLevelPassed        int64            `json:"maxFillLevelPassed,omitempty"`
 }
 
-func (r *finalReport) computeBreakingPoint() {
-	for i := len(r.Steps) - 1; i >= 0; i-- {
-		if r.Steps[i].Passed {
-			r.MaxSustainableEPS = r.Steps[i].ActualEPS
+func (r *finalReport) computeHeadline() {
+	if r.Phase2 != nil {
+		if r.Phase2.FixedBatchSize > 0 && r.Phase2.MaxRequestRate > 0 {
+			r.MaxSustainableItemsPerSec = float64(r.Phase2.FixedBatchSize) * r.Phase2.MaxRequestRate
 			return
 		}
+		// Fall back to the best actual measured throughput from any passing Phase 2
+		// step — useful when Phase 2 had to round down or skipped steps.
+		var best float64
+		for _, s := range r.Phase2.Steps {
+			if s.Passed && s.ActualItemsPerSec > best {
+				best = s.ActualItemsPerSec
+			}
+		}
+		r.MaxSustainableItemsPerSec = best
+	}
+	if r.ReadProbe != nil {
+		r.MaxFillLevelPassed = r.ReadProbe.MaxFillLevelPassed
 	}
 }
 
-// runRamp drives the EPS ramp: hold a target rate for stepDuration, snapshot
-// stats, evaluate the breaking-point criteria, and either advance or stop.
-// Doubling cadence (100 -> 200 -> 400 -> ...) gets us to the cliff in <10 steps
-// for any realistic SUT, keeping total runtime bounded.
-func runRamp(
-	ctx context.Context,
-	cfg config,
-	ingester *ingester,
-	ingest *latencyTracker,
-	reads map[string]*latencyTracker,
-) []stepResult {
-	results := []stepResult{}
-	target := cfg.initialEPS
-
-	for stepNo := 1; target <= cfg.maxEPS; stepNo++ {
-		ingester.SetRate(target)
-
-		// Reset trackers at start of step so we measure only the new rate's
-		// steady state, not the ramp-up transient from the previous step.
-		ingest.SnapshotAndReset()
-		for _, t := range reads {
-			t.SnapshotAndReset()
-		}
-
-		stepCtx, cancel := context.WithTimeout(ctx, cfg.stepDuration)
-		start := time.Now()
-		<-stepCtx.Done()
-		cancel()
-		elapsed := time.Since(start)
-
-		ingestSnap := ingest.SnapshotAndReset()
-		readSnaps := map[string]latencySnapshot{}
-		for name, t := range reads {
-			readSnaps[name] = t.SnapshotAndReset()
-		}
-
-		// Both target and actual must be in the same unit (traces/sec).
-		// Rate limiter ticks per request (= per frame), so requests/sec × the
-		// batch size gives the trace throughput on the wire. OTLP requests
-		// carry spans rather than traces; we count them at the same rate
-		// because the user-facing question is "events/sec the system swallowed"
-		// regardless of which protocol carried them.
-		actualEPS := 0.0
-		if elapsed > 0 {
-			actualEPS = float64(ingestSnap.OK+ingestSnap.Errors) / elapsed.Seconds() * tracesPerFrame
-		}
-
-		passed, reason := evaluate(cfg, ingestSnap, readSnaps)
-
-		res := stepResult{
-			Step:       stepNo,
-			TargetEPS:  target,
-			ActualEPS:  actualEPS,
-			Ingest:     ingestSnap,
-			Reads:      readSnaps,
-			Passed:     passed,
-			FailReason: reason,
-		}
-		results = append(results, res)
-		fmt.Fprintf(stderrPrefix(), "step %d: target=%.0f actual=%.0f ingest_p99=%.0fms ingest_err=%.2f%% passed=%t %s\n",
-			stepNo, target, actualEPS, ingestSnap.P99, ingestSnap.ErrRate*100, passed, reason)
-
-		if !passed || ctx.Err() != nil {
-			return results
-		}
-
-		target *= 2
+// runBatchSizeRamp holds requestRate fixed (phase1FixedRate) and grows batch
+// size step by step. Stops at the first failing step. Returns a phaseResult
+// whose MaxBatchSize is the largest batch that passed.
+func runBatchSizeRamp(ctx context.Context, cfg config, ing *ingester, ingest *latencyTracker) phaseResult {
+	res := phaseResult{
+		Kind:             "batch-size-ramp",
+		FixedRequestRate: cfg.phase1FixedRate,
 	}
-	return results
+
+	ing.SetRequestRate(cfg.phase1FixedRate)
+
+	for idx, batch := range cfg.phase1BatchSizes {
+		if ctx.Err() != nil {
+			break
+		}
+		ing.SetBatchSize(batch)
+		s := runOneStep(ctx, cfg, ing, ingest, idx+1, batch, cfg.phase1FixedRate)
+		res.Steps = append(res.Steps, s)
+		fmt.Fprintf(stderrPrefix(), "phase1 step %d: batch=%d rate=%.1f items/s=%.0f p99=%.0fms err=%.2f%% passed=%t %s\n",
+			s.Step, s.BatchSize, s.RequestRate, s.ActualItemsPerSec, s.Ingest.P99, s.Ingest.ErrRate*100, s.Passed, s.FailReason)
+		if !s.Passed {
+			break
+		}
+		res.MaxBatchSize = batch
+	}
+
+	return res
 }
 
-func evaluate(cfg config, ingest latencySnapshot, reads map[string]latencySnapshot) (bool, string) {
-	if ingest.ErrRate > cfg.ingestErrThreshold {
-		return false, fmt.Sprintf("ingest error rate %.2f%% > %.2f%% threshold", ingest.ErrRate*100, cfg.ingestErrThreshold*100)
+// runRequestRateRamp holds batchSize fixed at min(phase1.MaxBatchSize, cfg.phase2BatchCap)
+// and grows request rate step by step.
+func runRequestRateRamp(ctx context.Context, cfg config, ing *ingester, ingest *latencyTracker, phase1 phaseResult) phaseResult {
+	batch := phase1.MaxBatchSize
+	if batch <= 0 {
+		batch = cfg.phase2BatchCap
 	}
-	for name, s := range reads {
-		// If a read endpoint never returned a single OK response during this
-		// step the SUT is effectively unavailable for reads; treat that as a
-		// hard fail even though P99 reads as 0 from the empty histogram.
-		if s.OK == 0 && s.Errors > 0 {
-			return false, fmt.Sprintf("read endpoint %q served zero OK responses", name)
+	if batch > cfg.phase2BatchCap {
+		batch = cfg.phase2BatchCap
+	}
+
+	res := phaseResult{
+		Kind:           "request-rate-ramp",
+		FixedBatchSize: batch,
+	}
+	if batch <= 0 {
+		return res
+	}
+
+	ing.SetBatchSize(batch)
+
+	for idx, rate := range cfg.phase2RequestRates {
+		if ctx.Err() != nil {
+			break
 		}
-		if s.P99 > cfg.readP99ThresholdMs {
-			return false, fmt.Sprintf("read endpoint %q p99 = %.0fms > %.0fms threshold", name, s.P99, cfg.readP99ThresholdMs)
+		ing.SetRequestRate(rate)
+		s := runOneStep(ctx, cfg, ing, ingest, idx+1, batch, rate)
+		res.Steps = append(res.Steps, s)
+		fmt.Fprintf(stderrPrefix(), "phase2 step %d: batch=%d rate=%.1f items/s=%.0f p99=%.0fms err=%.2f%% passed=%t %s\n",
+			s.Step, s.BatchSize, s.RequestRate, s.ActualItemsPerSec, s.Ingest.P99, s.Ingest.ErrRate*100, s.Passed, s.FailReason)
+		if !s.Passed {
+			break
 		}
+		res.MaxRequestRate = rate
+	}
+
+	return res
+}
+
+// runOneStep resizes the worker pool for the new rate, holds the step for
+// stepDuration, then snapshots latency + item counters. The worker pool is
+// torn down between steps so worker count tracks the current rate.
+func runOneStep(ctx context.Context, cfg config, ing *ingester, ingest *latencyTracker, stepNo, batchSize int, requestRate float64) stepResult {
+	ingest.SnapshotAndReset()
+	ing.SnapshotAndResetItems()
+
+	ing.Start(ctx)
+
+	stepCtx, cancel := context.WithTimeout(ctx, cfg.stepDuration)
+	start := time.Now()
+	<-stepCtx.Done()
+	cancel()
+	elapsed := time.Since(start)
+
+	ing.Stop()
+
+	snap := ingest.SnapshotAndReset()
+	attempted, rejected := ing.SnapshotAndResetItems()
+
+	var attemptedIps, actualIps float64
+	if elapsed > 0 {
+		attemptedIps = float64(attempted) / elapsed.Seconds()
+		actualItems := attempted - rejected
+		// Discount failed HTTP requests too — their items never made it in.
+		if attempted > 0 {
+			httpFailItems := int64(float64(snap.Errors) / float64(snap.OK+snap.Errors) * float64(attempted))
+			actualItems -= httpFailItems
+		}
+		if actualItems < 0 {
+			actualItems = 0
+		}
+		actualIps = float64(actualItems) / elapsed.Seconds()
+	}
+
+	passed, reason := evaluateStep(cfg, snap, attempted, rejected)
+
+	return stepResult{
+		Step:                 stepNo,
+		BatchSize:            batchSize,
+		RequestRate:          requestRate,
+		AttemptedItemsPerSec: attemptedIps,
+		ActualItemsPerSec:    actualIps,
+		Rejected:             rejected,
+		Ingest:               snap,
+		Passed:               passed,
+		FailReason:           reason,
+	}
+}
+
+// evaluateStep combines HTTP-level error rate with OTLP partial-success
+// rejections. A SUT that returns 200 OK but rejects half the items is failing
+// just as surely as one that 500s.
+func evaluateStep(cfg config, snap latencySnapshot, attempted, rejected int64) (bool, string) {
+	totalReq := snap.OK + snap.Errors
+	if totalReq == 0 {
+		return false, "no requests completed"
+	}
+	httpErrRate := float64(snap.Errors) / float64(totalReq)
+	var rejectRate float64
+	if attempted > 0 {
+		rejectRate = float64(rejected) / float64(attempted)
+	}
+	combined := httpErrRate + rejectRate
+	if combined > cfg.ingestErrThreshold {
+		return false, fmt.Sprintf("combined error rate %.2f%% (http %.2f%% + rejected %.2f%%) > %.2f%% threshold",
+			combined*100, httpErrRate*100, rejectRate*100, cfg.ingestErrThreshold*100)
 	}
 	return true, ""
 }

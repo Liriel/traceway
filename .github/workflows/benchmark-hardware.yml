@@ -10,9 +10,21 @@ on:
         required: true
         default: 'ccx13,ccx23,ccx33'
       modes:
-        description: 'Comma-separated DB modes (sqlite,pgch)'
+        description: 'Comma-separated DB modes (sqlite,pgch,managed-ch). managed-ch points at an external ClickHouse and requires the BENCH_CH_* repository secrets.'
         required: true
         default: 'sqlite,pgch'
+      signals:
+        description: 'Comma-separated OTLP signals to benchmark (spans,metrics,logs). Each is a separate fresh VM pair.'
+        required: true
+        default: 'spans,metrics,logs'
+      scenario:
+        description: 'Benchmark scenario: throughput (two-phase ingest ramp, default) or read-probe (ingest to fill levels, probe a read, fail above 5s).'
+        required: true
+        type: choice
+        options:
+          - throughput
+          - read-probe
+        default: 'throughput'
       duration:
         description: 'Per-matrix-entry loadgen duration (e.g. 30m, 5m)'
         required: true
@@ -41,10 +53,18 @@ jobs:
           set -euo pipefail
           tiers="${{ github.event.inputs.tiers }}"
           modes="${{ github.event.inputs.modes }}"
+          signals="${{ github.event.inputs.signals }}"
           jq -nc \
             --arg tiers "${tiers}" \
             --arg modes "${modes}" \
-            '{include: [($tiers | split(",")) as $T | ($modes | split(",")) as $M | $T[] as $t | $M[] as $m | {tier: $t, mode: $m}]}' \
+            --arg signals "${signals}" \
+            '{include: [
+              ($tiers | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(. != ""))) as $T |
+              ($modes | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(. != ""))) as $M |
+              ($signals | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(. != ""))) as $S |
+              $T[] as $t | $M[] as $m | $S[] as $s |
+              {tier: $t, mode: $m, signal: $s}
+            ]}' \
             > matrix.json
           cat matrix.json
           echo "matrix=$(cat matrix.json)" >> "$GITHUB_OUTPUT"
@@ -62,6 +82,15 @@ jobs:
     env:
       HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
       BENCH_LOCATION: ${{ github.event.inputs.location }}
+      BENCH_SCENARIO: ${{ github.event.inputs.scenario }}
+      # Managed-ClickHouse credentials. Used only when modes contains
+      # managed-ch; empty for sqlite/pgch entries (harmless — sut-bootstrap
+      # only validates them when MODE=managed-ch).
+      CLICKHOUSE_SERVER: ${{ secrets.BENCH_CH_SERVER }}
+      CLICKHOUSE_USERNAME: ${{ secrets.BENCH_CH_USERNAME }}
+      CLICKHOUSE_PASSWORD: ${{ secrets.BENCH_CH_PASSWORD }}
+      CLICKHOUSE_DATABASE: ${{ secrets.BENCH_CH_DATABASE }}
+      BENCH_CH_HTTPS_PORT: ${{ secrets.BENCH_CH_HTTPS_PORT }}
     steps:
       - uses: actions/checkout@v4
 
@@ -85,15 +114,17 @@ jobs:
           go-version: '1.25'
 
       - name: Preflight
+        env:
+          BENCH_MODES_PLAN: ${{ matrix.mode }}
         run: ./benchmarks/scripts/preflight.sh
 
-      - name: Run matrix entry (${{ matrix.tier }} / ${{ matrix.mode }})
-        run: ./benchmarks/scripts/run-matrix-entry.sh "${{ matrix.tier }}" "${{ matrix.mode }}" "${{ github.event.inputs.duration }}" benchmarks/results/_artifact
+      - name: Run matrix entry (${{ matrix.tier }} / ${{ matrix.mode }} / ${{ matrix.signal }})
+        run: ./benchmarks/scripts/run-matrix-entry.sh "${{ matrix.tier }}" "${{ matrix.mode }}" "${{ matrix.signal }}" "${{ github.event.inputs.duration }}" benchmarks/results/_artifact
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: result-${{ matrix.tier }}-${{ matrix.mode }}
+          name: result-${{ matrix.tier }}-${{ matrix.mode }}-${{ matrix.signal }}
           path: benchmarks/results/_artifact/*.json
           if-no-files-found: warn
 

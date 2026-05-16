@@ -13,7 +13,10 @@ type latencyTracker struct {
 }
 
 func newLatencyTracker() *latencyTracker {
-	return &latencyTracker{samples: make([]float64, 0, 8192)}
+	// 65536 covers 400 req/sec × 120s step without reallocation; the higher
+	// rate ramp steps are where percentile noise hurts most, so amortize the
+	// allocation up front rather than growing during the step.
+	return &latencyTracker{samples: make([]float64, 0, 65536)}
 }
 
 func (l *latencyTracker) Record(milliseconds float64, err error) {

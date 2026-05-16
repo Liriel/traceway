@@ -1,0 +1,50 @@
+services:
+  traceway:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.minimal
+    ports:
+      - "${BENCH_PORT:-8087}:80"
+    environment:
+      CLICKHOUSE_SERVER: "${CLICKHOUSE_SERVER}"
+      CLICKHOUSE_DATABASE: "${CLICKHOUSE_DATABASE:-traceway}"
+      CLICKHOUSE_USERNAME: "${CLICKHOUSE_USERNAME}"
+      CLICKHOUSE_PASSWORD: "${CLICKHOUSE_PASSWORD}"
+      CLICKHOUSE_TLS: "${CLICKHOUSE_TLS:-true}"
+      POSTGRES_HOST: "postgres"
+      POSTGRES_PORT: "5432"
+      POSTGRES_DATABASE: "traceway"
+      POSTGRES_USERNAME: "traceway"
+      POSTGRES_PASSWORD: "traceway"
+      POSTGRES_SSLMODE: "disable"
+      JWT_SECRET: "bench-jwt-secret-not-for-production-use-only-32chars+"
+      GIN_MODE: "release"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 5s
+      timeout: 3s
+      start_period: 10s
+      retries: 20
+
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: traceway
+      POSTGRES_PASSWORD: traceway
+      POSTGRES_DB: traceway
+    volumes:
+      - postgres-bench-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U traceway"]
+      interval: 5s
+      timeout: 3s
+      start_period: 10s
+      retries: 20
+    restart: "no"
+
+volumes:
+  postgres-bench-data:
