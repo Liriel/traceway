@@ -27,11 +27,12 @@ type config struct {
 	phase2RequestRates []float64
 	phase1FixedRate    float64
 	phase2BatchCap     int
-	ingestErrThreshold    float64
-	softCliffRatio        float64
-	stepDrainSeconds      time.Duration
-	phase2BisectMaxSteps  int
-	phase2BisectTolerance float64
+	ingestErrThreshold        float64
+	softCliffRatio            float64
+	stepDrainSeconds          time.Duration
+	interPhaseCooldownSeconds time.Duration
+	phase2BisectMaxSteps      int
+	phase2BisectTolerance     float64
 	fillLevels         []int64
 	readThresholdMs    int
 	settleSeconds      time.Duration
@@ -61,10 +62,11 @@ func main() {
 	flag.StringVar(&phase1BatchesStr, "phase1-batch-sizes", "256,1024,4096,8192,16384", "Comma-separated batch sizes for Phase 1 (throughput scenario)")
 	flag.StringVar(&phase2RatesStr, "phase2-request-rates", "1,5,25,100,400", "Comma-separated request rates for Phase 2 (throughput scenario)")
 	flag.Float64Var(&cfg.phase1FixedRate, "phase1-fixed-rate", 5, "Fixed request rate during Phase 1 (req/sec)")
-	flag.IntVar(&cfg.phase2BatchCap, "phase2-batch-cap", 8192, "Cap on Phase 2 batch size; Phase 2 uses min(this, Phase 1 winner)")
+	flag.IntVar(&cfg.phase2BatchCap, "phase2-batch-cap", 16384, "Cap on Phase 2 batch size; Phase 2 uses min(this, Phase 1 winner). Bumped from the OTel collector default of 8192 because pgch SUTs can usefully exceed it.")
 	flag.Float64Var(&cfg.ingestErrThreshold, "ingest-err-threshold", 0.05, "Step fails if combined (HTTP error + OTLP rejected) item rate exceeds this")
 	flag.Float64Var(&cfg.softCliffRatio, "soft-cliff-ratio", 0.70, "Step fails when achieved req-rate is below this fraction of target — catches saturated-but-not-erroring cliffs. 0 disables.")
 	flag.DurationVar(&cfg.stepDrainSeconds, "step-drain-seconds", 10*time.Second, "After step duration expires, wait up to this long for in-flight HTTP requests to complete before hard-canceling (reduces error-count noise at boundaries)")
+	flag.DurationVar(&cfg.interPhaseCooldownSeconds, "inter-phase-cooldown-seconds", 30*time.Second, "Pause between Phase 1 and Phase 2 to let the SUT drain queues and recover from Phase 1's final-step load. 0 disables.")
 	flag.IntVar(&cfg.phase2BisectMaxSteps, "phase2-bisect-max-steps", 3, "After Phase 2 finds the cliff, run up to this many bisection steps between the last passing and first failing rate to narrow the cliff. 0 disables.")
 	flag.Float64Var(&cfg.phase2BisectTolerance, "phase2-bisect-tolerance", 0.20, "Bisection stops when (firstFailRate-lastPassRate)/lastPassRate falls below this fraction (e.g. 0.20 = stop when the cliff is pinned to within 20% of the last passing rate).")
 	flag.StringVar(&fillLevelsStr, "fill-levels", "100000,1000000,10000000,100000000", "Comma-separated row counts to fill before probing a read (read-probe scenario)")
@@ -155,6 +157,19 @@ func main() {
 	switch cfg.scenario {
 	case "throughput":
 		phase1 := runBatchSizeRamp(ctx, cfg, ing, ingestStats)
+		// Cool-down between phases: Phase 1's last step often runs the SUT at
+		// 70-99% of capacity, leaving its internal queues (CH merges, PG WAL,
+		// HTTP handler pool) saturated. Jumping straight into Phase 2 with the
+		// SUT still digesting that wave produces "0 OK / 0 errors" garbage
+		// because new requests sit on the SUT-side TCP backlog without ever
+		// reaching a handler or timing out.
+		if cfg.interPhaseCooldownSeconds > 0 {
+			fmt.Fprintf(stderrPrefix(), "inter-phase cooldown: %v\n", cfg.interPhaseCooldownSeconds)
+			select {
+			case <-time.After(cfg.interPhaseCooldownSeconds):
+			case <-ctx.Done():
+			}
+		}
 		phase2 := runRequestRateRamp(ctx, cfg, ing, ingestStats, phase1)
 		out.Phase1 = &phase1
 		out.Phase2 = &phase2

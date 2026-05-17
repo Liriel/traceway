@@ -55,8 +55,15 @@ Per matrix entry (one tier × one mode × one signal):
    - **Phase 1 — batch-size ramp.** Single client at a fixed 5 req/sec.
      Batch sizes step through `256,1024,4096,8192,16384`. Each step holds for
      `--step-duration` (default 2 min). Stops at the first failing step.
+   - **Inter-phase cooldown.** Phase 1's last step typically runs the SUT
+     near saturation; the loadgen sleeps `--inter-phase-cooldown-seconds`
+     (default 30 s) before starting Phase 2 so the SUT can drain its
+     queues (CH merges, PG WAL, HTTP handler pool). Without this pause,
+     pgch runs reliably produced "0 OK / 0 errors" Phase 2 because new
+     requests sat on the SUT-side TCP backlog while the SUT was still
+     digesting Phase 1's final wave.
    - **Phase 2 — request-rate ramp.** Batch size fixed at
-     `min(Phase 1 winner, --phase2-batch-cap=8192)`. Request rates step
+     `min(Phase 1 winner, --phase2-batch-cap=16384)`. Request rates step
      through `1,5,25,100,400`. When the coarse ramp finds the first failing
      step, up to `--phase2-bisect-max-steps` (default 3) bisection steps run
      between the last passing rate and the failing rate to pin the cliff
@@ -73,7 +80,10 @@ Per matrix entry (one tier × one mode × one signal):
    The headline `maxSustainableItemsPerSec` is the highest `actualItemsPerSec`
    recorded across passing Phase 2 steps — measured from real OK responses,
    not the formula `batchSize × targetRate` (which over-reports when workers
-   saturate before the limiter does).
+   saturate before the limiter does). If Phase 2 produces zero passing steps
+   (rare, but happens when Phase 1 leaves the SUT in an unrecoverable state
+   even after the cooldown), the headline falls back to the best Phase 1
+   `actualItemsPerSec` so the run still reports a meaningful number.
 7. `hetzner-down.sh` deletes everything via a bash `trap` — even on Ctrl-C.
 
 After all matrix entries finish, `chart.py` renders three bar charts

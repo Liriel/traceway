@@ -56,6 +56,17 @@ func (r *finalReport) computeHeadline() {
 		}
 		r.MaxSustainableItemsPerSec = best
 	}
+	// Fall back to Phase 1 when Phase 2 produced no passing steps. This
+	// happens when Phase 1's heavy final step poisons the SUT and Phase 2
+	// can't recover within its drain window — without this fallback the
+	// headline would be 0 even though Phase 1 has perfectly valid data.
+	if r.MaxSustainableItemsPerSec == 0 && r.Phase1 != nil {
+		for _, s := range r.Phase1.Steps {
+			if s.Passed && s.ActualItemsPerSec > r.MaxSustainableItemsPerSec {
+				r.MaxSustainableItemsPerSec = s.ActualItemsPerSec
+			}
+		}
+	}
 	if r.ReadProbe != nil {
 		r.MaxFillLevelPassed = r.ReadProbe.MaxFillLevelPassed
 	}
