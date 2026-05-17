@@ -57,11 +57,23 @@ Per matrix entry (one tier × one mode × one signal):
      `--step-duration` (default 2 min). Stops at the first failing step.
    - **Phase 2 — request-rate ramp.** Batch size fixed at
      `min(Phase 1 winner, --phase2-batch-cap=8192)`. Request rates step
-     through `1,5,25,100,400`.
-6. A step "fails" when combined error rate (HTTP failures + OTLP
-   `PartialSuccess` rejected items) exceeds `--ingest-err-threshold`
-   (default 5%). The headline is
-   `maxSustainableItemsPerSec = batchSize × maxRequestRate`.
+     through `1,5,25,100,400`. When the coarse ramp finds the first failing
+     step, up to `--phase2-bisect-max-steps` (default 3) bisection steps run
+     between the last passing rate and the failing rate to pin the cliff
+     within `--phase2-bisect-tolerance` (default 20%). So `5→25` (a 5× jump)
+     gets refined into something like `5, 15, 10, 12` until the gap is
+     <20% of the last passing rate.
+6. A step "fails" when **either**:
+   - combined error rate (HTTP failures + OTLP `PartialSuccess` rejected items)
+     exceeds `--ingest-err-threshold` (default 5%), **or**
+   - the *achieved* request rate falls below `--soft-cliff-ratio` × target rate
+     (default 70%) — meaning the workers can't keep up with the limiter, the
+     SUT has cliffed on latency, and we'd be erroring out one step later anyway.
+
+   The headline `maxSustainableItemsPerSec` is the highest `actualItemsPerSec`
+   recorded across passing Phase 2 steps — measured from real OK responses,
+   not the formula `batchSize × targetRate` (which over-reports when workers
+   saturate before the limiter does).
 7. `hetzner-down.sh` deletes everything via a bash `trap` — even on Ctrl-C.
 
 After all matrix entries finish, `chart.py` renders three bar charts

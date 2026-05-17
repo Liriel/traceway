@@ -27,7 +27,11 @@ type config struct {
 	phase2RequestRates []float64
 	phase1FixedRate    float64
 	phase2BatchCap     int
-	ingestErrThreshold float64
+	ingestErrThreshold    float64
+	softCliffRatio        float64
+	stepDrainSeconds      time.Duration
+	phase2BisectMaxSteps  int
+	phase2BisectTolerance float64
 	fillLevels         []int64
 	readThresholdMs    int
 	settleSeconds      time.Duration
@@ -59,6 +63,10 @@ func main() {
 	flag.Float64Var(&cfg.phase1FixedRate, "phase1-fixed-rate", 5, "Fixed request rate during Phase 1 (req/sec)")
 	flag.IntVar(&cfg.phase2BatchCap, "phase2-batch-cap", 8192, "Cap on Phase 2 batch size; Phase 2 uses min(this, Phase 1 winner)")
 	flag.Float64Var(&cfg.ingestErrThreshold, "ingest-err-threshold", 0.05, "Step fails if combined (HTTP error + OTLP rejected) item rate exceeds this")
+	flag.Float64Var(&cfg.softCliffRatio, "soft-cliff-ratio", 0.70, "Step fails when achieved req-rate is below this fraction of target — catches saturated-but-not-erroring cliffs. 0 disables.")
+	flag.DurationVar(&cfg.stepDrainSeconds, "step-drain-seconds", 10*time.Second, "After step duration expires, wait up to this long for in-flight HTTP requests to complete before hard-canceling (reduces error-count noise at boundaries)")
+	flag.IntVar(&cfg.phase2BisectMaxSteps, "phase2-bisect-max-steps", 3, "After Phase 2 finds the cliff, run up to this many bisection steps between the last passing and first failing rate to narrow the cliff. 0 disables.")
+	flag.Float64Var(&cfg.phase2BisectTolerance, "phase2-bisect-tolerance", 0.20, "Bisection stops when (firstFailRate-lastPassRate)/lastPassRate falls below this fraction (e.g. 0.20 = stop when the cliff is pinned to within 20% of the last passing rate).")
 	flag.StringVar(&fillLevelsStr, "fill-levels", "100000,1000000,10000000,100000000", "Comma-separated row counts to fill before probing a read (read-probe scenario)")
 	flag.IntVar(&cfg.readThresholdMs, "read-threshold-ms", 5000, "Read latency threshold in ms; step fails if a probe exceeds it (read-probe scenario)")
 	flag.DurationVar(&cfg.settleSeconds, "settle-seconds", 10*time.Second, "Wait between finishing ingest and probing the read (read-probe scenario)")
