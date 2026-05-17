@@ -33,6 +33,7 @@ type config struct {
 	softCliffRatio            float64
 	stepDrainSeconds          time.Duration
 	interPhaseCooldownSeconds time.Duration
+	sutHealthTimeoutSeconds   time.Duration
 	phase2BisectMaxSteps      int
 	phase2BisectTolerance     float64
 	fillLevels         []int64
@@ -72,6 +73,7 @@ func main() {
 	flag.Float64Var(&cfg.softCliffRatio, "soft-cliff-ratio", 0.70, "Step fails when achieved req-rate is below this fraction of target — catches saturated-but-not-erroring cliffs. 0 disables.")
 	flag.DurationVar(&cfg.stepDrainSeconds, "step-drain-seconds", 10*time.Second, "After step duration expires, wait up to this long for in-flight HTTP requests to complete before hard-canceling (reduces error-count noise at boundaries)")
 	flag.DurationVar(&cfg.interPhaseCooldownSeconds, "inter-phase-cooldown-seconds", 30*time.Second, "Pause between Phase 1 and Phase 2 to let the SUT drain queues and recover from Phase 1's final-step load. 0 disables.")
+	flag.DurationVar(&cfg.sutHealthTimeoutSeconds, "sut-health-timeout-seconds", 60*time.Second, "After each inter-phase cooldown, poll GET <target>/health for up to this long. If the SUT doesn't return 200 in time, remaining phases are skipped and the partial JSON is written via the existing checkpoint. 0 disables the check.")
 	flag.IntVar(&cfg.phase2BisectMaxSteps, "phase2-bisect-max-steps", 3, "After Phase 2 finds the cliff, run up to this many bisection steps between the last passing and first failing rate to narrow the cliff. 0 disables.")
 	flag.Float64Var(&cfg.phase2BisectTolerance, "phase2-bisect-tolerance", 0.20, "Bisection stops when (firstFailRate-lastPassRate)/lastPassRate falls below this fraction (e.g. 0.20 = stop when the cliff is pinned to within 20% of the last passing rate).")
 	flag.StringVar(&fillLevelsStr, "fill-levels", "100000,1000000,10000000,100000000", "Comma-separated row counts to fill before probing a read (read-probe scenario)")
@@ -197,6 +199,14 @@ func main() {
 			case <-ctx.Done():
 			}
 		}
+		// Verify the SUT survived Phase 1 before launching Phase 2. If the
+		// compose restart policy didn't bring the SUT back, skip remaining
+		// phases — the final writeCheckpoint after the switch captures
+		// whatever data was collected up to this point.
+		if err := waitForSutHealthy(ctx, cfg.target, cfg.sutHealthTimeoutSeconds); err != nil {
+			fmt.Fprintf(stderrPrefix(), "SUT unhealthy after Phase 1 cooldown — skipping Phase 2/3: %v\n", err)
+			break
+		}
 		phase2 := runRequestRateRamp(ctx, cfg, ing, ingestStats, phase1, func(p phaseResult) {
 			out.Phase2 = &p
 			writeCheckpoint()
@@ -212,6 +222,10 @@ func main() {
 			case <-time.After(cfg.interPhaseCooldownSeconds):
 			case <-ctx.Done():
 			}
+		}
+		if err := waitForSutHealthy(ctx, cfg.target, cfg.sutHealthTimeoutSeconds); err != nil {
+			fmt.Fprintf(stderrPrefix(), "SUT unhealthy after Phase 2 cooldown — skipping Phase 3: %v\n", err)
+			break
 		}
 		phase3 := runSmallBatchRateRamp(ctx, cfg, ing, ingestStats, func(p phaseResult) {
 			out.Phase3 = &p
@@ -237,6 +251,51 @@ func main() {
 	case "read-probe":
 		fmt.Fprintf(os.Stderr, "wrote %s: signal=%s max fill level passed = %d rows\n",
 			cfg.reportOut, cfg.signal, out.MaxFillLevelPassed)
+	}
+}
+
+// waitForSutHealthy polls GET <target>/health until it returns 200 or the
+// timeout expires. Used between phases to detect SUT-side crashes: when
+// Phase 1's heavy final step OOM-kills ClickHouse, the compose restart
+// policy (on-failure:3) brings the container back within a few seconds.
+// This poll confirms recovery before we ask Phase 2 to fire requests at a
+// SUT that may still be coming up.
+//
+// /health returns 200 unconditionally when traceway is alive — it doesn't
+// validate downstream CH connectivity. That's intentional: the per-step
+// ingestErrThreshold + softCliffRatio already detect CH-down-but-traceway-up,
+// so this poll only catches the case where the traceway container itself
+// went away.
+func waitForSutHealthy(ctx context.Context, target string, timeout time.Duration) error {
+	if timeout <= 0 {
+		return nil
+	}
+	deadline := time.Now().Add(timeout)
+	client := &http.Client{Timeout: 5 * time.Second}
+	interval := 2 * time.Second
+	var lastErr error
+	for {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		resp, err := client.Get(target + "/health")
+		if err == nil {
+			resp.Body.Close()
+			if resp.StatusCode == 200 {
+				return nil
+			}
+			lastErr = fmt.Errorf("status %d", resp.StatusCode)
+		} else {
+			lastErr = err
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("/health did not return 200 within %v (last err: %v)", timeout, lastErr)
+		}
+		select {
+		case <-time.After(interval):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 }
 

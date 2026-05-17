@@ -24,7 +24,7 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
-    restart: "no"
+    restart: on-failure:3
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost/health"]
       interval: 5s
@@ -45,7 +45,7 @@ services:
       timeout: 3s
       start_period: 10s
       retries: 20
-    restart: "no"
+    restart: on-failure:3
     ulimits:
       nofile:
         soft: 262144
@@ -65,7 +65,7 @@ services:
       timeout: 3s
       start_period: 10s
       retries: 20
-    restart: "no"
+    restart: on-failure:3
 
 volumes:
   clickhouse-bench-data:

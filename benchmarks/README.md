@@ -96,6 +96,21 @@ Per matrix entry (one tier × one mode × one signal):
    reports; per-phase numbers stay in the JSON for shape-specific analysis.
 7. `hetzner-down.sh` deletes everything via a bash `trap` — even on Ctrl-C.
 
+### SUT crash recovery
+
+`pgch` and `managed-ch` containers declare `restart: on-failure:3` in their
+compose files. When ClickHouse OOMs under Phase 1's heaviest step (typical
+on `ccx33` + `pgch` once Phase 2 climbs past `batch=16384 × rate=100`), Docker
+auto-restarts the crashed service within seconds. After each inter-phase
+cooldown the loadgen then polls `GET <target>/health` for up to
+`--sut-health-timeout-seconds` (default 60 s) to confirm the SUT actually
+came back. If `/health` never returns 200, the loadgen skips the remaining
+phases and writes the partial JSON via the existing per-step checkpoint —
+no data already collected is lost. The bounded `on-failure:3` retry count
+prevents a permanently-broken SUT from restart-looping forever; if the
+third restart also crashes, the container stays down and the health-poll
+fires the clean-abort path.
+
 After all matrix entries finish, `chart.py` renders three bar charts
 (`chart-spans.png`, `chart-metrics.png`, `chart-logs.png`), three detail
 charts (`chart-detail-<signal>.png`), and a combined `summary.md`.
