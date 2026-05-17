@@ -62,7 +62,7 @@ Per matrix entry (one tier × one mode × one signal):
      pgch runs reliably produced "0 OK / 0 errors" Phase 2 because new
      requests sat on the SUT-side TCP backlog while the SUT was still
      digesting Phase 1's final wave.
-   - **Phase 2 — request-rate ramp.** Batch size fixed at
+   - **Phase 2 — request-rate ramp (collector shape).** Batch size fixed at
      `min(Phase 1 winner, --phase2-batch-cap=16384)`. Request rates step
      through `1,5,25,100,400`. When the coarse ramp finds the first failing
      step, up to `--phase2-bisect-max-steps` (default 3) bisection steps run
@@ -70,6 +70,16 @@ Per matrix entry (one tier × one mode × one signal):
      within `--phase2-bisect-tolerance` (default 20%). So `5→25` (a 5× jump)
      gets refined into something like `5, 15, 10, 12` until the gap is
      <20% of the last passing rate.
+   - **Inter-phase cooldown** before Phase 3 too.
+   - **Phase 3 — request-rate ramp (SDK-fleet shape).** Batch size fixed at
+     `--phase3-batch-size` (default **100**, matching typical language-SDK
+     `BatchSpanProcessor` output rather than the collector's 8192). Request
+     rates step through `--phase3-request-rates` (default
+     `10,100,1000,5000,10000` — much higher than Phase 2 because each
+     request is much cheaper at batch=100). Same bisection logic as Phase 2.
+     Measures the SUT under "thousands of small batches/sec from a real
+     SDK fleet" load, which stresses the HTTP/auth/decode/queue path more
+     than the raw insert path Phase 2 measures.
 6. A step "fails" when **either**:
    - combined error rate (HTTP failures + OTLP `PartialSuccess` rejected items)
      exceeds `--ingest-err-threshold` (default 5%), **or**
@@ -78,12 +88,12 @@ Per matrix entry (one tier × one mode × one signal):
      SUT has cliffed on latency, and we'd be erroring out one step later anyway.
 
    The headline `maxSustainableItemsPerSec` is the highest `actualItemsPerSec`
-   recorded across passing Phase 2 steps — measured from real OK responses,
-   not the formula `batchSize × targetRate` (which over-reports when workers
-   saturate before the limiter does). If Phase 2 produces zero passing steps
-   (rare, but happens when Phase 1 leaves the SUT in an unrecoverable state
-   even after the cooldown), the headline falls back to the best Phase 1
-   `actualItemsPerSec` so the run still reports a meaningful number.
+   recorded across passing steps from **any** of Phase 1, Phase 2, or Phase 3
+   — measured from real OK responses, not the formula `batchSize × targetRate`
+   (which over-reports when workers saturate before the limiter does).
+   Different phases probe different shapes (collector fat-batch vs SDK
+   small-batch fleet) and the SUT's best-shape ceiling is what the headline
+   reports; per-phase numbers stay in the JSON for shape-specific analysis.
 7. `hetzner-down.sh` deletes everything via a bash `trap` — even on Ctrl-C.
 
 After all matrix entries finish, `chart.py` renders three bar charts

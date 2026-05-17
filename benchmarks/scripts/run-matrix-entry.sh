@@ -74,7 +74,7 @@ if [[ "${SMOKE}" == "smoke" ]]; then
     if [[ "${SCENARIO}" == "read-probe" ]]; then
         extra_args+=( --fill-levels 100000,1000000 --settle-seconds 5s )
     else
-        extra_args+=( --phase1-batch-sizes 256,1024 --phase2-request-rates 1,5 --step-duration 15s )
+        extra_args+=( --phase1-batch-sizes 256,1024 --phase2-request-rates 1,5 --phase3-request-rates 10,100 --step-duration 15s )
     fi
 fi
 

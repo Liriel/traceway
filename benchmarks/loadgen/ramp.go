@@ -36,35 +36,37 @@ type finalReport struct {
 	EndedAt                   string           `json:"endedAt"`
 	Phase1                    *phaseResult     `json:"phase1,omitempty"`
 	Phase2                    *phaseResult     `json:"phase2,omitempty"`
+	Phase3                    *phaseResult     `json:"phase3,omitempty"`
 	ReadProbe                 *readProbeResult `json:"readProbe,omitempty"`
 	MaxSustainableItemsPerSec float64          `json:"maxSustainableItemsPerSec,omitempty"`
 	MaxFillLevelPassed        int64            `json:"maxFillLevelPassed,omitempty"`
 }
 
 func (r *finalReport) computeHeadline() {
-	if r.Phase2 != nil {
-		// Use the achieved throughput of the last passing step. The
-		// FixedBatchSize × MaxRequestRate formula is unreliable: at the cliff,
-		// workers saturate on HTTP latency and never deliver the target rate,
-		// so the formula overstates capacity. ActualItemsPerSec is measured
-		// from real OK responses and tells the truth.
+	// Take the max ActualItemsPerSec across passing steps from all three
+	// throughput phases. Different phases probe different shapes (collector
+	// fat batches, SDK small-batch fleet), and the headline is the SUT's
+	// best sustained number regardless of shape. Per-phase numbers live in
+	// the JSON for shape-specific analysis.
+	maxFromPhase := func(p *phaseResult) float64 {
+		if p == nil {
+			return 0
+		}
 		var best float64
-		for _, s := range r.Phase2.Steps {
+		for _, s := range p.Steps {
 			if s.Passed && s.ActualItemsPerSec > best {
 				best = s.ActualItemsPerSec
 			}
 		}
-		r.MaxSustainableItemsPerSec = best
+		return best
 	}
-	// Fall back to Phase 1 when Phase 2 produced no passing steps. This
-	// happens when Phase 1's heavy final step poisons the SUT and Phase 2
-	// can't recover within its drain window — without this fallback the
-	// headline would be 0 even though Phase 1 has perfectly valid data.
-	if r.MaxSustainableItemsPerSec == 0 && r.Phase1 != nil {
-		for _, s := range r.Phase1.Steps {
-			if s.Passed && s.ActualItemsPerSec > r.MaxSustainableItemsPerSec {
-				r.MaxSustainableItemsPerSec = s.ActualItemsPerSec
-			}
+	for _, candidate := range []float64{
+		maxFromPhase(r.Phase2),
+		maxFromPhase(r.Phase3),
+		maxFromPhase(r.Phase1), // fallback when phases 2/3 produce nothing
+	} {
+		if candidate > r.MaxSustainableItemsPerSec {
+			r.MaxSustainableItemsPerSec = candidate
 		}
 	}
 	if r.ReadProbe != nil {
@@ -113,8 +115,9 @@ func runBatchSizeRamp(ctx context.Context, cfg config, ing *ingester, ingest *la
 }
 
 // runRequestRateRamp holds batchSize fixed at min(phase1.MaxBatchSize, cfg.phase2BatchCap)
-// and grows request rate step by step. Calls `checkpoint` after each coarse
-// step and after each bisection step so partial state is durable.
+// and grows request rate step by step. Phase 2's purpose: at the largest
+// single-request payload the SUT can absorb (collector-shape), find the
+// req/sec ceiling.
 func runRequestRateRamp(ctx context.Context, cfg config, ing *ingester, ingest *latencyTracker, phase1 phaseResult, checkpoint phaseCheckpoint) phaseResult {
 	batch := phase1.MaxBatchSize
 	if batch <= 0 {
@@ -123,12 +126,29 @@ func runRequestRateRamp(ctx context.Context, cfg config, ing *ingester, ingest *
 	if batch > cfg.phase2BatchCap {
 		batch = cfg.phase2BatchCap
 	}
+	return runRateRamp(ctx, cfg, ing, ingest, batch, cfg.phase2RequestRates, "request-rate-ramp", "phase2", checkpoint)
+}
 
+// runSmallBatchRateRamp holds batchSize fixed at cfg.phase3BatchSize (default
+// 100 — typical SDK batch shape rather than collector-default 8192) and
+// ramps request rate. Phase 3's purpose: measure the SUT's behaviour under
+// many small requests, as opposed to Phase 2's few-fat-requests shape.
+// SDK fleets in the wild send hundreds-to-thousands of small batches per
+// second — language-SDK BatchSpanProcessor defaults are 512 per batch on a
+// 5 s rotation, often much less in practice; this phase covers that regime.
+func runSmallBatchRateRamp(ctx context.Context, cfg config, ing *ingester, ingest *latencyTracker, checkpoint phaseCheckpoint) phaseResult {
+	return runRateRamp(ctx, cfg, ing, ingest, cfg.phase3BatchSize, cfg.phase3RequestRates, "small-batch-rate-ramp", "phase3", checkpoint)
+}
+
+// runRateRamp is the shared engine for Phase 2 and Phase 3: hold batch
+// fixed, ramp request rate, bisect after the first failing step. logPrefix
+// is just for stderr messages ("phase2" / "phase3").
+func runRateRamp(ctx context.Context, cfg config, ing *ingester, ingest *latencyTracker, batch int, rates []float64, kind, logPrefix string, checkpoint phaseCheckpoint) phaseResult {
 	res := phaseResult{
-		Kind:           "request-rate-ramp",
+		Kind:           kind,
 		FixedBatchSize: batch,
 	}
-	if batch <= 0 {
+	if batch <= 0 || len(rates) == 0 {
 		return res
 	}
 
@@ -137,7 +157,7 @@ func runRequestRateRamp(ctx context.Context, cfg config, ing *ingester, ingest *
 	var lastPassRate, firstFailRate float64
 	stepNo := 0
 
-	for _, rate := range cfg.phase2RequestRates {
+	for _, rate := range rates {
 		if ctx.Err() != nil {
 			break
 		}
@@ -145,8 +165,8 @@ func runRequestRateRamp(ctx context.Context, cfg config, ing *ingester, ingest *
 		ing.SetRequestRate(rate)
 		s := runOneStep(ctx, cfg, ing, ingest, stepNo, batch, rate)
 		res.Steps = append(res.Steps, s)
-		fmt.Fprintf(stderrPrefix(), "phase2 step %d: batch=%d rate=%.1f items/s=%.0f p99=%.0fms err=%.2f%% passed=%t %s\n",
-			s.Step, s.BatchSize, s.RequestRate, s.ActualItemsPerSec, s.Ingest.P99, s.Ingest.ErrRate*100, s.Passed, s.FailReason)
+		fmt.Fprintf(stderrPrefix(), "%s step %d: batch=%d rate=%.1f items/s=%.0f p99=%.0fms err=%.2f%% passed=%t %s\n",
+			logPrefix, s.Step, s.BatchSize, s.RequestRate, s.ActualItemsPerSec, s.Ingest.P99, s.Ingest.ErrRate*100, s.Passed, s.FailReason)
 		if s.Passed {
 			res.MaxRequestRate = rate
 			lastPassRate = rate
@@ -162,9 +182,8 @@ func runRequestRateRamp(ctx context.Context, cfg config, ing *ingester, ingest *
 
 	// Bisection refinement. After the coarse ramp finds an adjacent
 	// (passing, failing) pair, halve the gap up to phase2BisectMaxSteps
-	// times to pin the real cliff. Skipped when nothing failed (no cliff
-	// in the configured range) or nothing passed (cliff below the
-	// smallest configured rate — bisecting below it isn't informative).
+	// times to pin the real cliff. Phase 3 reuses the same tunables since
+	// the math is identical regardless of batch size.
 	if cfg.phase2BisectMaxSteps > 0 && lastPassRate > 0 && firstFailRate > lastPassRate {
 		for b := 0; b < cfg.phase2BisectMaxSteps; b++ {
 			if ctx.Err() != nil {
@@ -179,8 +198,8 @@ func runRequestRateRamp(ctx context.Context, cfg config, ing *ingester, ingest *
 			ing.SetRequestRate(mid)
 			s := runOneStep(ctx, cfg, ing, ingest, stepNo, batch, mid)
 			res.Steps = append(res.Steps, s)
-			fmt.Fprintf(stderrPrefix(), "phase2 bisect %d: batch=%d rate=%.1f items/s=%.0f p99=%.0fms err=%.2f%% passed=%t %s\n",
-				s.Step, s.BatchSize, s.RequestRate, s.ActualItemsPerSec, s.Ingest.P99, s.Ingest.ErrRate*100, s.Passed, s.FailReason)
+			fmt.Fprintf(stderrPrefix(), "%s bisect %d: batch=%d rate=%.1f items/s=%.0f p99=%.0fms err=%.2f%% passed=%t %s\n",
+				logPrefix, s.Step, s.BatchSize, s.RequestRate, s.ActualItemsPerSec, s.Ingest.P99, s.Ingest.ErrRate*100, s.Passed, s.FailReason)
 			if s.Passed {
 				lastPassRate = mid
 				res.MaxRequestRate = mid

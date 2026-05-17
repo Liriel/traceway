@@ -25,8 +25,10 @@ type config struct {
 	stepDuration       time.Duration
 	phase1BatchSizes   []int
 	phase2RequestRates []float64
+	phase3RequestRates []float64
 	phase1FixedRate    float64
 	phase2BatchCap     int
+	phase3BatchSize    int
 	ingestErrThreshold        float64
 	softCliffRatio            float64
 	stepDrainSeconds          time.Duration
@@ -48,6 +50,7 @@ func main() {
 		cfg              config
 		phase1BatchesStr string
 		phase2RatesStr   string
+		phase3RatesStr   string
 		fillLevelsStr    string
 	)
 
@@ -63,6 +66,8 @@ func main() {
 	flag.StringVar(&phase2RatesStr, "phase2-request-rates", "1,5,25,100,400", "Comma-separated request rates for Phase 2 (throughput scenario)")
 	flag.Float64Var(&cfg.phase1FixedRate, "phase1-fixed-rate", 5, "Fixed request rate during Phase 1 (req/sec)")
 	flag.IntVar(&cfg.phase2BatchCap, "phase2-batch-cap", 16384, "Cap on Phase 2 batch size; Phase 2 uses min(this, Phase 1 winner). Bumped from the OTel collector default of 8192 because pgch SUTs can usefully exceed it.")
+	flag.IntVar(&cfg.phase3BatchSize, "phase3-batch-size", 100, "Fixed batch size for Phase 3 (SDK-fleet shape — many small batches at high rate). Default 100 reflects typical language-SDK BatchSpanProcessor output, not the collector's 8192.")
+	flag.StringVar(&phase3RatesStr, "phase3-request-rates", "10,100,1000,5000,10000", "Comma-separated request rates for Phase 3 (small-batch rate ramp). Goes higher than Phase 2 because each request is much cheaper at batch=100.")
 	flag.Float64Var(&cfg.ingestErrThreshold, "ingest-err-threshold", 0.05, "Step fails if combined (HTTP error + OTLP rejected) item rate exceeds this")
 	flag.Float64Var(&cfg.softCliffRatio, "soft-cliff-ratio", 0.70, "Step fails when achieved req-rate is below this fraction of target — catches saturated-but-not-erroring cliffs. 0 disables.")
 	flag.DurationVar(&cfg.stepDrainSeconds, "step-drain-seconds", 10*time.Second, "After step duration expires, wait up to this long for in-flight HTTP requests to complete before hard-canceling (reduces error-count noise at boundaries)")
@@ -95,8 +100,14 @@ func main() {
 		fmt.Fprintf(os.Stderr, "invalid --phase2-request-rates: %v\n", err)
 		os.Exit(2)
 	}
+	phase3Rates, err := parseFloats(phase3RatesStr)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "invalid --phase3-request-rates: %v\n", err)
+		os.Exit(2)
+	}
 	cfg.phase1BatchSizes = batches
 	cfg.phase2RequestRates = rates
+	cfg.phase3RequestRates = phase3Rates
 
 	fillLevels, err := parseInt64s(fillLevelsStr)
 	if err != nil {
@@ -191,6 +202,22 @@ func main() {
 			writeCheckpoint()
 		})
 		out.Phase2 = &phase2
+
+		// Phase 3 — small-batch high-rate (SDK-fleet shape). Independent of
+		// Phase 1/2 results, so it runs even if Phase 2 produced no passing
+		// steps. Same cooldown before it as between 1 and 2.
+		if cfg.interPhaseCooldownSeconds > 0 && ctx.Err() == nil {
+			fmt.Fprintf(stderrPrefix(), "inter-phase cooldown: %v\n", cfg.interPhaseCooldownSeconds)
+			select {
+			case <-time.After(cfg.interPhaseCooldownSeconds):
+			case <-ctx.Done():
+			}
+		}
+		phase3 := runSmallBatchRateRamp(ctx, cfg, ing, ingestStats, func(p phaseResult) {
+			out.Phase3 = &p
+			writeCheckpoint()
+		})
+		out.Phase3 = &phase3
 	case "read-probe":
 		probe := runReadProbe(ctx, cfg, ing, ingestStats, httpClient, func(p readProbeResult) {
 			out.ReadProbe = &p

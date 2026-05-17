@@ -203,19 +203,20 @@ def render_summary(runs: list[dict], out: Path) -> None:
                 continue
             lines.append(f"### {signal.capitalize()}")
             lines.append("")
-            lines.append(f"| Tier | Mode | Max {ITEM_LABEL[signal]} | Phase 1 max batch | Phase 2 max req/sec | Ingest P99 @ max (ms) |")
-            lines.append("|------|------|---------|-------------------|---------------------|------------------------|")
+            lines.append(f"| Tier | Mode | Max {ITEM_LABEL[signal]} | P1 max batch | P2 max req/sec @ batch | P3 max req/sec @ batch=100 |")
+            lines.append("|------|------|---------|--------------|-------------------------|-------------------------------|")
             for run in sorted(sig_runs, key=lambda r: (tier_rank(r["tier"]), mode_rank(r["mode"]))):
                 max_items = int(run.get("maxSustainableItemsPerSec", 0))
                 max_batch = (run.get("phase1") or {}).get("maxBatchSize", 0)
-                max_rate = (run.get("phase2") or {}).get("maxRequestRate", 0)
-                last_pass = None
-                for s in reversed((run.get("phase2") or {}).get("steps") or []):
-                    if s.get("passed"):
-                        last_pass = s
-                        break
-                ingest_p99 = int(last_pass["ingest"]["p99"]) if last_pass else 0
-                lines.append(f"| {run['tier']} | {run['mode']} | {max_items:,} | {max_batch:,} | {max_rate:g} | {ingest_p99} |")
+                p2 = run.get("phase2") or {}
+                p2_rate = p2.get("maxRequestRate", 0)
+                p2_batch = p2.get("fixedBatchSize", 0)
+                p2_cell = f"{p2_rate:g} @ {p2_batch:,}" if p2_rate else "—"
+                p3 = run.get("phase3") or {}
+                p3_rate = p3.get("maxRequestRate", 0)
+                p3_batch = p3.get("fixedBatchSize", 0)
+                p3_cell = f"{p3_rate:g} @ {p3_batch:,}" if p3_rate else "—"
+                lines.append(f"| {run['tier']} | {run['mode']} | {max_items:,} | {max_batch:,} | {p2_cell} | {p3_cell} |")
             lines.append("")
 
     readprobe_runs = [r for r in runs if r["scenario"] == "read-probe"]
