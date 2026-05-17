@@ -20,8 +20,18 @@ fi
 TIER="$1"
 RUN_ID="$2"
 LOCATION="${3:-nbg1}"
-LOADGEN_TIER="${LOADGEN_TIER:-cax11}"
 IMAGE="${BENCH_IMAGE:-debian-12}"
+
+# Loadgen tier: pick the cheapest shared-vCPU instance available in the
+# target location. CAX (ARM) is EU-only; CPX (x86) is global. Override with
+# LOADGEN_TIER if you want a beefier loadgen box.
+case "${LOCATION}" in
+    nbg1|fsn1|hel1) LOADGEN_DEFAULT="cax11" ;;   # ARM, cheaper, EU only
+    ash|hil)        LOADGEN_DEFAULT="cpx11" ;;   # x86, available in US
+    sin)            LOADGEN_DEFAULT="cpx11" ;;   # x86, safest in Singapore
+    *)              LOADGEN_DEFAULT="cpx11" ;;   # x86 is the safe global default
+esac
+LOADGEN_TIER="${LOADGEN_TIER:-${LOADGEN_DEFAULT}}"
 NET_NAME="bench-net-${RUN_ID}"
 SUT_NAME="bench-sut-${RUN_ID}"
 LOADGEN_NAME="bench-loadgen-${RUN_ID}"
