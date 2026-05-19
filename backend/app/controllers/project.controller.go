@@ -61,6 +61,10 @@ type UpdateProjectRequest struct {
 	Framework string `json:"framework" binding:"required"`
 }
 
+type DeleteProjectRequest struct {
+	Name string `json:"name" binding:"required"`
+}
+
 func (p projectController) ListProjects(c *gin.Context) {
 	userId := middleware.GetUserId(c)
 
@@ -153,8 +157,9 @@ func (p projectController) UpdateProject(c *gin.Context) {
 		return
 	}
 
-	tx := middleware.GetTx(c)
-	project, err := repositories.ProjectRepository.Update(tx, projectId, request.Name, request.Framework)
+	project, err := db.ExecuteTransaction(func(tx *sql.Tx) (*models.Project, error) {
+		return repositories.ProjectRepository.Update(tx, projectId, request.Name, request.Framework)
+	})
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("error updating project: %w", err))
 		return
@@ -166,15 +171,40 @@ func (p projectController) UpdateProject(c *gin.Context) {
 }
 
 func (p projectController) DeleteProject(c *gin.Context) {
+	var request DeleteProjectRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	projectId, err := middleware.GetProjectId(c)
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("RequireProjectAccess middleware must be applied: %w", err))
 		return
 	}
 
-	tx := middleware.GetTx(c)
-	if err := repositories.ProjectRepository.Delete(tx, projectId); err != nil {
+	nameMatched, err := db.ExecuteTransaction(func(tx *sql.Tx) (bool, error) {
+		project, err := repositories.ProjectRepository.FindById(tx, projectId)
+		if err != nil {
+			return false, err
+		}
+		if project == nil {
+			return false, fmt.Errorf("project not found: %s", projectId)
+		}
+		if project.Name != request.Name {
+			return false, nil
+		}
+		if err := repositories.ProjectRepository.Delete(tx, projectId); err != nil {
+			return false, err
+		}
+		return true, nil
+	})
+	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("error deleting project: %w", err))
+		return
+	}
+	if !nameMatched {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Project name does not match"})
 		return
 	}
 

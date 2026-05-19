@@ -156,8 +156,8 @@ class ProjectsState {
         return response;
     }
 
-    async deleteProject(id: string): Promise<void> {
-        await api.delete('/projects', { projectId: id });
+    async deleteProject(id: string, name: string): Promise<void> {
+        await api.delete('/projects', { projectId: id }, { name });
         await this.loadProjects();
     }
 
