@@ -1,8 +1,10 @@
 package services
 
 import (
+	"crypto/sha256"
 	"database/sql"
 	"encoding/base32"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -23,7 +25,9 @@ type dbSessionStore struct {
 }
 
 func newDBSessionStore(secret string, options *sessions.Options) *dbSessionStore {
-	codecs := securecookie.CodecsFromPairs([]byte(secret))
+	hashKey := []byte(secret)
+	blockKey := sha256.Sum256([]byte(secret + ":oauth-session-encryption"))
+	codecs := securecookie.CodecsFromPairs(hashKey, blockKey[:])
 	for _, c := range codecs {
 		if sc, ok := c.(*securecookie.SecureCookie); ok {
 			sc.MaxLength(0)
@@ -81,10 +85,11 @@ func (s *dbSessionStore) Save(r *http.Request, w http.ResponseWriter, session *s
 	}
 
 	if session.ID == "" {
-		session.ID = strings.TrimRight(
-			base32.StdEncoding.EncodeToString(securecookie.GenerateRandomKey(32)),
-			"=",
-		)
+		key := securecookie.GenerateRandomKey(32)
+		if key == nil {
+			return errors.New("oauth session: failed to generate session ID (crypto/rand unavailable)")
+		}
+		session.ID = strings.TrimRight(base32.StdEncoding.EncodeToString(key), "=")
 	}
 
 	encoded, err := securecookie.EncodeMulti(session.Name(), session.Values, s.codecs...)
