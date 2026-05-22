@@ -237,12 +237,7 @@
 
         <PageHeader title="Tasks" />
 
-        <div class="flex flex-col gap-2 sm:flex-row sm:items-end">
-            <SearchBar placeholder="Search tasks..." bind:value={searchQuery} onSearch={handleSearch}>
-                {#snippet children()}
-                    <RootFilter bind:value={rootFilter} />
-                {/snippet}
-            </SearchBar>
+        <div class="flex flex-col">
             <TimeRangePicker
                 bind:fromDate
                 bind:toDate
@@ -253,6 +248,18 @@
             />
         </div>
     </div>
+
+    <!-- Search -->
+    <SearchBar
+        placeholder="Search tasks..."
+        bind:value={searchQuery}
+        onSearch={handleSearch}
+        disabled={loading}
+    >
+        {#snippet children()}
+            <RootFilter bind:value={rootFilter} />
+        {/snippet}
+    </SearchBar>
 
     <!-- Tasks Table -->
     <div class="rounded-md border overflow-hidden">
