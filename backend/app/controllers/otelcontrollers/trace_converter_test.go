@@ -445,6 +445,206 @@ func TestFormatExceptionStackTrace(t *testing.T) {
 	}
 }
 
+// --- Non-root classification tests ---
+
+func TestConvertTraces_ConsumerNonRoot_BecomesTask(t *testing.T) {
+	// Worker batch: CONSUMER span with a parent that lives in the producer's
+	// batch (not present in our scope), plus a child DB span.
+	traceId := []byte{0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f}
+	producerSpanId := []byte{0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7}
+	consumerSpanId := []byte{0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7}
+	childSpanId := []byte{0xC0, 0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, 0xC7}
+	now := uint64(1_700_000_000_000_000_000)
+
+	req := &coltracepb.ExportTraceServiceRequest{
+		ResourceSpans: []*tracepb.ResourceSpans{{
+			Resource: &resourcepb.Resource{Attributes: []*commonpb.KeyValue{strKV("service.name", "worker")}},
+			ScopeSpans: []*tracepb.ScopeSpans{{
+				Spans: []*tracepb.Span{
+					{TraceId: traceId, SpanId: consumerSpanId, ParentSpanId: producerSpanId, Name: "process job", Kind: tracepb.Span_SPAN_KIND_CONSUMER, StartTimeUnixNano: now, EndTimeUnixNano: now + 1_000_000},
+					{TraceId: traceId, SpanId: childSpanId, ParentSpanId: consumerSpanId, Name: "SELECT users", Kind: tracepb.Span_SPAN_KIND_INTERNAL, StartTimeUnixNano: now, EndTimeUnixNano: now + 500_000},
+				},
+			}},
+		}},
+	}
+
+	endpoints, tasks, spans, _, _, _ := convertTraces(testProjectId, req)
+
+	if len(endpoints) != 0 {
+		t.Fatalf("expected 0 endpoints, got %d", len(endpoints))
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+	if tasks[0].IsRoot {
+		t.Errorf("expected task.IsRoot == false, got true")
+	}
+	wantTaskId := otelSpanIDToUUID(consumerSpanId)
+	if tasks[0].Id != wantTaskId {
+		t.Errorf("expected task.Id %s (from span_id), got %s", wantTaskId, tasks[0].Id)
+	}
+	wantDtId := otelTraceIDToUUID(traceId)
+	if tasks[0].DistributedTraceId == nil || *tasks[0].DistributedTraceId != wantDtId {
+		t.Errorf("expected task.DistributedTraceId %s (from trace_id), got %v", wantDtId, tasks[0].DistributedTraceId)
+	}
+
+	if len(spans) != 1 {
+		t.Fatalf("expected 1 span row, got %d", len(spans))
+	}
+	if spans[0].TraceId != wantTaskId {
+		t.Errorf("expected child span.TraceId == task.Id %s, got %s", wantTaskId, spans[0].TraceId)
+	}
+}
+
+func TestConvertTraces_ConsoleCommand_BecomesTask(t *testing.T) {
+	traceId := []byte{0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f}
+	rootSpanId := []byte{0xD0, 0xD1, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7}
+	now := uint64(1_700_000_000_000_000_000)
+
+	req := &coltracepb.ExportTraceServiceRequest{
+		ResourceSpans: []*tracepb.ResourceSpans{{
+			Resource: &resourcepb.Resource{Attributes: []*commonpb.KeyValue{strKV("service.name", "scheduler")}},
+			ScopeSpans: []*tracepb.ScopeSpans{{
+				Spans: []*tracepb.Span{{
+					TraceId: traceId, SpanId: rootSpanId,
+					Name: "bookings:send-reminders", Kind: tracepb.Span_SPAN_KIND_INTERNAL,
+					StartTimeUnixNano: now, EndTimeUnixNano: now + 2_000_000,
+					Attributes: []*commonpb.KeyValue{strKV("console.command", "bookings:send-reminders")},
+				}},
+			}},
+		}},
+	}
+
+	_, tasks, _, _, _, _ := convertTraces(testProjectId, req)
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 task, got %d", len(tasks))
+	}
+	if !tasks[0].IsRoot {
+		t.Errorf("expected task.IsRoot == true, got false")
+	}
+	if tasks[0].Id != otelTraceIDToUUID(traceId) {
+		t.Errorf("expected task.Id == otelTraceIDToUUID(trace_id), got %s", tasks[0].Id)
+	}
+}
+
+func TestConvertTraces_InlineGenAi_BecomesAiTrace(t *testing.T) {
+	traceId := []byte{0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f}
+	rootSpanId := []byte{0xE0, 0xE1, 0xE2, 0xE3, 0xE4, 0xE5, 0xE6, 0xE7}
+	llmSpanId := []byte{0xE8, 0xE9, 0xEA, 0xEB, 0xEC, 0xED, 0xEE, 0xEF}
+	now := uint64(1_700_000_000_000_000_000)
+
+	req := &coltracepb.ExportTraceServiceRequest{
+		ResourceSpans: []*tracepb.ResourceSpans{{
+			Resource: &resourcepb.Resource{Attributes: []*commonpb.KeyValue{strKV("service.name", "api")}},
+			ScopeSpans: []*tracepb.ScopeSpans{{
+				Spans: []*tracepb.Span{
+					{TraceId: traceId, SpanId: rootSpanId, Name: "POST /chat", Kind: tracepb.Span_SPAN_KIND_SERVER, StartTimeUnixNano: now, EndTimeUnixNano: now + 10_000_000,
+						Attributes: []*commonpb.KeyValue{strKV("http.request.method", "POST"), strKV("http.route", "/chat")}},
+					{TraceId: traceId, SpanId: llmSpanId, ParentSpanId: rootSpanId, Name: "chat openai", Kind: tracepb.Span_SPAN_KIND_INTERNAL, StartTimeUnixNano: now, EndTimeUnixNano: now + 5_000_000,
+						Attributes: []*commonpb.KeyValue{strKV("gen_ai.system", "openai"), strKV("gen_ai.request.model", "gpt-4")}},
+				},
+			}},
+		}},
+	}
+
+	endpoints, _, _, _, aiTraces, _ := convertTraces(testProjectId, req)
+	if len(endpoints) != 1 {
+		t.Fatalf("expected 1 endpoint, got %d", len(endpoints))
+	}
+	if !endpoints[0].IsRoot {
+		t.Errorf("expected endpoint.IsRoot == true")
+	}
+	wantEndpointId := otelTraceIDToUUID(traceId)
+	if endpoints[0].Id != wantEndpointId {
+		t.Errorf("expected endpoint.Id %s, got %s", wantEndpointId, endpoints[0].Id)
+	}
+
+	if len(aiTraces) != 1 {
+		t.Fatalf("expected 1 ai_trace, got %d", len(aiTraces))
+	}
+	if aiTraces[0].IsRoot {
+		t.Errorf("expected aiTrace.IsRoot == false")
+	}
+	wantAiId := otelSpanIDToUUID(llmSpanId)
+	if aiTraces[0].Id != wantAiId {
+		t.Errorf("expected aiTrace.Id %s, got %s", wantAiId, aiTraces[0].Id)
+	}
+	if aiTraces[0].DistributedTraceId == nil || *aiTraces[0].DistributedTraceId != wantEndpointId {
+		t.Errorf("expected aiTrace.DistributedTraceId %s, got %v", wantEndpointId, aiTraces[0].DistributedTraceId)
+	}
+}
+
+func TestConvertTraces_ExceptionOnConsumer_TraceTypeIsTask(t *testing.T) {
+	traceId := []byte{0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f}
+	producerSpanId := []byte{0xF0, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0xF6, 0xF7}
+	consumerSpanId := []byte{0xF8, 0xF9, 0xFA, 0xFB, 0xFC, 0xFD, 0xFE, 0xFF}
+	now := uint64(1_700_000_000_000_000_000)
+
+	req := &coltracepb.ExportTraceServiceRequest{
+		ResourceSpans: []*tracepb.ResourceSpans{{
+			Resource: &resourcepb.Resource{Attributes: []*commonpb.KeyValue{strKV("service.name", "worker")}},
+			ScopeSpans: []*tracepb.ScopeSpans{{
+				Spans: []*tracepb.Span{{
+					TraceId: traceId, SpanId: consumerSpanId, ParentSpanId: producerSpanId,
+					Name: "process job", Kind: tracepb.Span_SPAN_KIND_CONSUMER,
+					StartTimeUnixNano: now, EndTimeUnixNano: now + 1_000_000,
+					Events: []*tracepb.Span_Event{{
+						Name:         "exception",
+						TimeUnixNano: now + 500_000,
+						Attributes: []*commonpb.KeyValue{
+							strKV("exception.type", "RuntimeError"),
+							strKV("exception.message", "boom"),
+						},
+					}},
+				}},
+			}},
+		}},
+	}
+
+	_, tasks, _, exceptions, _, _ := convertTraces(testProjectId, req)
+	if len(tasks) != 1 || len(exceptions) != 1 {
+		t.Fatalf("expected 1 task + 1 exception, got %d / %d", len(tasks), len(exceptions))
+	}
+	if exceptions[0].TraceType != "task" {
+		t.Errorf("expected exception.TraceType == 'task', got %q", exceptions[0].TraceType)
+	}
+	if exceptions[0].TraceId == nil || *exceptions[0].TraceId != tasks[0].Id {
+		t.Errorf("expected exception.TraceId == task.Id %s, got %v", tasks[0].Id, exceptions[0].TraceId)
+	}
+}
+
+func TestConvertTraces_OrphanSpan_FallsBackToTraceId(t *testing.T) {
+	// A non-root span whose parent is not in this batch and the span itself
+	// isn't classified as an entity. Should land in the spans table with
+	// trace_id == otelTraceIDToUUID(trace_id) (orphan fallback path).
+	traceId := []byte{0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5a, 0x5b, 0x5c, 0x5d, 0x5e, 0x5f}
+	orphanParentId := []byte{0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67}
+	orphanSpanId := []byte{0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77}
+	now := uint64(1_700_000_000_000_000_000)
+
+	req := &coltracepb.ExportTraceServiceRequest{
+		ResourceSpans: []*tracepb.ResourceSpans{{
+			Resource: &resourcepb.Resource{Attributes: []*commonpb.KeyValue{strKV("service.name", "worker")}},
+			ScopeSpans: []*tracepb.ScopeSpans{{
+				Spans: []*tracepb.Span{{
+					TraceId: traceId, SpanId: orphanSpanId, ParentSpanId: orphanParentId,
+					Name: "redis GET", Kind: tracepb.Span_SPAN_KIND_INTERNAL,
+					StartTimeUnixNano: now, EndTimeUnixNano: now + 100_000,
+				}},
+			}},
+		}},
+	}
+
+	_, _, spans, _, _, _ := convertTraces(testProjectId, req)
+	if len(spans) != 1 {
+		t.Fatalf("expected 1 span row, got %d", len(spans))
+	}
+	want := otelTraceIDToUUID(traceId)
+	if spans[0].TraceId != want {
+		t.Errorf("expected orphan span.TraceId %s (fallback to OTel trace_id), got %s", want, spans[0].TraceId)
+	}
+}
+
 // --- Helpers ---
 
 func makeAttrs(key, val string) []*commonpb.KeyValue {

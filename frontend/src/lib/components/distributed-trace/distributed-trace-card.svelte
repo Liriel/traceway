@@ -44,6 +44,8 @@
 		projectsState.selectProject(node.projectId);
 		if (node.traceType === 'task' && node.task) {
 			goto(`/tasks/${encodeURIComponent(node.task.taskName)}/${node.task.id}?preset=24h`);
+		} else if (node.traceType === 'ai_trace' && node.aiTrace) {
+			goto(`/ai-traces/${encodeURIComponent(node.aiTrace.traceName)}/${node.aiTrace.id}?preset=24h`);
 		} else if (node.traceType === 'exception' && node.exception) {
 			goto(`/issues/${node.exception.exceptionHash}?preset=24h`);
 		} else if (node.endpoint) {
@@ -93,6 +95,8 @@
 							<span class="truncate font-mono text-sm">
 								{#if node.traceType === 'task'}
 									{node.task?.taskName}
+								{:else if node.traceType === 'ai_trace'}
+									{node.aiTrace?.traceName}
 								{:else if node.traceType === 'exception'}
 									{node.exception?.stackTrace.split('\n')[0]}
 								{:else}
@@ -104,9 +108,16 @@
 									{node.endpoint.statusCode}
 								</span>
 							{/if}
+							{#if node.traceType === 'ai_trace' && node.aiTrace}
+								<Badge variant="secondary" class="shrink-0">{node.aiTrace.provider || node.aiTrace.model || 'AI'}</Badge>
+							{/if}
 							{#if node.traceType !== 'exception'}
 								<span class="shrink-0 font-mono text-sm text-muted-foreground">
-									{formatDuration(node.traceType === 'task' ? node.task?.duration ?? 0 : node.endpoint?.duration ?? 0)}
+									{formatDuration(
+										node.traceType === 'task' ? node.task?.duration ?? 0
+										: node.traceType === 'ai_trace' ? node.aiTrace?.duration ?? 0
+										: node.endpoint?.duration ?? 0
+									)}
 								</span>
 							{/if}
 							{#if node.exception}

@@ -18,7 +18,7 @@ import (
 type endpointRepository struct{}
 
 func (e *endpointRepository) InsertAsync(ctx context.Context, lines []models.Endpoint) error {
-	batch, err := chdb.Conn.PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)), "INSERT INTO endpoints (id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, attributes, app_version, server_name, distributed_trace_id, span_id, is_stream)")
+	batch, err := chdb.Conn.PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)), "INSERT INTO endpoints (id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, attributes, app_version, server_name, distributed_trace_id, span_id, is_stream, is_root)")
 	if err != nil {
 		return err
 	}
@@ -33,7 +33,11 @@ func (e *endpointRepository) InsertAsync(ctx context.Context, lines []models.End
 		if t.IsStream {
 			isStream = 1
 		}
-		if err := batch.Append(t.Id, t.ProjectId, t.Endpoint, int64(t.Duration), t.RecordedAt, t.StatusCode, t.BodySize, t.ClientIP, attributesJSON, t.AppVersion, t.ServerName, t.DistributedTraceId, t.SpanId, isStream); err != nil {
+		isRoot := uint8(0)
+		if t.IsRoot {
+			isRoot = 1
+		}
+		if err := batch.Append(t.Id, t.ProjectId, t.Endpoint, int64(t.Duration), t.RecordedAt, t.StatusCode, t.BodySize, t.ClientIP, attributesJSON, t.AppVersion, t.ServerName, t.DistributedTraceId, t.SpanId, isStream, isRoot); err != nil {
 			return err
 		}
 	}
@@ -91,7 +95,7 @@ func (e *endpointRepository) FindAll(ctx context.Context, projectId uuid.UUID, f
 	return endpoints, int64(count), nil
 }
 
-func (e *endpointRepository) FindGroupedByEndpoint(ctx context.Context, projectId uuid.UUID, fromDate, toDate time.Time, page, pageSize int, orderBy string, sortDirection string, search string) ([]models.EndpointStats, int64, error) {
+func (e *endpointRepository) FindGroupedByEndpoint(ctx context.Context, projectId uuid.UUID, fromDate, toDate time.Time, page, pageSize int, orderBy string, sortDirection string, search string, rootFilter string) ([]models.EndpointStats, int64, error) {
 	// Build WHERE clause with optional search filter
 	// Count query uses bare column names; main query uses e. prefix for LEFT JOIN
 	whereClause := "project_id = ? AND recorded_at >= ? AND recorded_at <= ?"
@@ -102,6 +106,15 @@ func (e *endpointRepository) FindGroupedByEndpoint(ctx context.Context, projectI
 		whereClause += " AND positionCaseInsensitive(endpoint, ?) > 0"
 		joinWhereClause += " AND positionCaseInsensitive(e.endpoint, ?) > 0"
 		args = append(args, search)
+	}
+
+	switch rootFilter {
+	case "root":
+		whereClause += " AND is_root = 1"
+		joinWhereClause += " AND e.is_root = 1"
+	case "non_root":
+		whereClause += " AND is_root = 0"
+		joinWhereClause += " AND e.is_root = 0"
 	}
 
 	// Count unique endpoints
@@ -140,7 +153,7 @@ func (e *endpointRepository) FindGroupedByEndpoint(ctx context.Context, projectI
 		endpoint, total_count as count, p50_duration, p95_duration, p99_duration,
 		avg_duration, last_seen, offset_ms,
 		satisfied_count, tolerating_count, bad_count, client_error_count,
-		server_error_count, is_stream,
+		server_error_count, is_stream, has_root, has_non_root,
 		if(is_stream = 1,
 			-- Streaming endpoints: skip Apdex + P99 (duration-driven, meaningless
 			-- for connection lifetimes). Substitute server_error_count for
@@ -213,9 +226,11 @@ func (e *endpointRepository) FindGroupedByEndpoint(ctx context.Context, projectI
 			countIf(duration > (1500000000 + toInt64(offset_ms) * 1000000)
 				OR status_code >= 500) as bad_count,
 			countIf(status_code >= 400 AND status_code < 500) as client_error_count,
-			countIf(status_code >= 500) as server_error_count
+			countIf(status_code >= 500) as server_error_count,
+			max(is_root) as has_root,
+			max(if(is_root = 0, 1, 0)) as has_non_root
 		FROM (
-			SELECT e.endpoint, e.duration, e.status_code, e.recorded_at, e.is_stream,
+			SELECT e.endpoint, e.duration, e.status_code, e.recorded_at, e.is_stream, e.is_root,
 				   s.offset_ms as offset_ms
 			FROM endpoints e
 			LEFT JOIN (SELECT * FROM slow_endpoints FINAL) AS s
@@ -242,13 +257,15 @@ func (e *endpointRepository) FindGroupedByEndpoint(ctx context.Context, projectI
 		var p50, p95, p99, avg float64
 		var offsetMs uint32
 		var satisfiedCount, toleratingCount, badCount, clientErrorCount, serverErrorCount uint64
-		var isStream uint8
+		var isStream, hasRoot, hasNonRoot uint8
 		if err := rows.Scan(&s.Endpoint, &s.Count, &p50, &p95, &p99, &avg, &s.LastSeen,
 			&offsetMs, &satisfiedCount, &toleratingCount, &badCount, &clientErrorCount,
-			&serverErrorCount, &isStream, &s.Impact); err != nil {
+			&serverErrorCount, &isStream, &hasRoot, &hasNonRoot, &s.Impact); err != nil {
 			return nil, 0, err
 		}
 		s.IsStream = isStream == 1
+		s.HasRoot = hasRoot == 1
+		s.HasNonRoot = hasNonRoot == 1
 		if s.IsStream {
 			// Latency/Apdex are zero for streams. Impact came from the
 			// stream-specific branch of the SQL (status-code components only);
@@ -321,17 +338,19 @@ func (e *endpointRepository) FindByEndpoint(ctx context.Context, projectId uuid.
 
 // FindById returns a single endpoint by ID
 func (e *endpointRepository) FindById(ctx context.Context, projectId, endpointId uuid.UUID) (*models.Endpoint, error) {
-	query := `SELECT id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, attributes, app_version, server_name, distributed_trace_id, span_id
+	query := `SELECT id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, attributes, app_version, server_name, distributed_trace_id, span_id, is_root
 		FROM endpoints
 		WHERE project_id = ? AND id = ?
 		LIMIT 1`
 
 	var t models.Endpoint
 	var attributesJSON string
+	var isRoot uint8
 
 	err := chdb.Conn.QueryRow(ctx, query, projectId, endpointId).Scan(
 		&t.Id, &t.ProjectId, &t.Endpoint, &t.Duration, &t.RecordedAt,
-		&t.StatusCode, &t.BodySize, &t.ClientIP, &attributesJSON, &t.AppVersion, &t.ServerName, &t.DistributedTraceId, &t.SpanId)
+		&t.StatusCode, &t.BodySize, &t.ClientIP, &attributesJSON, &t.AppVersion, &t.ServerName, &t.DistributedTraceId, &t.SpanId, &isRoot)
+	t.IsRoot = isRoot == 1
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

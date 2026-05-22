@@ -20,6 +20,27 @@ type aiTraceConversation struct {
 	Content    []byte
 }
 
+type entityKind int
+
+const (
+	entityNone entityKind = iota
+	entityEndpoint
+	entityTask
+	entityAiTrace
+)
+
+func (k entityKind) traceType() string {
+	switch k {
+	case entityEndpoint:
+		return "endpoint"
+	case entityTask:
+		return "task"
+	case entityAiTrace:
+		return "ai_trace"
+	}
+	return ""
+}
+
 func convertTraces(projectId uuid.UUID, req *coltracepb.ExportTraceServiceRequest) (
 	endpoints []models.Endpoint,
 	tasks []models.Task,
@@ -41,14 +62,13 @@ func convertTraces(projectId uuid.UUID, req *coltracepb.ExportTraceServiceReques
 			}
 		}
 
-		// First pass: collect all spans and build parent→child relationships
 		type spanEntry struct {
 			span      *tracepb.Span
 			scopeName string
 		}
 		var allSpans []spanEntry
-		parentMap := map[string]string{}        // childSpanId → parentSpanId
-		spanById := map[string]*tracepb.Span{}  // spanId → span (for trace_id lookup)
+		parentMap := map[string]string{}
+		spanById := map[string]*tracepb.Span{}
 		for _, ss := range rs.ScopeSpans {
 			for _, span := range ss.Spans {
 				allSpans = append(allSpans, spanEntry{span: span, scopeName: ss.GetScope().GetName()})
@@ -59,88 +79,157 @@ func convertTraces(projectId uuid.UUID, req *coltracepb.ExportTraceServiceReques
 			}
 		}
 
-		// Build spanToTraceId. Prefer each span's native OTel trace_id so logs on
-		// the wire (which carry trace_id as hex) can be joined against the
-		// converted traces via traceIdUuidToHex(endpoint.id). Fall back to walking
-		// parents + minting a UUID only when the OTel trace_id is missing or
-		// malformed — an unusual case but worth handling defensively.
-		spanToTraceId := map[string]uuid.UUID{}
-		var resolveTraceId func(spanIdStr string) uuid.UUID
-		resolveTraceId = func(spanIdStr string) uuid.UUID {
-			if tid, ok := spanToTraceId[spanIdStr]; ok {
-				return tid
-			}
-			if sp, ok := spanById[spanIdStr]; ok && len(sp.TraceId) > 0 {
-				if tid := otelTraceIDToUUID(sp.TraceId); tid != uuid.Nil {
-					spanToTraceId[spanIdStr] = tid
-					return tid
-				}
-			}
-			if parentId, hasParent := parentMap[spanIdStr]; hasParent {
-				tid := resolveTraceId(parentId)
-				spanToTraceId[spanIdStr] = tid
-				return tid
-			}
-			tid := uuid.New()
-			spanToTraceId[spanIdStr] = tid
-			return tid
+		// Pass 1: classify each span by Kind/attrs and assign an entity id.
+		// Roots get id = otelTraceIDToUUID(trace_id); non-roots get id = otelSpanIDToUUID(span_id).
+		// distributed_trace_id = otelTraceIDToUUID(trace_id) for both, unless overridden by
+		// the vendor `traceway.distributed_trace_id` attribute.
+		type promotion struct {
+			kind               entityKind
+			id                 uuid.UUID
+			isRoot             bool
+			distributedTraceId *uuid.UUID
 		}
-		for _, entry := range allSpans {
-			resolveTraceId(string(entry.span.SpanId))
-		}
+		spanIdToPromotion := map[string]promotion{}
 
-		// Second pass: process spans and create records
 		for _, entry := range allSpans {
 			span := entry.span
-			spanAttrs := span.Attributes
-			allAttrs := extractAttributes(spanAttrs)
+			kind := classifySpan(span, spanById)
+			if kind == entityNone {
+				continue
+			}
 
 			isRoot := len(span.ParentSpanId) == 0
-			traceId := spanToTraceId[string(span.SpanId)]
 
-			spanId := otelSpanIDToUUID(span.SpanId)
-			startTime := nanoToTime(span.StartTimeUnixNano)
-			endTime := nanoToTime(span.EndTimeUnixNano)
-			duration := endTime.Sub(startTime)
+			var id uuid.UUID
+			if isRoot {
+				id = otelTraceIDToUUID(span.TraceId)
+				if id == uuid.Nil {
+					id = otelSpanIDToUUID(span.SpanId)
+				}
+			} else {
+				id = otelSpanIDToUUID(span.SpanId)
+				if id == uuid.Nil {
+					id = uuid.New()
+				}
+			}
 
+			dtId := otelTraceIDToUUID(span.TraceId)
 			var distributedTraceId *uuid.UUID
-			if dtid := getStringAttribute(spanAttrs, "traceway.distributed_trace_id"); dtid != "" {
-				if parsed, err := uuid.Parse(dtid); err == nil {
+			if dtId != uuid.Nil {
+				distributedTraceId = &dtId
+			}
+			if override := getStringAttribute(span.Attributes, "traceway.distributed_trace_id"); override != "" {
+				if parsed, err := uuid.Parse(override); err == nil {
 					distributedTraceId = &parsed
 				}
 			}
 
-			if isRoot {
-				rootSpanId := spanId
-				if (span.Kind == tracepb.Span_SPAN_KIND_SERVER || span.Kind == tracepb.Span_SPAN_KIND_INTERNAL) && hasHTTPAttributes(spanAttrs) {
+			spanIdToPromotion[string(span.SpanId)] = promotion{
+				kind:               kind,
+				id:                 id,
+				isRoot:             isRoot,
+				distributedTraceId: distributedTraceId,
+			}
+		}
+
+		// resolveOwner walks parents until it finds a promoted entity. Returns the
+		// promotion (so callers know the kind for trace_type) and whether one was
+		// found. Cached per span id within this resource batch.
+		ownerCache := map[string]*promotion{}
+		var resolveOwner func(spanIdStr string) *promotion
+		resolveOwner = func(spanIdStr string) *promotion {
+			if cached, ok := ownerCache[spanIdStr]; ok {
+				return cached
+			}
+			if p, ok := spanIdToPromotion[spanIdStr]; ok {
+				pp := p
+				ownerCache[spanIdStr] = &pp
+				return &pp
+			}
+			parentId, hasParent := parentMap[spanIdStr]
+			if !hasParent {
+				ownerCache[spanIdStr] = nil
+				return nil
+			}
+			owner := resolveOwner(parentId)
+			ownerCache[spanIdStr] = owner
+			return owner
+		}
+
+		// Pass 2: emit entity rows + span rows + exceptions.
+		for _, entry := range allSpans {
+			span := entry.span
+			spanAttrs := span.Attributes
+			allAttrs := extractAttributes(spanAttrs)
+			startTime := nanoToTime(span.StartTimeUnixNano)
+			endTime := nanoToTime(span.EndTimeUnixNano)
+			duration := endTime.Sub(startTime)
+
+			prom, promoted := spanIdToPromotion[string(span.SpanId)]
+
+			// Determine the owning entity for span/exception trace_id.
+			var owner *promotion
+			if promoted {
+				p := prom
+				owner = &p
+			} else {
+				owner = resolveOwner(string(span.SpanId))
+			}
+
+			// trace_id for span rows / exceptions: owning entity id when known;
+			// otherwise fall back to the OTel trace_id (orphan path — preserves
+			// today's behavior for cross-process children whose parent never
+			// matched a promoted entity within this batch).
+			var ownerId uuid.UUID
+			var ownerTraceType string
+			if owner != nil {
+				ownerId = owner.id
+				ownerTraceType = owner.kind.traceType()
+			} else {
+				ownerId = otelTraceIDToUUID(span.TraceId)
+				if ownerId == uuid.Nil {
+					ownerId = uuid.New()
+				}
+			}
+
+			if promoted {
+				rootSpanId := otelSpanIDToUUID(span.SpanId)
+				switch prom.kind {
+				case entityEndpoint:
 					ep := buildEndpoint(
-						traceId, projectId, span, spanAttrs, allAttrs,
+						prom.id, projectId, span, spanAttrs, allAttrs,
 						startTime, duration, serverName, appVersion,
 					)
-					ep.DistributedTraceId = distributedTraceId
+					ep.DistributedTraceId = prom.distributedTraceId
 					ep.SpanId = &rootSpanId
+					ep.IsRoot = prom.isRoot
 					endpoints = append(endpoints, ep)
-				} else if span.Kind == tracepb.Span_SPAN_KIND_CONSUMER {
+				case entityTask:
 					t := buildTask(
-						traceId, projectId, span, allAttrs,
+						prom.id, projectId, span, allAttrs,
 						startTime, endTime, duration, serverName, appVersion,
 					)
-					t.DistributedTraceId = distributedTraceId
+					t.DistributedTraceId = prom.distributedTraceId
 					t.SpanId = &rootSpanId
+					t.IsRoot = prom.isRoot
 					tasks = append(tasks, t)
-				} else if hasGenAiAttributes(spanAttrs) {
+				case entityAiTrace:
 					aiTrace := buildAiTrace(
-						traceId, projectId, span, spanAttrs, allAttrs,
+						prom.id, projectId, span, spanAttrs, allAttrs,
 						startTime, duration, serverName, appVersion,
 					)
+					aiTrace.DistributedTraceId = prom.distributedTraceId
+					aiTrace.IsRoot = prom.isRoot
 					aiTraces = append(aiTraces, aiTrace)
-					if conv := extractConversation(spanAttrs, projectId, traceId); conv != nil {
+					if conv := extractConversation(spanAttrs, projectId, prom.id); conv != nil {
 						aiConversations = append(aiConversations, *conv)
 					}
-				} else {
-					continue
 				}
-			} else {
+			} else if len(span.ParentSpanId) > 0 {
+				// Non-root, unpromoted span → goes to the generic spans table,
+				// re-rooted to its nearest enclosing entity (or the OTel
+				// trace_id as fallback when the parent chain doesn't reach a
+				// promoted span in this batch).
 				spanName := span.Name
 				if dbQuery := getStringAttribute(spanAttrs, "db.query.text"); dbQuery != "" {
 					spanName = dbQuery
@@ -149,8 +238,8 @@ func convertTraces(projectId uuid.UUID, req *coltracepb.ExportTraceServiceReques
 				}
 
 				spans = append(spans, models.Span{
-					Id:           spanId,
-					TraceId:      traceId,
+					Id:           otelSpanIDToUUID(span.SpanId),
+					TraceId:      ownerId,
 					ProjectId:    projectId,
 					Name:         spanName,
 					StartTime:    startTime,
@@ -158,26 +247,59 @@ func convertTraces(projectId uuid.UUID, req *coltracepb.ExportTraceServiceReques
 					RecordedAt:   startTime,
 					ParentSpanId: ptrSpanUUID(span.ParentSpanId),
 				})
+			} else {
+				// Unpromoted root span — match historical behavior and drop
+				// it (no entity row, no span row, no exception). Common case:
+				// CLIENT-kind roots or non-HTTP SERVER roots from custom
+				// instrumentation that we don't have a dedicated page for.
+				continue
 			}
 
-			traceType := "task"
-			if isRoot && (span.Kind == tracepb.Span_SPAN_KIND_SERVER || span.Kind == tracepb.Span_SPAN_KIND_INTERNAL) && hasHTTPAttributes(spanAttrs) {
-				traceType = "endpoint"
+			traceType := ownerTraceType
+			if traceType == "" {
+				traceType = "task"
 			}
 
 			for _, event := range span.Events {
 				if event.Name == "exception" {
 					exc := buildException(
-						projectId, traceId, traceType, event,
+						projectId, ownerId, traceType, event,
 						allAttrs, serverName, appVersion,
 					)
-					exc.DistributedTraceId = distributedTraceId
+					if owner != nil {
+						exc.DistributedTraceId = owner.distributedTraceId
+					}
 					exceptions = append(exceptions, exc)
 				}
 			}
 		}
 	}
 	return
+}
+
+func classifySpan(span *tracepb.Span, spanById map[string]*tracepb.Span) entityKind {
+	attrs := span.Attributes
+	if (span.Kind == tracepb.Span_SPAN_KIND_SERVER || span.Kind == tracepb.Span_SPAN_KIND_INTERNAL) && hasHTTPAttributes(attrs) {
+		if len(span.ParentSpanId) == 0 {
+			return entityEndpoint
+		}
+		if _, parentInBatch := spanById[string(span.ParentSpanId)]; !parentInBatch {
+			return entityEndpoint
+		}
+	}
+	if span.Kind == tracepb.Span_SPAN_KIND_CONSUMER {
+		return entityTask
+	}
+	// keepsuit's ConsoleInstrumentation (and equivalents) emits a root INTERNAL
+	// span with `console.command` set. Only promote when it is a root span —
+	// otherwise we would scoop up arbitrary manual roots from other code paths.
+	if span.Kind == tracepb.Span_SPAN_KIND_INTERNAL && len(span.ParentSpanId) == 0 && getStringAttribute(attrs, "console.command") != "" {
+		return entityTask
+	}
+	if hasGenAiAttributes(attrs) {
+		return entityAiTrace
+	}
+	return entityNone
 }
 
 func hasHTTPAttributes(attrs []*commonpb.KeyValue) bool {

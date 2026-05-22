@@ -18,6 +18,7 @@ type Task struct {
 	ServerName         string            `json:"serverName" ch:"server_name"`
 	DistributedTraceId *uuid.UUID        `json:"distributedTraceId,omitempty" ch:"distributed_trace_id"`
 	SpanId             *uuid.UUID        `json:"spanId,omitempty" ch:"span_id"`
+	IsRoot             bool              `json:"isRoot" ch:"is_root"`
 }
 
 type TaskStats struct {
@@ -27,6 +28,8 @@ type TaskStats struct {
 	P95Duration time.Duration `json:"p95Duration"`
 	AvgDuration time.Duration `json:"avgDuration"`
 	LastSeen    time.Time     `json:"lastSeen"`
+	HasRoot     bool          `json:"hasRoot"`
+	HasNonRoot  bool          `json:"hasNonRoot"`
 }
 
 // TaskDetailStats contains detailed statistics for a specific task

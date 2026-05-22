@@ -1,7 +1,7 @@
 export type DistributedTraceNode = {
 	projectId: string;
 	projectName: string;
-	traceType: 'endpoint' | 'task' | 'exception';
+	traceType: 'endpoint' | 'task' | 'ai_trace' | 'exception';
 	endpoint?: {
 		id: string;
 		endpoint: string;
@@ -13,6 +13,16 @@ export type DistributedTraceNode = {
 		id: string;
 		taskName: string;
 		duration: number;
+		recordedAt: string;
+	};
+	aiTrace?: {
+		id: string;
+		traceName: string;
+		model: string;
+		provider: string;
+		duration: number;
+		totalTokens: number;
+		totalCost: number;
 		recordedAt: string;
 	};
 	spans: any[];

@@ -10,6 +10,8 @@
     import { PaginationFooter } from "$lib/components/ui/pagination-footer";
     import { TimeRangePicker } from "$lib/components/ui/time-range-picker";
     import { SearchBar } from "$lib/components/ui/search-bar";
+    import { RootFilter } from "$lib/components/ui/root-filter";
+    import { NonRootChip } from "$lib/components/ui/non-root-chip";
     import { browser } from '$app/environment';
     import { CalendarDate } from "@internationalized/date";
     import { projectsState } from '$lib/state/projects.svelte';
@@ -45,6 +47,8 @@
         avgInputTokens: number;
         avgOutputTokens: number;
         lastSeen: string;
+        hasRoot: boolean;
+        hasNonRoot: boolean;
     };
 
     type SortField = 'count' | 'p50_duration' | 'p95_duration' | 'total_tokens' | 'total_cost' | 'last_seen';
@@ -59,14 +63,15 @@
     let total = $state(0);
     let totalPages = $state(0);
 
-    // Parse URL params including search
+    // Parse URL params including search + rootFilter
     function parseAiTracesUrlParams() {
-        if (!browser) return { preset: '24h', from: null, to: null, search: '' };
+        if (!browser) return { preset: '24h', from: null, to: null, search: '', rootFilter: 'all' };
         const params = new URLSearchParams(window.location.search);
         const timeParams = parseTimeRangeFromUrl(timezone, '24h');
         return {
             ...timeParams,
-            search: params.get('search') || ''
+            search: params.get('search') || '',
+            rootFilter: params.get('rootFilter') || 'all'
         };
     }
 
@@ -74,8 +79,9 @@
     const initialUrlParams = parseAiTracesUrlParams();
     const initialRange = getResolvedTimeRange(initialUrlParams, timezone);
 
-    // Search state
+    // Search + rootFilter state
     let searchQuery = $state(initialUrlParams.search);
+    let rootFilter = $state(initialUrlParams.rootFilter);
 
     // Date Range State
     let selectedPreset = $state<string | null>(initialUrlParams.preset);
@@ -96,6 +102,9 @@
         if (searchQuery.trim()) {
             params.search = searchQuery.trim();
         }
+        if (rootFilter && rootFilter !== 'all') {
+            params.rootFilter = rootFilter;
+        }
         updateUrl(params, { pushToHistory });
     }
 
@@ -110,6 +119,7 @@
         toDate = dateToCalendarDate(range.to, timezone);
         toTime = dateToTimeString(range.to, timezone);
         searchQuery = urlParams.search;
+        rootFilter = urlParams.rootFilter;
 
         page = 1;
         loadData(false);
@@ -189,7 +199,8 @@
                     page: page,
                     pageSize: pageSize
                 },
-                search: searchQuery.trim()
+                search: searchQuery.trim(),
+                rootFilter: rootFilter === 'all' ? '' : rootFilter
             };
 
             const response = await api.post('/ai-traces/grouped', requestBody, { projectId: projectsState.currentProjectId ?? undefined });
@@ -269,7 +280,11 @@
         bind:value={searchQuery}
         onSearch={handleSearch}
         disabled={loading}
-    />
+    >
+        {#snippet children()}
+            <RootFilter bind:value={rootFilter} />
+        {/snippet}
+    </SearchBar>
 
     <!-- AI Traces Table -->
     <div class="rounded-md border overflow-hidden">
@@ -367,6 +382,9 @@
                     >
                         <Table.Cell class="font-mono text-sm">
                             {trace.traceName}
+                            {#if trace.hasNonRoot}
+                                <NonRootChip mixed={trace.hasRoot && trace.hasNonRoot} />
+                            {/if}
                         </Table.Cell>
                         <Table.Cell class="tabular-nums">
                             {formatCount(trace.count)}

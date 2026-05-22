@@ -9,7 +9,11 @@
     import { TableEmptyState } from "$lib/components/ui/table-empty-state";
     import { PaginationFooter } from "$lib/components/ui/pagination-footer";
     import { TimeRangePicker } from "$lib/components/ui/time-range-picker";
+    import { SearchBar } from '$lib/components/ui/search-bar';
+    import { RootFilter } from '$lib/components/ui/root-filter';
+    import { NonRootChip } from '$lib/components/ui/non-root-chip';
     import { CalendarDate } from "@internationalized/date";
+    import { browser } from '$app/environment';
     import { projectsState } from '$lib/state/projects.svelte';
     import { createRowClickHandler } from '$lib/utils/navigation';
     import { resolve } from '$app/paths';
@@ -39,6 +43,8 @@
         p95Duration: number;
         avgDuration: number;
         lastSeen: string;
+        hasRoot: boolean;
+        hasNonRoot: boolean;
     };
 
     type SortField = 'count' | 'p50_duration' | 'p95_duration' | 'last_seen';
@@ -57,6 +63,19 @@
     const initialUrlParams = parseTimeRangeFromUrl(timezone);
     const initialRange = getResolvedTimeRange(initialUrlParams, timezone);
 
+    function readSearchAndFilterFromUrl() {
+        if (!browser) return { search: '', rootFilter: 'all' };
+        const params = new URLSearchParams(window.location.search);
+        return {
+            search: params.get('search') || '',
+            rootFilter: params.get('rootFilter') || 'all'
+        };
+    }
+
+    const initialSearchState = readSearchAndFilterFromUrl();
+    let searchQuery = $state(initialSearchState.search);
+    let rootFilter = $state(initialSearchState.rootFilter);
+
     // Date Range State
     let selectedPreset = $state<string | null>(initialUrlParams.preset);
     let fromDate = $state<CalendarDate>(dateToCalendarDate(initialRange.from, timezone));
@@ -64,14 +83,14 @@
     let fromTime = $state(dateToTimeString(initialRange.from, timezone));
     let toTime = $state(dateToTimeString(initialRange.to, timezone));
 
-    // Update URL with current time range
+    // Update URL with current time range + search + rootFilter
     function updateTimeRangeUrl(pushToHistory = true) {
-        updateUrl(
-            selectedPreset
-                ? { preset: selectedPreset }
-                : { from: getFromDateTimeUTC(), to: getToDateTimeUTC() },
-            { pushToHistory }
-        );
+        const params: Record<string, string | undefined> = selectedPreset
+            ? { preset: selectedPreset }
+            : { from: getFromDateTimeUTC(), to: getToDateTimeUTC() };
+        if (searchQuery) params.search = searchQuery;
+        if (rootFilter && rootFilter !== 'all') params.rootFilter = rootFilter;
+        updateUrl(params, { pushToHistory });
     }
 
     // Handle browser back/forward navigation
@@ -149,6 +168,8 @@
                 toDate: getToDateTimeUTC(),
                 orderBy: orderBy,
                 sortDirection: sortDirection,
+                search: searchQuery,
+                rootFilter: rootFilter === 'all' ? '' : rootFilter,
                 pagination: {
                     page: page,
                     pageSize: pageSize
@@ -190,6 +211,11 @@
         loadData(false);
     }
 
+    function handleSearch() {
+        page = 1;
+        loadData(true);
+    }
+
     onMount(() => {
         // Add popstate listener for back/forward navigation
         window.addEventListener('popstate', handlePopState);
@@ -211,7 +237,12 @@
 
         <PageHeader title="Tasks" />
 
-        <div class="flex flex-col">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <SearchBar placeholder="Search tasks..." bind:value={searchQuery} onSearch={handleSearch}>
+                {#snippet children()}
+                    <RootFilter bind:value={rootFilter} />
+                {/snippet}
+            </SearchBar>
             <TimeRangePicker
                 bind:fromDate
                 bind:toDate
@@ -292,6 +323,9 @@
                     >
                         <Table.Cell class="font-mono text-sm">
                             {task.taskName}
+                            {#if task.hasNonRoot}
+                                <NonRootChip mixed={task.hasRoot && task.hasNonRoot} />
+                            {/if}
                         </Table.Cell>
                         <Table.Cell class="tabular-nums">
                             {formatCount(task.count)}
