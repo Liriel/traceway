@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
@@ -19,7 +20,7 @@ type aiTraceRepository struct{}
 
 func (r *aiTraceRepository) InsertAsync(ctx context.Context, lines []models.AiTrace) error {
 	batch, err := chdb.Conn.PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)),
-		"INSERT INTO ai_traces (id, project_id, recorded_at, duration, status_code, model, response_model, provider, operation, input_tokens, output_tokens, total_tokens, cached_tokens, reasoning_tokens, input_cost, output_cost, total_cost, trace_name, user_id, finish_reason, server_name, app_version, storage_key, attributes)")
+		"INSERT INTO ai_traces (id, project_id, recorded_at, duration, status_code, model, response_model, provider, operation, input_tokens, output_tokens, total_tokens, cached_tokens, reasoning_tokens, input_cost, output_cost, total_cost, trace_name, user_id, finish_reason, server_name, app_version, storage_key, attributes, distributed_trace_id, is_root)")
 	if err != nil {
 		return err
 	}
@@ -30,13 +31,17 @@ func (r *aiTraceRepository) InsertAsync(ctx context.Context, lines []models.AiTr
 				attributesJSON = string(attributesBytes)
 			}
 		}
+		isRoot := uint8(0)
+		if t.IsRoot {
+			isRoot = 1
+		}
 		if err := batch.Append(
 			t.Id, t.ProjectId, t.RecordedAt, int64(t.Duration), t.StatusCode,
 			t.Model, t.ResponseModel, t.Provider, t.Operation,
 			t.InputTokens, t.OutputTokens, t.TotalTokens, t.CachedTokens, t.ReasoningTokens,
 			t.InputCost, t.OutputCost, t.TotalCost,
 			t.TraceName, t.UserId, t.FinishReason, t.ServerName, t.AppVersion,
-			t.StorageKey, attributesJSON,
+			t.StorageKey, attributesJSON, t.DistributedTraceId, isRoot,
 		); err != nil {
 			return err
 		}
@@ -44,13 +49,19 @@ func (r *aiTraceRepository) InsertAsync(ctx context.Context, lines []models.AiTr
 	return batch.Send()
 }
 
-func (r *aiTraceRepository) FindGroupedByTraceName(ctx context.Context, projectId uuid.UUID, fromDate, toDate time.Time, page, pageSize int, orderBy, sortDirection, search string) ([]models.AiTraceStats, int64, error) {
+func (r *aiTraceRepository) FindGroupedByTraceName(ctx context.Context, projectId uuid.UUID, fromDate, toDate time.Time, page, pageSize int, orderBy, sortDirection, search, rootFilter string) ([]models.AiTraceStats, int64, error) {
 	whereClause := "project_id = ? AND recorded_at >= ? AND recorded_at <= ?"
 	args := []interface{}{projectId, fromDate, toDate}
 
 	if search != "" {
 		whereClause += " AND positionCaseInsensitive(trace_name, ?) > 0"
 		args = append(args, search)
+	}
+	switch rootFilter {
+	case "root":
+		whereClause += " AND is_root = 1"
+	case "non_root":
+		whereClause += " AND is_root = 0"
 	}
 
 	var count uint64
@@ -90,7 +101,9 @@ func (r *aiTraceRepository) FindGroupedByTraceName(ctx context.Context, projectI
 		sum(total_cost) as total_cost,
 		avg(input_tokens) as avg_input_tokens,
 		avg(output_tokens) as avg_output_tokens,
-		max(recorded_at) as last_seen
+		max(recorded_at) as last_seen,
+		max(is_root) as has_root,
+		max(if(is_root = 0, 1, 0)) as has_non_root
 	FROM ai_traces
 	WHERE ` + whereClause + `
 	GROUP BY trace_name
@@ -108,13 +121,16 @@ func (r *aiTraceRepository) FindGroupedByTraceName(ctx context.Context, projectI
 	for rows.Next() {
 		var s models.AiTraceStats
 		var p50, p95, avg float64
+		var hasRoot, hasNonRoot uint8
 		if err := rows.Scan(&s.TraceName, &s.Count, &p50, &p95, &avg,
-			&s.TotalTokens, &s.TotalCost, &s.AvgInputTokens, &s.AvgOutputTokens, &s.LastSeen); err != nil {
+			&s.TotalTokens, &s.TotalCost, &s.AvgInputTokens, &s.AvgOutputTokens, &s.LastSeen, &hasRoot, &hasNonRoot); err != nil {
 			return nil, 0, err
 		}
 		s.P50Duration = time.Duration(p50)
 		s.P95Duration = time.Duration(p95)
 		s.AvgDuration = time.Duration(avg)
+		s.HasRoot = hasRoot == 1
+		s.HasNonRoot = hasNonRoot == 1
 		stats = append(stats, s)
 	}
 
@@ -236,13 +252,14 @@ func (r *aiTraceRepository) FindById(ctx context.Context, projectId, traceId uui
 		input_tokens, output_tokens, total_tokens, cached_tokens, reasoning_tokens,
 		input_cost, output_cost, total_cost,
 		trace_name, user_id, finish_reason, server_name, app_version,
-		storage_key, attributes
+		storage_key, attributes, distributed_trace_id, is_root
 	FROM ai_traces
 	WHERE project_id = ? AND id = ?
 	LIMIT 1`
 
 	var t models.AiTrace
 	var attributesJSON string
+	var isRoot uint8
 
 	err := chdb.Conn.QueryRow(ctx, query, projectId, traceId).Scan(
 		&t.Id, &t.ProjectId, &t.RecordedAt, &t.Duration, &t.StatusCode,
@@ -250,7 +267,7 @@ func (r *aiTraceRepository) FindById(ctx context.Context, projectId, traceId uui
 		&t.InputTokens, &t.OutputTokens, &t.TotalTokens, &t.CachedTokens, &t.ReasoningTokens,
 		&t.InputCost, &t.OutputCost, &t.TotalCost,
 		&t.TraceName, &t.UserId, &t.FinishReason, &t.ServerName, &t.AppVersion,
-		&t.StorageKey, &attributesJSON,
+		&t.StorageKey, &attributesJSON, &t.DistributedTraceId, &isRoot,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -258,6 +275,7 @@ func (r *aiTraceRepository) FindById(ctx context.Context, projectId, traceId uui
 		}
 		return nil, err
 	}
+	t.IsRoot = isRoot == 1
 
 	if attributesJSON != "" && attributesJSON != "{}" {
 		if err := json.Unmarshal([]byte(attributesJSON), &t.Attributes); err != nil {
@@ -266,6 +284,59 @@ func (r *aiTraceRepository) FindById(ctx context.Context, projectId, traceId uui
 	}
 
 	return &t, nil
+}
+
+func (r *aiTraceRepository) FindByDistributedTraceId(ctx context.Context, distributedTraceId uuid.UUID, projectIds []uuid.UUID) ([]models.AiTrace, error) {
+	if len(projectIds) == 0 {
+		return nil, nil
+	}
+	placeholders := make([]string, len(projectIds))
+	args := []interface{}{distributedTraceId}
+	for i, pid := range projectIds {
+		placeholders[i] = "?"
+		args = append(args, pid)
+		_ = i
+	}
+	query := `SELECT id, project_id, recorded_at, duration, status_code,
+		model, response_model, provider, operation,
+		input_tokens, output_tokens, total_tokens, cached_tokens, reasoning_tokens,
+		input_cost, output_cost, total_cost,
+		trace_name, user_id, finish_reason, server_name, app_version,
+		storage_key, attributes, distributed_trace_id, is_root
+	FROM ai_traces
+	WHERE distributed_trace_id = ? AND project_id IN (` + strings.Join(placeholders, ",") + `)
+	ORDER BY recorded_at ASC`
+
+	rows, err := chdb.Conn.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var traces []models.AiTrace
+	for rows.Next() {
+		var t models.AiTrace
+		var attributesJSON string
+		var isRoot uint8
+		if err := rows.Scan(
+			&t.Id, &t.ProjectId, &t.RecordedAt, &t.Duration, &t.StatusCode,
+			&t.Model, &t.ResponseModel, &t.Provider, &t.Operation,
+			&t.InputTokens, &t.OutputTokens, &t.TotalTokens, &t.CachedTokens, &t.ReasoningTokens,
+			&t.InputCost, &t.OutputCost, &t.TotalCost,
+			&t.TraceName, &t.UserId, &t.FinishReason, &t.ServerName, &t.AppVersion,
+			&t.StorageKey, &attributesJSON, &t.DistributedTraceId, &isRoot,
+		); err != nil {
+			return nil, err
+		}
+		t.IsRoot = isRoot == 1
+		if attributesJSON != "" && attributesJSON != "{}" {
+			if err := json.Unmarshal([]byte(attributesJSON), &t.Attributes); err != nil {
+				t.Attributes = nil
+			}
+		}
+		traces = append(traces, t)
+	}
+	return traces, nil
 }
 
 var AiTraceRepository = aiTraceRepository{}

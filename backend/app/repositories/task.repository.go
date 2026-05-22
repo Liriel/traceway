@@ -18,7 +18,7 @@ import (
 type taskRepository struct{}
 
 func (e *taskRepository) InsertAsync(ctx context.Context, lines []models.Task) error {
-	batch, err := chdb.Conn.PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)), "INSERT INTO tasks (id, project_id, task_name, duration, recorded_at, client_ip, attributes, app_version, server_name, distributed_trace_id, span_id)")
+	batch, err := chdb.Conn.PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)), "INSERT INTO tasks (id, project_id, task_name, duration, recorded_at, client_ip, attributes, app_version, server_name, distributed_trace_id, span_id, is_root)")
 	if err != nil {
 		return err
 	}
@@ -29,7 +29,11 @@ func (e *taskRepository) InsertAsync(ctx context.Context, lines []models.Task) e
 				attributesJSON = string(attributesBytes)
 			}
 		}
-		if err := batch.Append(t.Id, t.ProjectId, t.TaskName, int64(t.Duration), t.RecordedAt, t.ClientIP, attributesJSON, t.AppVersion, t.ServerName, t.DistributedTraceId, t.SpanId); err != nil {
+		isRoot := uint8(0)
+		if t.IsRoot {
+			isRoot = 1
+		}
+		if err := batch.Append(t.Id, t.ProjectId, t.TaskName, int64(t.Duration), t.RecordedAt, t.ClientIP, attributesJSON, t.AppVersion, t.ServerName, t.DistributedTraceId, t.SpanId, isRoot); err != nil {
 			return err
 		}
 	}
@@ -85,10 +89,22 @@ func (e *taskRepository) FindAll(ctx context.Context, projectId uuid.UUID, fromD
 	return tasks, int64(count), nil
 }
 
-func (e *taskRepository) FindGroupedByTaskName(ctx context.Context, projectId uuid.UUID, fromDate, toDate time.Time, page, pageSize int, orderBy string, sortDirection string) ([]models.TaskStats, int64, error) {
-	// Count unique task names
+func (e *taskRepository) FindGroupedByTaskName(ctx context.Context, projectId uuid.UUID, fromDate, toDate time.Time, page, pageSize int, orderBy string, sortDirection string, search string, rootFilter string) ([]models.TaskStats, int64, error) {
+	whereClause := "project_id = ? AND recorded_at >= ? AND recorded_at <= ?"
+	args := []interface{}{projectId, fromDate, toDate}
+	if search != "" {
+		whereClause += " AND positionCaseInsensitive(task_name, ?) > 0"
+		args = append(args, search)
+	}
+	switch rootFilter {
+	case "root":
+		whereClause += " AND is_root = 1"
+	case "non_root":
+		whereClause += " AND is_root = 0"
+	}
+
 	var count uint64
-	err := chdb.Conn.QueryRow(ctx, "SELECT uniq(task_name) FROM tasks WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ?", projectId, fromDate, toDate).Scan(&count)
+	err := chdb.Conn.QueryRow(ctx, "SELECT uniq(task_name) FROM tasks WHERE "+whereClause, args...).Scan(&count)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -122,14 +138,17 @@ func (e *taskRepository) FindGroupedByTaskName(ctx context.Context, projectId uu
 		quantile(0.5)(duration) as p50_duration,
 		quantile(0.95)(duration) as p95_duration,
 		avg(duration) as avg_duration,
-		max(recorded_at) as last_seen
+		max(recorded_at) as last_seen,
+		max(is_root) as has_root,
+		max(if(is_root = 0, 1, 0)) as has_non_root
 	FROM tasks
-	WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ?
+	WHERE ` + whereClause + `
 	GROUP BY task_name
 	ORDER BY ` + orderExpr + ` ` + sortDir + `
 	LIMIT ? OFFSET ?`
 
-	rows, err := chdb.Conn.Query(ctx, query, projectId, fromDate, toDate, pageSize, offset)
+	queryArgs := append(args, pageSize, offset)
+	rows, err := chdb.Conn.Query(ctx, query, queryArgs...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -139,12 +158,15 @@ func (e *taskRepository) FindGroupedByTaskName(ctx context.Context, projectId uu
 	for rows.Next() {
 		var s models.TaskStats
 		var p50, p95, avg float64
-		if err := rows.Scan(&s.TaskName, &s.Count, &p50, &p95, &avg, &s.LastSeen); err != nil {
+		var hasRoot, hasNonRoot uint8
+		if err := rows.Scan(&s.TaskName, &s.Count, &p50, &p95, &avg, &s.LastSeen, &hasRoot, &hasNonRoot); err != nil {
 			return nil, 0, err
 		}
 		s.P50Duration = time.Duration(p50)
 		s.P95Duration = time.Duration(p95)
 		s.AvgDuration = time.Duration(avg)
+		s.HasRoot = hasRoot == 1
+		s.HasNonRoot = hasNonRoot == 1
 		stats = append(stats, s)
 	}
 
@@ -202,17 +224,19 @@ func (e *taskRepository) FindByTaskName(ctx context.Context, projectId uuid.UUID
 
 // FindById returns a single task by ID
 func (e *taskRepository) FindById(ctx context.Context, projectId, taskId uuid.UUID) (*models.Task, error) {
-	query := `SELECT id, project_id, task_name, duration, recorded_at, client_ip, attributes, app_version, server_name, distributed_trace_id, span_id
+	query := `SELECT id, project_id, task_name, duration, recorded_at, client_ip, attributes, app_version, server_name, distributed_trace_id, span_id, is_root
 		FROM tasks
 		WHERE project_id = ? AND id = ?
 		LIMIT 1`
 
 	var t models.Task
 	var attributesJSON string
+	var isRoot uint8
 
 	err := chdb.Conn.QueryRow(ctx, query, projectId, taskId).Scan(
 		&t.Id, &t.ProjectId, &t.TaskName, &t.Duration, &t.RecordedAt,
-		&t.ClientIP, &attributesJSON, &t.AppVersion, &t.ServerName, &t.DistributedTraceId, &t.SpanId)
+		&t.ClientIP, &attributesJSON, &t.AppVersion, &t.ServerName, &t.DistributedTraceId, &t.SpanId, &isRoot)
+	t.IsRoot = isRoot == 1
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

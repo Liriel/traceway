@@ -16,6 +16,8 @@
     import { PaginationFooter } from "$lib/components/ui/pagination-footer";
     import { TimeRangePicker } from "$lib/components/ui/time-range-picker";
     import { SearchBar } from "$lib/components/ui/search-bar";
+    import { RootFilter } from "$lib/components/ui/root-filter";
+    import { NonRootChip } from "$lib/components/ui/non-root-chip";
     import { browser } from '$app/environment';
     import { CalendarDate } from "@internationalized/date";
     import { projectsState } from '$lib/state/projects.svelte';
@@ -54,6 +56,8 @@
         impact: number;
         impactReason: string;
         isStream?: boolean;
+        hasRoot: boolean;
+        hasNonRoot: boolean;
     };
 
     type SortField = 'count' | 'p50_duration' | 'p95_duration' | 'p99_duration' | 'last_seen' | 'impact';
@@ -93,14 +97,15 @@
     let total = $state(0);
     let totalPages = $state(0);
 
-    // Parse URL params including search
+    // Parse URL params including search + rootFilter
     function parseEndpointsUrlParams() {
-        if (!browser) return { preset: '24h', from: null, to: null, search: '' };
+        if (!browser) return { preset: '24h', from: null, to: null, search: '', rootFilter: 'all' };
         const params = new URLSearchParams(window.location.search);
         const timeParams = parseTimeRangeFromUrl(timezone, '24h');
         return {
             ...timeParams,
-            search: params.get('search') || ''
+            search: params.get('search') || '',
+            rootFilter: params.get('rootFilter') || 'all'
         };
     }
 
@@ -108,8 +113,9 @@
     const initialUrlParams = parseEndpointsUrlParams();
     const initialRange = getResolvedTimeRange(initialUrlParams, timezone);
 
-    // Search state
+    // Search + rootFilter state
     let searchQuery = $state(initialUrlParams.search);
+    let rootFilter = $state(initialUrlParams.rootFilter);
 
     // Date Range State
     let selectedPreset = $state<string | null>(initialUrlParams.preset);
@@ -130,6 +136,9 @@
         if (searchQuery.trim()) {
             params.search = searchQuery.trim();
         }
+        if (rootFilter && rootFilter !== 'all') {
+            params.rootFilter = rootFilter;
+        }
         updateUrl(params, { pushToHistory });
     }
 
@@ -144,6 +153,7 @@
         toDate = dateToCalendarDate(range.to, timezone);
         toTime = dateToTimeString(range.to, timezone);
         searchQuery = urlParams.search;
+        rootFilter = urlParams.rootFilter;
 
         page = 1;
         loadData(false);
@@ -264,7 +274,8 @@
                     page: page,
                     pageSize: pageSize
                 },
-                search: searchQuery.trim()
+                search: searchQuery.trim(),
+                rootFilter: rootFilter === 'all' ? '' : rootFilter
             };
 
             const response = await api.post('/endpoints/grouped', requestBody, { projectId: projectsState.currentProjectId ?? undefined });
@@ -402,7 +413,11 @@
         bind:value={searchQuery}
         onSearch={handleSearch}
         disabled={loading}
-    />
+    >
+        {#snippet children()}
+            <RootFilter bind:value={rootFilter} />
+        {/snippet}
+    </SearchBar>
 
     <!-- Performance Chart -->
     <Card.Root class="pt-2">
@@ -549,6 +564,9 @@
                                 {endpoint.endpoint}
                                 {#if endpoint.isStream}
                                     <Badge variant="outline" class="font-sans text-xs" title="Streaming response (SSE / WebSocket / long-poll). Excluded from latency, Apdex, and impact scoring.">Stream</Badge>
+                                {/if}
+                                {#if endpoint.hasNonRoot}
+                                    <NonRootChip mixed={endpoint.hasRoot && endpoint.hasNonRoot} />
                                 {/if}
                             </span>
                         </Table.Cell>

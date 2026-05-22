@@ -35,14 +35,15 @@ Every AI trace records:
 
 ## How It Works
 
-AI traces are ingested via the [OpenTelemetry](/client/otel) OTLP/HTTP endpoint. AI providers that support OTLP trace export (like [OpenRouter](/client/openrouter)) send spans with `gen_ai.*` semantic convention attributes. Traceway detects these attributes and stores them as AI traces.
+AI traces are ingested via the [OpenTelemetry](/client/otel) OTLP/HTTP endpoint. Any span carrying `gen_ai.*` semantic convention attributes is promoted to an AI trace — **regardless of whether it's a root span or a child** of an HTTP request, queue job, or scheduled task. This matters in practice: most LLM calls happen inside a request handler, so the gen_ai span is a child of a SERVER span. Traceway captures both.
 
 The data flow:
 
-1. **AI provider sends OTLP span** — The span contains `gen_ai.request.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.total_cost`, and other standardized attributes
-2. **Traceway parses gen_ai attributes** — The OTEL trace converter detects spans with `gen_ai.*` attributes and extracts structured fields
-3. **Conversation content stored separately** — The full prompt and completion are stored in object storage (S3 or local filesystem) to keep the database lean
-4. **Dashboard shows aggregated view** — AI traces are grouped by trace name (your agent or workflow identifier), with drill-down to individual calls
+1. **OTLP span arrives** — From an AI provider broadcast (e.g. [OpenRouter](/client/openrouter)) or your own SDK instrumentation. The span contains `gen_ai.request.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.total_cost`, and other standardized attributes.
+2. **Traceway promotes the span by attributes, not by position** — If a span has `gen_ai.*` attributes, it lands in the AI Traces table. Root spans use the OTel trace_id as their id; non-root child spans use their own span_id, so a request handler and the LLM call it made each get their own row without collision.
+3. **Conversation content stored separately** — The full prompt and completion are stored in object storage (S3 or local filesystem) to keep the database lean.
+4. **Linked across the trace** — `distributed_trace_id` is auto-derived from the OTel trace_id, so a child AI trace and its parent endpoint show up together in the distributed-trace view with no extra configuration.
+5. **Dashboard shows aggregated view** — AI traces are grouped by trace name (your agent or workflow identifier), with drill-down to individual calls. Groups containing non-root calls are flagged with a **Non-root** chip.
 
 ## Three-Level Drill-Down
 

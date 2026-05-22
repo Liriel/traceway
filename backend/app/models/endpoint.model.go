@@ -22,6 +22,7 @@ type Endpoint struct {
 	DistributedTraceId *uuid.UUID        `json:"distributedTraceId,omitempty" ch:"distributed_trace_id"`
 	SpanId             *uuid.UUID        `json:"spanId,omitempty" ch:"span_id"`
 	IsStream bool `json:"isStream" ch:"is_stream"`
+	IsRoot   bool `json:"isRoot" ch:"is_root"`
 }
 
 type EndpointStats struct {
@@ -35,6 +36,8 @@ type EndpointStats struct {
 	Impact       float64       `json:"impact"`       // 0-1 impact score
 	ImpactReason string        `json:"impactReason"` // human-readable explanation of the dominant impact factor
 	IsStream     bool          `json:"isStream"`     // true => latency/Apdex/impact intentionally zero
+	HasRoot      bool          `json:"hasRoot"`
+	HasNonRoot   bool          `json:"hasNonRoot"`
 }
 
 // EndpointDetailStats contains detailed statistics for a specific endpoint

@@ -24,6 +24,7 @@ type AiTraceSearchRequest struct {
 	SortDirection string           `json:"sortDirection"`
 	Pagination    PaginationParams `json:"pagination"`
 	Search        string           `json:"search"`
+	RootFilter    string           `json:"rootFilter"`
 }
 
 type AiTraceInstancesRequest struct {
@@ -58,7 +59,7 @@ func (a aiTraceController) FindGroupedByTraceName(c *gin.Context) {
 		return
 	}
 
-	stats, total, err := repositories.AiTraceRepository.FindGroupedByTraceName(c, projectId, request.FromDate, request.ToDate, request.Pagination.Page, request.Pagination.PageSize, request.OrderBy, request.SortDirection, request.Search)
+	stats, total, err := repositories.AiTraceRepository.FindGroupedByTraceName(c, projectId, request.FromDate, request.ToDate, request.Pagination.Page, request.Pagination.PageSize, request.OrderBy, request.SortDirection, request.Search, request.RootFilter)
 	if err != nil {
 		c.AbortWithError(500, traceway.NewStackTraceErrorf("error loading ai trace stats: %w", err))
 		return

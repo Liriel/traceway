@@ -23,6 +23,7 @@ type DistributedTraceNode struct {
 	TraceType   string                 `json:"traceType"`
 	Endpoint    *models.Endpoint       `json:"endpoint,omitempty"`
 	Task        *models.Task           `json:"task,omitempty"`
+	AiTrace     *models.AiTrace        `json:"aiTrace,omitempty"`
 	Spans       []models.Span          `json:"spans"`
 	Exception   *EndpointExceptionInfo `json:"exception,omitempty"`
 }
@@ -79,6 +80,12 @@ func (d distributedTraceController) GetDistributedTrace(c *gin.Context) {
 		return
 	}
 
+	aiTraces, err := repositories.AiTraceRepository.FindByDistributedTraceId(ctx, distributedTraceId, projectIds)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to query ai traces: %w", err))
+		return
+	}
+
 	exceptions, err := repositories.ExceptionStackTraceRepository.FindByDistributedTraceId(ctx, distributedTraceId, projectIds)
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to query exceptions: %w", err))
@@ -105,6 +112,9 @@ func (d distributedTraceController) GetDistributedTrace(c *gin.Context) {
 	for _, t := range tasks {
 		matchedIds[t.Id] = true
 	}
+	for _, a := range aiTraces {
+		matchedIds[a.Id] = true
+	}
 
 	var nodes []DistributedTraceNode
 
@@ -128,6 +138,18 @@ func (d distributedTraceController) GetDistributedTrace(c *gin.Context) {
 			Task:        &t,
 			Spans:       []models.Span{},
 			Exception:   exceptionByTraceId[t.Id],
+		}
+		nodes = append(nodes, node)
+	}
+
+	for _, a := range aiTraces {
+		node := DistributedTraceNode{
+			ProjectId:   a.ProjectId,
+			ProjectName: projectNameMap[a.ProjectId],
+			TraceType:   "ai_trace",
+			AiTrace:     &a,
+			Spans:       []models.Span{},
+			Exception:   exceptionByTraceId[a.Id],
 		}
 		nodes = append(nodes, node)
 	}

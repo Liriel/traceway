@@ -141,7 +141,7 @@ func TestTaskRepository_FindGroupedByTaskName(t *testing.T) {
 		t.Fatalf("InsertAsync failed: %v", err)
 	}
 
-	stats, total, err := TaskRepository.FindGroupedByTaskName(ctx, projectId, now.Add(-time.Hour), now.Add(time.Hour), 1, 10, "count", "desc")
+	stats, total, err := TaskRepository.FindGroupedByTaskName(ctx, projectId, now.Add(-time.Hour), now.Add(time.Hour), 1, 10, "count", "desc", "", "")
 	if err != nil {
 		t.Fatalf("FindGroupedByTaskName failed: %v", err)
 	}
@@ -159,6 +159,55 @@ func TestTaskRepository_FindGroupedByTaskName(t *testing.T) {
 	}
 	if stats[0].Count != 2 {
 		t.Errorf("expected count 2 for email.send, got %d", stats[0].Count)
+	}
+}
+
+func TestTaskRepository_FindGroupedByTaskName_RootFilterAndSearch(t *testing.T) {
+	setupTestDB(t)
+	ctx := context.Background()
+	projectId := uuid.New()
+	now := truncateMs(time.Now().UTC())
+
+	rootTask := makeTask(projectId, "scheduler.cleanup", 100*time.Millisecond, now)
+	rootTask.IsRoot = true
+	nonRootTask := makeTask(projectId, "queue.process", 200*time.Millisecond, now.Add(time.Minute))
+	nonRootTask.IsRoot = false
+
+	if err := TaskRepository.InsertAsync(ctx, []models.Task{rootTask, nonRootTask}); err != nil {
+		t.Fatalf("InsertAsync failed: %v", err)
+	}
+
+	// rootFilter=root → only the cleanup task
+	stats, _, err := TaskRepository.FindGroupedByTaskName(ctx, projectId, now.Add(-time.Hour), now.Add(time.Hour), 1, 10, "count", "desc", "", "root")
+	if err != nil {
+		t.Fatalf("FindGroupedByTaskName(root) failed: %v", err)
+	}
+	if len(stats) != 1 || stats[0].TaskName != "scheduler.cleanup" {
+		t.Errorf("rootFilter=root: expected 1 stats row 'scheduler.cleanup', got %+v", stats)
+	}
+	if !stats[0].HasRoot || stats[0].HasNonRoot {
+		t.Errorf("expected HasRoot=true, HasNonRoot=false, got %+v", stats[0])
+	}
+
+	// rootFilter=non_root → only the queue.process task
+	stats, _, err = TaskRepository.FindGroupedByTaskName(ctx, projectId, now.Add(-time.Hour), now.Add(time.Hour), 1, 10, "count", "desc", "", "non_root")
+	if err != nil {
+		t.Fatalf("FindGroupedByTaskName(non_root) failed: %v", err)
+	}
+	if len(stats) != 1 || stats[0].TaskName != "queue.process" {
+		t.Errorf("rootFilter=non_root: expected 1 stats row 'queue.process', got %+v", stats)
+	}
+	if stats[0].HasRoot || !stats[0].HasNonRoot {
+		t.Errorf("expected HasRoot=false, HasNonRoot=true, got %+v", stats[0])
+	}
+
+	// search=queue → only matching task
+	stats, _, err = TaskRepository.FindGroupedByTaskName(ctx, projectId, now.Add(-time.Hour), now.Add(time.Hour), 1, 10, "count", "desc", "queue", "")
+	if err != nil {
+		t.Fatalf("FindGroupedByTaskName(search) failed: %v", err)
+	}
+	if len(stats) != 1 || stats[0].TaskName != "queue.process" {
+		t.Errorf("search=queue: expected 1 stats row 'queue.process', got %+v", stats)
 	}
 }
 

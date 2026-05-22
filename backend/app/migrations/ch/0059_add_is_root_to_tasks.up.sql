@@ -1,0 +1,1 @@
+ALTER TABLE tasks ADD COLUMN is_root UInt8 DEFAULT 1

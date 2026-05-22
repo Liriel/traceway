@@ -32,6 +32,7 @@ type endpoint struct {
 	DistributedTraceId *uuid.UUID    `lit:"distributed_trace_id"`
 	SpanId             *uuid.UUID    `lit:"span_id"`
 	IsStream           bool          `lit:"is_stream"`
+	IsRoot             bool          `lit:"is_root"`
 }
 
 type groupedEndpointRow struct {
@@ -46,6 +47,8 @@ type groupedEndpointRow struct {
 	ToleratingCount  uint64  `lit:"tolerating_count"`
 	BadCount         uint64  `lit:"bad_count"`
 	IsStream         bool    `lit:"is_stream"`
+	HasRoot          bool    `lit:"has_root"`
+	HasNonRoot       bool    `lit:"has_non_root"`
 }
 
 type endpointDurationRow struct {
@@ -106,6 +109,7 @@ func endpointToRow(e models.Endpoint) endpoint {
 		DistributedTraceId: e.DistributedTraceId,
 		SpanId:             e.SpanId,
 		IsStream:           e.IsStream,
+		IsRoot:             e.IsRoot,
 	}
 }
 
@@ -124,11 +128,26 @@ func (r *endpoint) toModel() models.Endpoint {
 		DistributedTraceId: r.DistributedTraceId,
 		SpanId:             r.SpanId,
 		IsStream:           r.IsStream,
+		IsRoot:             r.IsRoot,
 	}
 	if r.Attributes != nil {
 		e.Attributes = map[string]string(r.Attributes)
 	}
 	return e
+}
+
+// rootFilterClause returns a SQL fragment ("", " AND <col> = 1", " AND <col> = 0")
+// to splice into a WHERE clause based on the rootFilter param. Accepts "all" |
+// "root" | "non_root"; defaults to "all" (no filter).
+func rootFilterClause(qualifiedCol, rootFilter string) string {
+	switch rootFilter {
+	case "root":
+		return " AND " + qualifiedCol + " = 1"
+	case "non_root":
+		return " AND " + qualifiedCol + " = 0"
+	default:
+		return ""
+	}
 }
 
 type endpointRepository struct{}
@@ -199,7 +218,7 @@ func (e *endpointRepository) FindAll(ctx context.Context, projectId uuid.UUID, f
 	return endpoints, count, nil
 }
 
-func (e *endpointRepository) FindGroupedByEndpoint(ctx context.Context, projectId uuid.UUID, fromDate, toDate time.Time, page, pageSize int, orderBy string, sortDirection string, search string) ([]models.EndpointStats, int64, error) {
+func (e *endpointRepository) FindGroupedByEndpoint(ctx context.Context, projectId uuid.UUID, fromDate, toDate time.Time, page, pageSize int, orderBy string, sortDirection string, search string, rootFilter string) ([]models.EndpointStats, int64, error) {
 	params := lit.P{"project_id": projectId, "from": NewSQLiteTime(fromDate), "to": NewSQLiteTime(toDate)}
 
 	whereClause := "e.project_id = :project_id AND e.recorded_at >= :from AND e.recorded_at <= :to"
@@ -207,6 +226,7 @@ func (e *endpointRepository) FindGroupedByEndpoint(ctx context.Context, projectI
 		whereClause += " AND INSTR(LOWER(e.endpoint), LOWER(:search)) > 0"
 		params["search"] = search
 	}
+	whereClause += rootFilterClause("e.is_root", rootFilter)
 
 	countQuery := "SELECT COUNT(DISTINCT e.endpoint) AS count FROM endpoints e WHERE " + whereClause
 	totalResult, err := lit.SelectSingleNamed[models.CountResult](db.TelemetryDB, countQuery, params)
@@ -229,7 +249,9 @@ func (e *endpointRepository) FindGroupedByEndpoint(ctx context.Context, projectI
 		SUM(CASE WHEN e.duration <= (750000000 + COALESCE(s.offset_ms, 0) * 1000000) AND e.status_code < 500 THEN 1 ELSE 0 END) as satisfied_count,
 		SUM(CASE WHEN e.duration > (750000000 + COALESCE(s.offset_ms, 0) * 1000000) AND e.duration <= (1500000000 + COALESCE(s.offset_ms, 0) * 1000000) AND e.status_code < 500 THEN 1 ELSE 0 END) as tolerating_count,
 		SUM(CASE WHEN e.duration > (1500000000 + COALESCE(s.offset_ms, 0) * 1000000) OR e.status_code >= 500 THEN 1 ELSE 0 END) as bad_count,
-		MAX(e.is_stream) as is_stream
+		MAX(e.is_stream) as is_stream,
+		MAX(e.is_root) as has_root,
+		MAX(CASE WHEN e.is_root = 0 THEN 1 ELSE 0 END) as has_non_root
 	FROM endpoints e
 	LEFT JOIN slow_endpoints s ON e.endpoint = s.endpoint AND e.project_id = s.project_id
 	WHERE ` + whereClause + `
@@ -251,7 +273,7 @@ func (e *endpointRepository) FindGroupedByEndpoint(ctx context.Context, projectI
 		var g groupedEndpointRow
 		if err := sqlRows.Scan(&g.Endpoint, &g.TotalCount, &g.AvgDuration, &g.LastSeen,
 			&g.OffsetMs, &g.ServerErrorCount, &g.ClientErrorCount,
-			&g.SatisfiedCount, &g.ToleratingCount, &g.BadCount, &g.IsStream); err != nil {
+			&g.SatisfiedCount, &g.ToleratingCount, &g.BadCount, &g.IsStream, &g.HasRoot, &g.HasNonRoot); err != nil {
 			return nil, 0, err
 		}
 		groups = append(groups, g)
@@ -274,6 +296,8 @@ func (e *endpointRepository) FindGroupedByEndpoint(ctx context.Context, projectI
 				Impact:       ComputeStreamImpact(g.Endpoint, g.TotalCount, g.ServerErrorCount, g.ClientErrorCount),
 				ImpactReason: ComputeStreamImpactReason(g.Endpoint, g.TotalCount, g.ServerErrorCount, g.ClientErrorCount),
 				IsStream:     true,
+				HasRoot:      g.HasRoot,
+				HasNonRoot:   g.HasNonRoot,
 			})
 			continue
 		}
@@ -300,6 +324,8 @@ func (e *endpointRepository) FindGroupedByEndpoint(ctx context.Context, projectI
 			Impact:      impact,
 			ImpactReason: ComputeImpactReason(g.Endpoint, g.TotalCount, g.SatisfiedCount, g.ToleratingCount,
 				g.BadCount, g.ClientErrorCount, p99, g.OffsetMs),
+			HasRoot:    g.HasRoot,
+			HasNonRoot: g.HasNonRoot,
 		})
 	}
 

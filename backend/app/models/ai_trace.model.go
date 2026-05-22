@@ -29,8 +29,10 @@ type AiTrace struct {
 	FinishReason    string            `json:"finishReason" ch:"finish_reason"`
 	ServerName      string            `json:"serverName" ch:"server_name"`
 	AppVersion      string            `json:"appVersion" ch:"app_version"`
-	StorageKey      string            `json:"storageKey" ch:"storage_key"`
-	Attributes      map[string]string `json:"attributes" ch:"attributes"`
+	StorageKey         string            `json:"storageKey" ch:"storage_key"`
+	Attributes         map[string]string `json:"attributes" ch:"attributes"`
+	DistributedTraceId *uuid.UUID        `json:"distributedTraceId,omitempty" ch:"distributed_trace_id"`
+	IsRoot             bool              `json:"isRoot" ch:"is_root"`
 }
 
 type AiTraceStats struct {
@@ -44,6 +46,8 @@ type AiTraceStats struct {
 	AvgInputTokens  float64       `json:"avgInputTokens"`
 	AvgOutputTokens float64       `json:"avgOutputTokens"`
 	LastSeen        time.Time     `json:"lastSeen"`
+	HasRoot         bool          `json:"hasRoot"`
+	HasNonRoot      bool          `json:"hasNonRoot"`
 }
 
 type AiTraceDetailStats struct {
