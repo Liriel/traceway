@@ -4,14 +4,18 @@ The bundle automatically traces Symfony Messenger messages. Each consumed messag
 
 ## Setup
 
-Add `messenger_root_spans: true` to your bundle config so consumed messages appear as independent tasks (not children of the HTTP request that dispatched them):
+Nothing extra to configure — every consumed message is traced automatically as soon as the bundle is installed.
+
+Symfony Messenger's default behavior is to parent the consumer span to the dispatcher's trace (so the request that dispatched the message and the worker that processed it appear as one continuous distributed trace). Traceway captures these as Tasks regardless of whether they're root spans, so the consumed message shows up in the Tasks page either way — flagged with a **Non-root** chip when it was triggered from another trace.
+
+If you'd rather have each consumed message start its own independent trace, opt in:
 
 ```yaml filename="config/packages/open_telemetry.yaml"
 open_telemetry:
     messenger_root_spans: true
 ```
 
-That's it — every consumed message is now traced automatically.
+This is mostly a presentation choice. With `messenger_root_spans: true`, the consumer is a root Task (no chip) and the cross-trace link to the dispatcher is broken. Without it, the consumer is a non-root Task and the dispatcher → consumer relationship is preserved in the distributed-trace view.
 
 ## What Gets Captured
 
@@ -77,4 +81,4 @@ class PaymentProcessorHandler
 
 ## Dispatch Tracing
 
-The bundle also traces the dispatch side — when your controller or service dispatches a message, a PRODUCER span is created. W3C trace context is injected into the message envelope so the consumer span links back to the dispatching trace (unless `messenger_root_spans` is `true`, in which case the consumer creates an independent root span).
+The bundle also traces the dispatch side — when your controller or service dispatches a message, a PRODUCER span is created. W3C trace context is injected into the message envelope so the consumer span links back to the dispatching trace (unless `messenger_root_spans` is `true`, in which case the consumer creates an independent root span). Either way, Traceway captures the consumer as a Task and surfaces the cross-trace link when one exists.

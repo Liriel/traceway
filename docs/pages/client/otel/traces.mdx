@@ -4,16 +4,20 @@ Traceway ingests OpenTelemetry spans via the OTLP/HTTP protocol and maps them to
 
 ## Span Mapping
 
-How OTel spans are classified in Traceway depends on whether the span is a root span and its kind:
+Spans are classified by **kind and attributes**, not by whether they're a root span. Both root and child spans can be promoted to a top-level concept when the signal is there — a queued job processed as a child of the dispatcher's trace still becomes a Task, an LLM call made inside a request handler still becomes an AI Trace.
 
-| OTel Span | Condition | Traceway Concept |
-|-----------|-----------|-----------------|
-| Root span | `SpanKind = SERVER` with HTTP attributes | **Endpoint** |
-| Root span | All other kinds | **Task** |
-| Non-root span | Has a parent span ID | **Span** |
-| Exception event | Event named `"exception"` on any span | **Issue** |
+| Condition | Traceway Concept |
+|-----------|-----------------|
+| `SpanKind = SERVER` / `INTERNAL` with HTTP attributes, and the span is a root (or its parent is in another process — a cross-service inbound hop) | **Endpoint** |
+| `SpanKind = CONSUMER` (queue / messenger workers) | **Task** |
+| Root `INTERNAL` span with a `console.command` attribute (artisan commands, console runners) | **Task** |
+| Any span with `gen_ai.*` attributes (root or child of a request/task) | **AI Trace** |
+| Any other span with a parent | **Span** (waterfall row under its nearest enclosing entity) |
+| Event named `"exception"` on any span | **Issue** (attributed to the owning entity) |
 
-A root span is one with no `parentSpanId`.
+Each Endpoint / Task / AI Trace row carries an `is_root` flag. Non-root rows surface a **Non-root** chip in the dashboard list so you can tell at a glance which runs were triggered by another trace, and a **View distributed trace** link on the detail page jumps you to the full waterfall (endpoint → producer → consumer, request → child LLM call, etc.). The `distributed_trace_id` linking the rows is auto-derived from the OTel `trace_id`, so cross-trace lookup works without any vendor attribute.
+
+> **Sub-handler spans are not duplicated.** An in-process child SERVER/INTERNAL+HTTP span (e.g. a framework's "handler /path" sub-span) is kept in the Spans waterfall — Endpoints are only promoted for entry points (root or cross-service hop).
 
 ## Resource Attributes
 
@@ -87,7 +91,7 @@ const sdk = new NodeSDK({
 sdk.start();
 ```
 
-This automatically instruments HTTP servers, database clients, and other libraries. Root SERVER spans become Endpoints in Traceway, child spans become Spans, and any exceptions recorded as span events become Issues.
+This automatically instruments HTTP servers, database clients, and other libraries. SERVER spans become Endpoints, CONSUMER spans become Tasks, any span with `gen_ai.*` attributes becomes an AI Trace (root or child), and exception events become Issues.
 
 ## Example: Python with OTel SDK
 
