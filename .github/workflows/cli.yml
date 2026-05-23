@@ -1,0 +1,37 @@
+name: CLI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cli/**"
+      - ".github/workflows/cli.yml"
+  pull_request:
+    paths:
+      - "cli/**"
+      - ".github/workflows/cli.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cli
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
+
+      - name: Build
+        run: go build ./...
+
+      - name: Test
+        run: go test ./...

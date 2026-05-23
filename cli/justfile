@@ -1,0 +1,19 @@
+default: test
+
+build:
+    go build -o bin/traceway ./cmd/traceway
+
+test:
+    gotestsum --format pkgname -- ./...
+
+smoke-test:
+    gotestsum --format pkgname -- -tags smoke ./test/smoke/...
+
+lint:
+    golangci-lint run
+
+vulncheck:
+    govulncheck ./...
+
+# Run everything that should pass before a commit
+check: lint test vulncheck
