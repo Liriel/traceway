@@ -215,4 +215,5 @@ jobs:
             exit 0
           fi
           git commit -m "bench: ${{ github.event.inputs.scenario }} $(date -u +%Y-%m-%d)"
+          git pull --rebase origin main
           git push
