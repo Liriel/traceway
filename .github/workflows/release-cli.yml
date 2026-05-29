@@ -1,0 +1,139 @@
+name: Release CLI
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (X.Y.Z, no leading v)"
+        required: true
+        type: string
+      change_1:
+        description: "Changelog item 1 (optional)"
+        required: false
+        type: string
+      change_2:
+        description: "Changelog item 2 (optional)"
+        required: false
+        type: string
+      change_3:
+        description: "Changelog item 3 (optional)"
+        required: false
+        type: string
+      change_4:
+        description: "Changelog item 4 (optional)"
+        required: false
+        type: string
+      change_5:
+        description: "Changelog item 5 (optional)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate version format
+        run: |
+          if ! [[ "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: version must be in X.Y.Z format (got '${{ inputs.version }}')"
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Check tag does not already exist
+        run: |
+          TAG="cli/v${{ inputs.version }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Error: tag $TAG already exists"
+            exit 1
+          fi
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
+
+      - name: Build cross-platform binaries
+        working-directory: cli
+        env:
+          VERSION: ${{ inputs.version }}
+          CGO_ENABLED: "0"
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          # OS ARCH LABEL — LABEL is the user-facing arch name in the archive filename
+          PAIRS=(
+            "linux amd64 x86_64"
+            "linux arm64 arm64"
+            "darwin amd64 x86_64"
+            "darwin arm64 arm64"
+            "windows amd64 x86_64"
+          )
+          for entry in "${PAIRS[@]}"; do
+            read -r OS ARCH LABEL <<< "$entry"
+            STAGE="dist/staging/${OS}_${LABEL}"
+            mkdir -p "$STAGE"
+            BIN="traceway"
+            [[ "$OS" == "windows" ]] && BIN="traceway.exe"
+            echo "Building $OS/$ARCH -> $STAGE/$BIN"
+            GOOS="$OS" GOARCH="$ARCH" go build -trimpath -o "$STAGE/$BIN" ./cmd/traceway
+            cp README.md "$STAGE/"
+            cp ../LICENSE "$STAGE/"
+            ARCHIVE_BASE="traceway_${VERSION}_${OS}_${LABEL}"
+            if [[ "$OS" == "windows" ]]; then
+              (cd "$STAGE" && zip -q "../../${ARCHIVE_BASE}.zip" *)
+            else
+              tar -C "$STAGE" -czf "dist/${ARCHIVE_BASE}.tar.gz" .
+            fi
+          done
+          rm -rf dist/staging
+          ls -la dist
+
+      - name: Generate checksums
+        working-directory: cli/dist
+        run: |
+          sha256sum * > checksums.txt
+          cat checksums.txt
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Tag release
+        run: git tag "cli/v${{ inputs.version }}"
+
+      - name: Push tag
+        run: git push origin "cli/v${{ inputs.version }}"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          C1: ${{ inputs.change_1 }}
+          C2: ${{ inputs.change_2 }}
+          C3: ${{ inputs.change_3 }}
+          C4: ${{ inputs.change_4 }}
+          C5: ${{ inputs.change_5 }}
+        run: |
+          NOTES=""
+          for C in "$C1" "$C2" "$C3" "$C4" "$C5"; do
+            if [ -n "$C" ]; then
+              NOTES="${NOTES}- ${C}"$'\n'
+            fi
+          done
+          if [ -z "$NOTES" ]; then
+            NOTES="CLI v${{ inputs.version }}"
+          fi
+          gh release create "cli/v${{ inputs.version }}" \
+            --title "CLI v${{ inputs.version }}" \
+            --notes "$NOTES" \
+            cli/dist/*

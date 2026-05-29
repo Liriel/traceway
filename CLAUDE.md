@@ -7,6 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Traceway is an error tracking and monitoring platform consisting of:
 - **Frontend**: SvelteKit 2 dashboard application with Svelte 5
 - **Backend**: Go/Gin API server with ClickHouse database
+- **CLI**: Go/Cobra command-line client for the backend HTTP API (`/cli`)
 - **Go Client SDK**: Distributed tracing SDK for Go applications (external repo)
 
 ---
@@ -28,11 +29,16 @@ Traceway is an error tracking and monitoring platform consisting of:
 | Frontend | `npm run build` | Production build |
 | Frontend | `npm run check` | TypeScript checking |
 | Backend | `cd backend && go run .` | API server (port 8082) |
+| CLI | `cd cli && just build` | Builds `bin/traceway` |
+| CLI | `cd cli && just test` | Runs unit tests |
+| CLI | `cd cli && just check` | Lint + test + vulncheck (pre-commit gate) |
+| CLI | `cd cli && just smoke-test` | Live E2E (needs `TRACEWAY_SMOKE_*` env vars) |
 | Go Client | External repo at `/Users/dusanstanojevic/Documents/workspace/go-client` | Build with `go build ./...` |
 
 ### Tech Stack
 - **Frontend**: SvelteKit 2.49, Svelte 5.45, Tailwind CSS v4, shadcn-svelte, Vite 7
 - **Backend**: Go 1.25, Gin 1.11, ClickHouse, PostgreSQL
+- **CLI**: Go 1.26, Cobra 1.10, separate Go module (`github.com/tracewayapp/traceway/cli`); flake.nix dev shell, justfile entrypoints
 - **Client SDK**: Go 1.25, Gin middleware support
 
 ### go-lightning Library (PostgreSQL ORM)
