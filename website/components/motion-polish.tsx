@@ -1,13 +1,18 @@
 "use client";
 
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 
 type ScrollTriggerInstance = { kill: () => void };
 
 export function MotionPolish() {
+  const pathname = usePathname();
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // The blog is a reading experience — no entrance/scroll animations.
+    if (pathname?.startsWith("/blog")) return;
 
     let cancelled = false;
     const triggers: ScrollTriggerInstance[] = [];
@@ -230,7 +235,7 @@ export function MotionPolish() {
       triggers.forEach((t) => t.kill());
       cleanups.forEach((c) => c());
     };
-  }, []);
+  }, [pathname]);
 
   return null;
 }
