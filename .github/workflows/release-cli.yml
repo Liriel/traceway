@@ -1,31 +1,14 @@
 name: Release CLI
 
 on:
+  push:
+    tags:
+      - 'backend/v*'
   workflow_dispatch:
     inputs:
       version:
         description: "Release version (X.Y.Z, no leading v)"
         required: true
-        type: string
-      change_1:
-        description: "Changelog item 1 (optional)"
-        required: false
-        type: string
-      change_2:
-        description: "Changelog item 2 (optional)"
-        required: false
-        type: string
-      change_3:
-        description: "Changelog item 3 (optional)"
-        required: false
-        type: string
-      change_4:
-        description: "Changelog item 4 (optional)"
-        required: false
-        type: string
-      change_5:
-        description: "Changelog item 5 (optional)"
-        required: false
         type: string
 
 permissions:
@@ -35,10 +18,20 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            TAG="${{ github.ref_name }}"
+            echo "version=${TAG#backend/v}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Validate version format
         run: |
-          if ! [[ "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Error: version must be in X.Y.Z format (got '${{ inputs.version }}')"
+          if ! [[ "${{ steps.version.outputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: version must be in X.Y.Z format (got '${{ steps.version.outputs.version }}')"
             exit 1
           fi
 
@@ -46,11 +39,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.RELEASE_TOKEN }}
 
       - name: Check tag does not already exist
         run: |
-          TAG="cli/v${{ inputs.version }}"
+          TAG="cli/v${{ steps.version.outputs.version }}"
           if git rev-parse "$TAG" >/dev/null 2>&1; then
             echo "Error: tag $TAG already exists"
             exit 1
@@ -65,7 +57,7 @@ jobs:
       - name: Build cross-platform binaries
         working-directory: cli
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ steps.version.outputs.version }}
           CGO_ENABLED: "0"
         run: |
           set -euo pipefail
@@ -85,7 +77,7 @@ jobs:
             BIN="traceway"
             [[ "$OS" == "windows" ]] && BIN="traceway.exe"
             echo "Building $OS/$ARCH -> $STAGE/$BIN"
-            GOOS="$OS" GOARCH="$ARCH" go build -trimpath -o "$STAGE/$BIN" ./cmd/traceway
+            GOOS="$OS" GOARCH="$ARCH" go build -trimpath -ldflags "-X main.version=${VERSION}" -o "$STAGE/$BIN" ./cmd/traceway
             cp README.md "$STAGE/"
             cp ../LICENSE "$STAGE/"
             ARCHIVE_BASE="traceway_${VERSION}_${OS}_${LABEL}"
@@ -104,36 +96,14 @@ jobs:
           sha256sum * > checksums.txt
           cat checksums.txt
 
-      - name: Configure git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-      - name: Tag release
-        run: git tag "cli/v${{ inputs.version }}"
-
-      - name: Push tag
-        run: git push origin "cli/v${{ inputs.version }}"
-
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          C1: ${{ inputs.change_1 }}
-          C2: ${{ inputs.change_2 }}
-          C3: ${{ inputs.change_3 }}
-          C4: ${{ inputs.change_4 }}
-          C5: ${{ inputs.change_5 }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          NOTES=""
-          for C in "$C1" "$C2" "$C3" "$C4" "$C5"; do
-            if [ -n "$C" ]; then
-              NOTES="${NOTES}- ${C}"$'\n'
-            fi
-          done
-          if [ -z "$NOTES" ]; then
-            NOTES="CLI v${{ inputs.version }}"
-          fi
-          gh release create "cli/v${{ inputs.version }}" \
-            --title "CLI v${{ inputs.version }}" \
+          NOTES="CLI v${VERSION}, released alongside [Backend v${VERSION}](https://github.com/${{ github.repository }}/releases/tag/backend/v${VERSION})."
+          gh release create "cli/v${VERSION}" \
+            --target "${{ github.sha }}" \
+            --title "CLI v${VERSION}" \
             --notes "$NOTES" \
             cli/dist/*

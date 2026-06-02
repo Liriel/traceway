@@ -4,7 +4,13 @@ A Go CLI for the [Traceway](https://github.com/tracewayapp/traceway) observabili
 
 ## Install
 
-This repo ships a Nix dev shell with Go 1.26, `just`, `gotestsum`, `golangci-lint`, `govulncheck`, and `gh`:
+Prebuilt binaries are published with every release at
+[github.com/tracewayapp/traceway/releases](https://github.com/tracewayapp/traceway/releases)
+under the matching `CLI vX.Y.Z` tag — the CLI version tracks the backend release.
+Download the archive for your platform (`traceway_<version>_<os>_<arch>.tar.gz`,
+or `.zip` on Windows), extract it, and put `traceway` on your `PATH`.
+
+Or build from source — this repo ships a Nix dev shell with Go 1.26, `just`, `gotestsum`, `golangci-lint`, `govulncheck`, and `gh`:
 
 ```bash
 nix develop
@@ -16,6 +22,8 @@ Or vanilla Go:
 ```bash
 go build -o bin/traceway ./cmd/traceway
 ```
+
+Check an installed binary with `traceway version` (or `traceway --version`). Source builds report `dev`.
 
 ## Quick start
 

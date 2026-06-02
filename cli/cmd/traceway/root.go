@@ -17,6 +17,7 @@ func newRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "traceway",
 		Short:         "CLI for the Traceway observability platform",
+		Version:       version,
 		SilenceUsage:  true, // we render our own error envelopes
 		SilenceErrors: true,
 	}
@@ -36,6 +37,7 @@ func newRootCmd() *cobra.Command {
 	cmd.AddCommand(newLogsCmd())
 	cmd.AddCommand(newEndpointsCmd())
 	cmd.AddCommand(newMetricsCmd())
+	cmd.AddCommand(newVersionCmd())
 
 	return cmd
 }
