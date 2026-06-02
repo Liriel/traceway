@@ -2,7 +2,7 @@
 title: "I Ran My Entire Observability Stack on SQLite. You Probably Could Too."
 date: "2026-05-29"
 category: "engineering"
-description: "Most observability stacks optimize for throughput your startup will never use. We optimized for accessibility instead — easy and cheap to run — and hit 58K metric points/sec anyway. Here is the full benchmark."
+description: "Most observability stacks optimize for throughput your startup will never use. We optimized for accessibility instead, easy and cheap to run, and hit 58K metric points/sec anyway. Here is the full benchmark."
 ---
 
 ## TL;DR
@@ -40,9 +40,9 @@ All of the tests have been performed on a dedicated-vCPU instance, specifically 
 
 We will be measuring throughput of metrics in three phases:
 
-1. **Large payload** — 16k max metric points per payload, 5 req/sec max
-2. **Largest sustainable payload, max request rate** — taking the largest sustainable payload we max out req/sec to find the breaking point
-3. **100 metric points per req** — how many requests per second can we ingest
+1. **Large payload** - 16k max metric points per payload, 5 req/sec max
+2. **Largest sustainable payload, max request rate** - taking the largest sustainable payload we max out req/sec to find the breaking point
+3. **100 metric points per req** - how many requests per second can we ingest
 
 ### What "accepted" means here
 

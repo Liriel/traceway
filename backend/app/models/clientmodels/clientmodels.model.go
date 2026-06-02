@@ -133,6 +133,7 @@ func (c *ClientTrace) ToEndpoint(appVersion, serverName string) models.Endpoint 
 		ServerName:         serverName,
 		DistributedTraceId: c.parsedDistributedTraceId(),
 		IsStream:           c.Attributes[streamAttributeKey] == "true",
+		IsRoot:             true,
 	}
 }
 
@@ -147,6 +148,7 @@ func (c *ClientTrace) ToTask(appVersion, serverName string) models.Task {
 		AppVersion:         appVersion,
 		ServerName:         serverName,
 		DistributedTraceId: c.parsedDistributedTraceId(),
+		IsRoot:             true,
 	}
 }
 
