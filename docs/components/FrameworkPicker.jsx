@@ -208,7 +208,7 @@ export default function FrameworkPicker() {
 
   function handleSelect(fw) {
     setSdk(fw.value);
-    router.push(`${fw.href}?sdk=${fw.value}`);
+    router.push(fw.href);
   }
 
   return (

@@ -288,6 +288,27 @@ main hr,
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--a1) 15%, transparent);
 }
 
+/* Results panel: solid surface. Nextra's default is translucent + backdrop-blur,
+   which lets page content bleed through and makes the results unreadable. */
+.nextra-search ul.nextra-scrollbar {
+  background-color: var(--ink-2) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  border-color: var(--hair-2) !important;
+}
+
+/* Matched query terms: Nextra colors these with the dark indigo primary, which
+   is hard to read on the panel — lighten so the match stands out legibly. */
+.nextra-search .nx-text-primary-600 {
+  color: color-mix(in oklab, var(--a1) 55%, var(--fg-0)) !important;
+  font-weight: 600;
+}
+
+/* Result excerpt: default gray-400 is too dim on the solid dark panel. */
+.nextra-search .excerpt {
+  color: var(--fg-1) !important;
+}
+
 /* =========================================================================
    Navbar alignment (pre-existing rules, preserved)
    ========================================================================= */

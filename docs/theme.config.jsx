@@ -14,6 +14,7 @@ const SDK_VISIBILITY = {
   nestjs: "js-nestjs",
   hono: "js-hono",
   react: "js-react",
+  "react-native": "react-native",
   vue: "js-vue",
   svelte: "js-svelte",
   jquery: "js-jquery",
@@ -23,6 +24,8 @@ const SDK_VISIBILITY = {
   cloudflare: "cloudflare",
   nextjs: "js-nextjs",
   symfony: "php-symfony",
+  laravel: "php-laravel",
+  django: "python-django",
   flutter: "flutter",
   android: "android",
 };
@@ -80,10 +83,12 @@ export default {
         return <SdkSelector />;
       }
 
-      for (const [folder, requiredSdk] of Object.entries(SDK_VISIBILITY)) {
-        if (route && route.includes(`/${folder}`)) {
-          return <SdkGuard requiredSdk={requiredSdk}>{title}</SdkGuard>;
-        }
+      const segment = route?.startsWith("/client")
+        ? route.split("/").filter(Boolean)[1]
+        : undefined;
+      const requiredSdk = segment ? SDK_VISIBILITY[segment] : undefined;
+      if (requiredSdk !== undefined) {
+        return <SdkGuard requiredSdk={requiredSdk}>{title}</SdkGuard>;
       }
 
       return <>{title}</>;
@@ -102,6 +107,9 @@ export default {
 
 function SdkGuard({ requiredSdk, children }) {
   const { sdk } = useSdk();
+  if (!sdk) {
+    return <HiddenItem />;
+  }
   let visible;
   if (Array.isArray(requiredSdk)) {
     visible = requiredSdk.includes(sdk);

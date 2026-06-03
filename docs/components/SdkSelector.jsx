@@ -22,6 +22,8 @@ const SDK_QUICK_START = {
   'otel': '/client/otel',
   'cloudflare': '/client/cloudflare',
   'php-symfony': '/client/symfony',
+  'php-laravel': '/client/laravel',
+  'python-django': '/client/django',
   'flutter': '/client/flutter',
   'android': '/client/android',
   'react-native': '/client/react-native',
@@ -98,7 +100,7 @@ export default function SdkSelector() {
                     setSearch('')
                     const href = SDK_QUICK_START[option.value]
                     if (href) {
-                      router.push(`${href}?sdk=${option.value}`)
+                      router.push(href)
                     }
                   }}
                 >
