@@ -5,6 +5,8 @@
 	import * as Popover from '$lib/components/ui/popover';
 	import Copy from 'lucide-svelte/icons/copy';
 	import Check from 'lucide-svelte/icons/check';
+	import ChevronRight from 'lucide-svelte/icons/chevron-right';
+	import ChevronDown from 'lucide-svelte/icons/chevron-down';
 
 	type Props = {
 		row: number;
@@ -12,6 +14,10 @@
 		traceStart: number;
 		traceDuration: number;
 		isOdd: boolean;
+		depth: number;
+		hasChildren: boolean;
+		isCollapsed: boolean;
+		onToggle: () => void;
 		nameColumnWidth: number;
 		updateNameWidth: (width: number) => void;
 
@@ -26,6 +32,10 @@
 		traceStart,
 		traceDuration,
 		isOdd,
+		depth,
+		hasChildren,
+		isCollapsed,
+		onToggle,
 		nameColumnWidth,
 		updateNameWidth,
 		spanCellHandleMouseEnter,
@@ -86,8 +96,13 @@
 		spanCellHandleMouseMove(x);
 	}
 
-	let nameElement: HTMLDivElement;
+	let nameElement: HTMLSpanElement;
 	let copied = $state(false);
+	let copiedKey = $state<string | null>(null);
+
+	const attributeEntries = $derived(
+		Object.entries(span.attributes ?? {}).sort((a, b) => a[0].localeCompare(b[0]))
+	);
 
 	async function copySpanName() {
 		await navigator.clipboard.writeText(span.name);
@@ -95,10 +110,16 @@
 		setTimeout(() => (copied = false), 2000);
 	}
 
+	async function copyAttribute(key: string, value: string) {
+		await navigator.clipboard.writeText(value);
+		copiedKey = key;
+		setTimeout(() => (copiedKey = null), 2000);
+	}
+
 	$effect(() => {
 		if (nameElement) {
-			// Measure the natural width needed
-			const naturalWidth = nameElement.scrollWidth;
+			// Measure the natural width needed, including indentation and chevron
+			const naturalWidth = nameElement.scrollWidth + depth * 16 + 44;
 			updateNameWidth?.(naturalWidth);
 		}
 	});
@@ -108,29 +129,70 @@
 	class={cn('flex items-center border-b border-border last:border-b-0', isOdd ? 'bg-muted/40' : '')}
 >
 	<!-- Span name -->
-	<Popover.Root>
-		<Popover.Trigger class="text-left cursor-pointer">
-			<div
-				bind:this={nameElement}
-				class="flex-shrink-0 truncate border-r border-border px-3 py-1.5 font-mono text-xs"
-				style="min-width: {nameColumnWidth}px; max-width: {nameColumnWidth}px"
+	<div
+		class="flex flex-shrink-0 items-center border-r border-border py-1.5 pr-3"
+		style="min-width: {nameColumnWidth}px; max-width: {nameColumnWidth}px; padding-left: {12 +
+			depth * 16}px"
+	>
+		{#if hasChildren}
+			<button
+				onclick={onToggle}
+				class="mr-1 shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+				aria-label={isCollapsed ? 'Expand children' : 'Collapse children'}
 			>
-				{span.name}
-			</div>
-		</Popover.Trigger>
-		<Popover.Content class="w-auto max-w-sm" align="start">
-			<div class="flex items-start gap-2">
-				<span class="font-mono text-xs break-all select-text">{span.name}</span>
-				<button onclick={copySpanName} class="shrink-0 p-1 rounded hover:bg-muted">
-					{#if copied}
-						<Check class="h-3.5 w-3.5 text-green-500" />
-					{:else}
-						<Copy class="h-3.5 w-3.5 text-muted-foreground" />
+				{#if isCollapsed}
+					<ChevronRight class="h-3 w-3" />
+				{:else}
+					<ChevronDown class="h-3 w-3" />
+				{/if}
+			</button>
+		{:else}
+			<span class="mr-1 w-4 shrink-0"></span>
+		{/if}
+		<Popover.Root>
+			<Popover.Trigger class="min-w-0 flex-1 cursor-pointer text-left">
+				<span bind:this={nameElement} class="block truncate font-mono text-xs">
+					{span.name}
+				</span>
+			</Popover.Trigger>
+			<Popover.Content class="w-auto max-w-sm" align="start">
+				<div class="flex max-h-[60vh] flex-col gap-2 overflow-y-auto">
+					<div class="flex items-start gap-2">
+						<span class="font-mono text-xs break-all select-text">{span.name}</span>
+						<button onclick={copySpanName} class="shrink-0 p-1 rounded hover:bg-muted">
+							{#if copied}
+								<Check class="h-3.5 w-3.5 text-green-500" />
+							{:else}
+								<Copy class="h-3.5 w-3.5 text-muted-foreground" />
+							{/if}
+						</button>
+					</div>
+					{#if attributeEntries.length > 0}
+						<div class="flex flex-col gap-1.5 border-t border-border pt-2">
+							{#each attributeEntries as [key, value]}
+								<div class="flex items-start gap-2">
+									<div class="min-w-0 flex-1">
+										<div class="font-mono text-xs break-all text-muted-foreground">{key}</div>
+										<div class="font-mono text-xs break-all select-text">{value}</div>
+									</div>
+									<button
+										onclick={() => copyAttribute(key, value)}
+										class="shrink-0 p-1 rounded hover:bg-muted"
+									>
+										{#if copiedKey === key}
+											<Check class="h-3.5 w-3.5 text-green-500" />
+										{:else}
+											<Copy class="h-3.5 w-3.5 text-muted-foreground" />
+										{/if}
+									</button>
+								</div>
+							{/each}
+						</div>
 					{/if}
-				</button>
-			</div>
-		</Popover.Content>
-	</Popover.Root>
+				</div>
+			</Popover.Content>
+		</Popover.Root>
+	</div>
 
 	<!-- Timeline bar -->
 	<div

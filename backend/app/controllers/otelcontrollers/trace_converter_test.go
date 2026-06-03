@@ -462,7 +462,7 @@ func TestConvertTraces_ConsumerNonRoot_BecomesTask(t *testing.T) {
 			ScopeSpans: []*tracepb.ScopeSpans{{
 				Spans: []*tracepb.Span{
 					{TraceId: traceId, SpanId: consumerSpanId, ParentSpanId: producerSpanId, Name: "process job", Kind: tracepb.Span_SPAN_KIND_CONSUMER, StartTimeUnixNano: now, EndTimeUnixNano: now + 1_000_000},
-					{TraceId: traceId, SpanId: childSpanId, ParentSpanId: consumerSpanId, Name: "SELECT users", Kind: tracepb.Span_SPAN_KIND_INTERNAL, StartTimeUnixNano: now, EndTimeUnixNano: now + 500_000},
+					{TraceId: traceId, SpanId: childSpanId, ParentSpanId: consumerSpanId, Name: "SELECT users", Kind: tracepb.Span_SPAN_KIND_INTERNAL, StartTimeUnixNano: now, EndTimeUnixNano: now + 500_000, Attributes: []*commonpb.KeyValue{strKV("db.system", "postgresql")}},
 				},
 			}},
 		}},
@@ -493,6 +493,9 @@ func TestConvertTraces_ConsumerNonRoot_BecomesTask(t *testing.T) {
 	}
 	if spans[0].TraceId != wantTaskId {
 		t.Errorf("expected child span.TraceId == task.Id %s, got %s", wantTaskId, spans[0].TraceId)
+	}
+	if spans[0].Attributes["db.system"] != "postgresql" {
+		t.Errorf("expected child span attribute db.system 'postgresql', got %q", spans[0].Attributes["db.system"])
 	}
 }
 

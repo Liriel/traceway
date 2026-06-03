@@ -246,6 +246,7 @@ func convertTraces(projectId uuid.UUID, req *coltracepb.ExportTraceServiceReques
 					Duration:     duration,
 					RecordedAt:   startTime,
 					ParentSpanId: ptrSpanUUID(span.ParentSpanId),
+					Attributes:   allAttrs,
 				})
 			} else {
 				// Unpromoted root span — match historical behavior and drop

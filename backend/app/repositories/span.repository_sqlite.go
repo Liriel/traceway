@@ -13,14 +13,15 @@ import (
 )
 
 type span struct {
-	Id           uuid.UUID  `lit:"id"`
-	TraceId      uuid.UUID  `lit:"trace_id"`
-	ProjectId    uuid.UUID  `lit:"project_id"`
-	Name         string     `lit:"name"`
-	StartTime    SQLiteTime `lit:"start_time"`
-	Duration     int64      `lit:"duration"`
-	RecordedAt   SQLiteTime `lit:"recorded_at"`
-	ParentSpanId *uuid.UUID `lit:"parent_span_id"`
+	Id           uuid.UUID     `lit:"id"`
+	TraceId      uuid.UUID     `lit:"trace_id"`
+	ProjectId    uuid.UUID     `lit:"project_id"`
+	Name         string        `lit:"name"`
+	StartTime    SQLiteTime    `lit:"start_time"`
+	Duration     int64         `lit:"duration"`
+	RecordedAt   SQLiteTime    `lit:"recorded_at"`
+	ParentSpanId *uuid.UUID    `lit:"parent_span_id"`
+	Attributes   SQLiteJSONMap `lit:"attributes"`
 }
 
 func init() {
@@ -39,11 +40,12 @@ func spanToRow(s models.Span) span {
 		Duration:     int64(s.Duration),
 		RecordedAt:   NewSQLiteTime(s.RecordedAt),
 		ParentSpanId: s.ParentSpanId,
+		Attributes:   NewSQLiteJSONMap(s.Attributes),
 	}
 }
 
 func (r *span) toModel() models.Span {
-	return models.Span{
+	s := models.Span{
 		Id:           r.Id,
 		TraceId:      r.TraceId,
 		ProjectId:    r.ProjectId,
@@ -53,6 +55,10 @@ func (r *span) toModel() models.Span {
 		RecordedAt:   r.RecordedAt.Time,
 		ParentSpanId: r.ParentSpanId,
 	}
+	if r.Attributes != nil {
+		s.Attributes = map[string]string(r.Attributes)
+	}
+	return s
 }
 
 type spanRepository struct{}
@@ -80,7 +86,7 @@ func (r *spanRepository) InsertAsync(ctx context.Context, spans []models.Span) e
 
 func (r *spanRepository) FindByTraceId(ctx context.Context, projectId, traceId uuid.UUID) ([]models.Span, error) {
 	rows, err := lit.SelectNamed[span](db.TelemetryDB,
-		`SELECT id, trace_id, project_id, name, start_time, duration, recorded_at, parent_span_id
+		`SELECT id, trace_id, project_id, name, start_time, duration, recorded_at, parent_span_id, attributes
 		FROM spans
 		WHERE project_id = :project_id AND trace_id = :trace_id
 		ORDER BY start_time ASC`,

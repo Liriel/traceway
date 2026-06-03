@@ -261,6 +261,7 @@
 						spans={response.spans}
 						traceDuration={response.endpoint.duration}
 						traceStartTime={response.endpoint.recordedAt}
+						rootSpanId={response.endpoint.spanId}
 					/>
 				{:else}
 					<SpanEmptyState framework={projectsState.currentProject?.framework ?? 'gin'} />
