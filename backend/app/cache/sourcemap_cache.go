@@ -11,12 +11,25 @@ type sourceMapCacheEntry struct {
 }
 
 type sourceMapCache struct {
-	maxCount int
-	maxBytes int64
-	mu       sync.Mutex
-	items    map[string]*list.Element
-	order    *list.List
-	curBytes int64
+	maxCount  int
+	maxBytes  int64
+	mu        sync.Mutex
+	items     map[string]*list.Element
+	order     *list.List
+	curBytes  int64
+	hits      uint64
+	misses    uint64
+	evictions uint64
+}
+
+type SourceMapCacheStats struct {
+	Entries    int
+	Bytes      int64
+	MaxEntries int
+	MaxBytes   int64
+	Hits       uint64
+	Misses     uint64
+	Evictions  uint64
 }
 
 var SourceMapCache *sourceMapCache
@@ -35,9 +48,11 @@ func (c *sourceMapCache) Get(key string) ([]byte, bool) {
 	defer c.mu.Unlock()
 
 	if el, ok := c.items[key]; ok {
+		c.hits++
 		c.order.MoveToFront(el)
 		return el.Value.(*sourceMapCacheEntry).data, true
 	}
+	c.misses++
 	return nil, false
 }
 
@@ -67,5 +82,21 @@ func (c *sourceMapCache) Put(key string, data []byte) {
 		evicted := c.order.Remove(back).(*sourceMapCacheEntry)
 		delete(c.items, evicted.key)
 		c.curBytes -= int64(len(evicted.data))
+		c.evictions++
+	}
+}
+
+func (c *sourceMapCache) Stats() SourceMapCacheStats {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return SourceMapCacheStats{
+		Entries:    len(c.items),
+		Bytes:      c.curBytes,
+		MaxEntries: c.maxCount,
+		MaxBytes:   c.maxBytes,
+		Hits:       c.hits,
+		Misses:     c.misses,
+		Evictions:  c.evictions,
 	}
 }

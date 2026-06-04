@@ -212,13 +212,6 @@ export function SiteHeader() {
                   >
                     Documentation →
                   </Link>
-                  <Link
-                    href="https://cloud.tracewayapp.com/login?email=demo@tracewayapp.com&password=demoaccount!"
-                    className="text-[11px] tracking-[.08em] uppercase hover:text-[color:var(--a2)] transition-colors"
-                    style={{ fontFamily: "var(--font-mono)", color: "var(--fg-2)" }}
-                  >
-                    Live Demo →
-                  </Link>
                 </div>
               </div>
             </div>

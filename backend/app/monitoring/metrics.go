@@ -2,6 +2,7 @@ package monitoring
 
 import (
 	"strconv"
+	"sync/atomic"
 
 	traceway "go.tracewayapp.com"
 )
@@ -13,7 +14,21 @@ const (
 	SignalNative  = "native"
 )
 
-func RecordIngestBatch(signal, table string, convertMs, insertMs float64, size int) {
+var inFlightIngest atomic.Int64
+
+func IngestStarted() {
+	inFlightIngest.Add(1)
+}
+
+func IngestFinished() {
+	inFlightIngest.Add(-1)
+}
+
+func InFlightIngest() int64 {
+	return inFlightIngest.Load()
+}
+
+func RecordIngestBatch(signal, table string, convertMs, insertMs float64, size, bytes int) {
 	tags := map[string]string{
 		"signal": signal,
 		"table":  table,
@@ -21,6 +36,7 @@ func RecordIngestBatch(signal, table string, convertMs, insertMs float64, size i
 	traceway.CaptureMetricWithTags("traceway.ingest.batch.convert_ms", convertMs, tags)
 	traceway.CaptureMetricWithTags("traceway.ingest.batch.insert_ms", insertMs, tags)
 	traceway.CaptureMetricWithTags("traceway.ingest.batch.size", float64(size), tags)
+	traceway.CaptureMetricWithTags("traceway.ingest.batch.bytes", float64(bytes), tags)
 }
 
 func RecordRateLimited(orgID int) {

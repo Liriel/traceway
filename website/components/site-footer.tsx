@@ -33,11 +33,6 @@ const COLUMNS: Column[] = [
       { label: "Release Notes", href: "/blog" },
       { label: "Docs", href: "https://docs.tracewayapp.com", external: true },
       { label: "GitHub", href: "https://github.com/tracewayapp/traceway", external: true },
-      {
-        label: "Live Demo",
-        href: "https://cloud.tracewayapp.com/login?email=demo@tracewayapp.com&password=demoaccount!",
-        external: true,
-      },
     ],
   },
   {

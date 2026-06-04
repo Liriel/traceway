@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/tracewayapp/traceway/backend/app/cache"
 	"github.com/tracewayapp/traceway/backend/app/models"
@@ -26,10 +27,13 @@ import (
 //
 // Consumers are safe for concurrent reads per go-sourcemap docs.
 type parsedSourceMapCache struct {
-	mu    sync.Mutex
-	items map[string]*list.Element
-	order *list.List
-	max   int
+	mu          sync.Mutex
+	items       map[string]*list.Element
+	order       *list.List
+	max         int
+	hits        uint64
+	misses      uint64
+	lastParseMs float64
 }
 
 type parsedSourceMapEntry struct {
@@ -43,14 +47,28 @@ var parsedSourceMaps = &parsedSourceMapCache{
 	max:   5,
 }
 
+func InitParsedSourceMapCache(max int) {
+	parsedSourceMaps.mu.Lock()
+	defer parsedSourceMaps.mu.Unlock()
+	parsedSourceMaps.max = max
+}
+
 func (c *parsedSourceMapCache) get(key string) (*sourcemap.Consumer, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if el, ok := c.items[key]; ok {
+		c.hits++
 		c.order.MoveToFront(el)
 		return el.Value.(*parsedSourceMapEntry).consumer, true
 	}
+	c.misses++
 	return nil, false
+}
+
+func (c *parsedSourceMapCache) recordParse(ms float64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.lastParseMs = ms
 }
 
 func (c *parsedSourceMapCache) put(key string, consumer *sourcemap.Consumer) {
@@ -73,10 +91,24 @@ func (c *parsedSourceMapCache) put(key string, consumer *sourcemap.Consumer) {
 	}
 }
 
-func ParsedSourceMapStats() (items int, max int) {
+type ParsedSourceMapCacheStats struct {
+	Entries     int
+	Max         int
+	Hits        uint64
+	Misses      uint64
+	LastParseMs float64
+}
+
+func ParsedSourceMapStats() ParsedSourceMapCacheStats {
 	parsedSourceMaps.mu.Lock()
 	defer parsedSourceMaps.mu.Unlock()
-	return parsedSourceMaps.order.Len(), parsedSourceMaps.max
+	return ParsedSourceMapCacheStats{
+		Entries:     parsedSourceMaps.order.Len(),
+		Max:         parsedSourceMaps.max,
+		Hits:        parsedSourceMaps.hits,
+		Misses:      parsedSourceMaps.misses,
+		LastParseMs: parsedSourceMaps.lastParseMs,
+	}
 }
 
 var stackFrameRe = regexp.MustCompile(`^(\s{4})(.+):(\d+):(\d+)$`)
@@ -227,10 +259,12 @@ func getParsedSourceMap(ctx context.Context, storageKey string, localConsumers m
 		cache.SourceMapCache.Put(storageKey, data)
 	}
 
+	parseStart := time.Now()
 	consumer, err := sourcemap.Parse("", data)
 	if err != nil {
 		return nil, err
 	}
+	parsedSourceMaps.recordParse(float64(time.Since(parseStart).Microseconds()) / 1000.0)
 	parsedSourceMaps.put(storageKey, consumer)
 	localConsumers[storageKey] = consumer
 	return consumer, nil

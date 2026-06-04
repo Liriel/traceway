@@ -33,6 +33,10 @@ type Cfg struct {
 	SessionRecordingUploadWorkers   string
 	SessionRecordingUploadQueueSize string
 
+	SourceMapCacheMaxEntries string
+	SourceMapCacheMaxBytesMB string
+	SourceMapParsedCacheMax  string
+
 	SMTPEnabled  string
 	SMTPHost     string
 	SMTPPort     string
@@ -104,6 +108,10 @@ func LoadFromEnv() *Cfg {
 		SessionRecordingRetentionDays:   os.Getenv("SESSION_RECORDING_RETENTION_DAYS"),
 		SessionRecordingUploadWorkers:   os.Getenv("SESSION_RECORDING_UPLOAD_WORKERS"),
 		SessionRecordingUploadQueueSize: os.Getenv("SESSION_RECORDING_UPLOAD_QUEUE_SIZE"),
+
+		SourceMapCacheMaxEntries: os.Getenv("SOURCEMAP_CACHE_MAX_ENTRIES"),
+		SourceMapCacheMaxBytesMB: os.Getenv("SOURCEMAP_CACHE_MAX_BYTES_MB"),
+		SourceMapParsedCacheMax:  os.Getenv("SOURCEMAP_PARSED_CACHE_MAX"),
 
 		SMTPEnabled:  os.Getenv("SMTP_ENABLED"),
 		SMTPHost:     os.Getenv("SMTP_HOST"),

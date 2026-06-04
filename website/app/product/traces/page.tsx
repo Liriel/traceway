@@ -142,10 +142,6 @@ export default function TracesPage() {
         }
         description="Connect an SDK, propagate one trace ID, and see the whole story."
         primary={{ label: "Get Started", href: "https://docs.tracewayapp.com" }}
-        secondary={{
-          label: "Try Live Demo",
-          href: "https://cloud.tracewayapp.com/login?email=demo@tracewayapp.com&password=demoaccount!",
-        }}
       />
 
       <section className="wrap pt-10 pb-24">

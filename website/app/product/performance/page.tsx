@@ -193,10 +193,6 @@ export default function PerformancePage() {
         }
         description="Performance dashboards included in every plan."
         primary={{ label: "Get Started", href: "https://docs.tracewayapp.com" }}
-        secondary={{
-          label: "Try Live Demo",
-          href: "https://cloud.tracewayapp.com/login?email=demo@tracewayapp.com&password=demoaccount!",
-        }}
       />
 
       <section className="wrap pt-10 pb-24">
