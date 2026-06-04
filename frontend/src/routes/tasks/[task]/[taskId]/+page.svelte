@@ -31,6 +31,7 @@
 			serverName: string;
 			appVersion: string;
 			distributedTraceId?: string;
+			spanId?: string;
 		};
 		exception?: {
 			exceptionHash: string;
@@ -257,6 +258,7 @@
 						spans={response.spans}
 						traceDuration={response.task.duration}
 						traceStartTime={response.task.recordedAt}
+						rootSpanId={response.task.spanId}
 					/>
 				{:else}
 					<SpanEmptyState framework={projectsState.currentProject?.framework ?? 'gin'} />

@@ -3,26 +3,38 @@
 	import ScrollArea from '../ui/scroll-area/scroll-area.svelte';
 	import SpanRow from './span-row.svelte';
 	import { preciseTimeMs } from '$lib/utils/formatters';
+	import { flattenSpanTree } from '$lib/utils/span-tree';
 
 	type Props = {
 		spans: Span[];
 		traceDuration: number;
 		traceStartTime: string;
+		rootSpanId?: string;
 	};
 
-	let { spans: rawSpans, traceDuration, traceStartTime }: Props = $props();
+	let { spans: rawSpans, traceDuration, traceStartTime, rootSpanId }: Props = $props();
 
-	const spans = $derived(
-		[...rawSpans].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
-	);
+	let collapsed = $state(new Set<string>());
+
+	function toggleCollapse(id: string) {
+		const next = new Set(collapsed);
+		if (next.has(id)) {
+			next.delete(id);
+		} else {
+			next.add(id);
+		}
+		collapsed = next;
+	}
+
+	const treeRows = $derived(flattenSpanTree(rawSpans, rootSpanId, collapsed));
 
 	const traceStart = $derived(
-		spans.length === 0
+		rawSpans.length === 0
 			? preciseTimeMs(traceStartTime)
-			: spans.reduce((earliest, s) => {
+			: rawSpans.reduce((earliest, s) => {
 					const sTime = preciseTimeMs(s.startTime);
 					return sTime < earliest ? sTime : earliest;
-				}, preciseTimeMs(spans[0].startTime))
+				}, preciseTimeMs(rawSpans[0].startTime))
 	);
 	const durationMs = $derived(traceDuration / 1_000_000);
 
@@ -83,13 +95,17 @@
 		</div>
 
 		<!-- Spans -->
-		{#each spans as span, i}
+		{#each treeRows as treeRow, i (treeRow.span.id)}
 			<SpanRow
 				row={i}
-				{span}
+				span={treeRow.span}
 				{traceStart}
 				{traceDuration}
 				isOdd={i % 2 === 1}
+				depth={treeRow.depth}
+				hasChildren={treeRow.hasChildren}
+				isCollapsed={collapsed.has(treeRow.span.id)}
+				onToggle={() => toggleCollapse(treeRow.span.id)}
 				{nameColumnWidth}
 				{updateNameWidth}
 				spanCellHandleMouseEnter={handleMouseEnter}

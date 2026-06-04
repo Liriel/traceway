@@ -30,7 +30,7 @@ Five endpoints exercise different parts of the logs feature end-to-end:
 | `GET /api/test-error` | Error log + exception recording on the root span |
 | `GET /api/test-success` | DEBUG + INFO logs on a simple successful request |
 | `GET /api/test-log-levels` | One log at each severity (TRACE/DEBUG/INFO/WARN/ERROR/FATAL) — validates `SeverityBadge` rendering |
-| `GET /api/test-spans-with-logs` | Nested child spans (`auth.verify` → `db.query` → `cache.lookup`) with logs emitted inside each. Exercises `parent_span_id` capture and span-chip linking on the trace detail page |
+| `GET /api/test-spans-with-logs` | Nested child spans (`auth.verify` → `db.query` → `cache.lookup`) with logs emitted inside each and attributes on every child span. Exercises `parent_span_id` capture, the span tree + attribute popover on the trace detail page, and span-chip linking |
 | `GET /api/test-distributed-logs` | Two services (`backend-service` + `worker-service`) emit logs under a shared `traceway.distributed_trace_id`. Powers the "Load logs from other traces" button on the trace detail page |
 
 Trigger them all at once:
@@ -46,11 +46,12 @@ Then in the dashboard (logged in, **Backend API** project selected):
 1. **Logs list** — open `/logs`. You should see six severity badges and every request's logs listed with a Message, Service (`backend-service` or `worker-service`), and trace ID. The severity dropdown and search (by Message / Service / Trace ID) should all work.
 2. **Trace detail + chip linking** — open `/endpoints`, click one of the test endpoints, click a row. Under the Spans card you should see a **Logs** card listing that request's logs, each chipped with the span that emitted it. For `/api/test-spans-with-logs` specifically, verify logs emitted inside `db.query` chip as `db.query`, logs from `cache.lookup` chip as `cache.lookup`, and logs from handler code (between the child-span blocks) chip as the endpoint name.
 3. **Distributed logs button** — on a trace from `/api/test-distributed-logs`, the Logs card shows a `Load logs from other traces` button. Clicking it loads logs from the `worker-service` trace under a divider.
-4. **`parent_span_id`** — verify in SQLite:
+4. **Span tree + attributes** — on a trace from `/api/test-spans-with-logs`, the Spans card renders a tree: `auth.verify` and `db.query` at the top level, `cache.lookup` indented under `db.query` with a chevron on `db.query` to collapse it. Clicking a span name opens a popover listing its attributes (e.g. `db.system`, `cache.hit`) with per-value copy buttons.
+5. **`parent_span_id` + `attributes`** — verify in SQLite:
    ```bash
-   sqlite3 storage/traceway_telemetry.db "SELECT substr(id,1,8), name, substr(parent_span_id,1,8) FROM spans ORDER BY start_time DESC LIMIT 10;"
+   sqlite3 storage/traceway_telemetry.db "SELECT substr(id,1,8), name, substr(parent_span_id,1,8), attributes FROM spans ORDER BY start_time DESC LIMIT 10;"
    ```
-   Non-root spans should show a non-null `parent_span_id` matching their parent span's `id`.
+   Non-root spans should show a non-null `parent_span_id` matching their parent span's `id` and a JSON `attributes` column.
 
 ## Starting from a clean slate
 

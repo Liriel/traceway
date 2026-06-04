@@ -50,6 +50,43 @@ func TestSpanRepository_InsertAndFindByTraceId(t *testing.T) {
 	}
 }
 
+func TestSpanRepository_AttributesRoundTrip(t *testing.T) {
+	setupTestDB(t)
+	ctx := context.Background()
+	projectId := uuid.New()
+	traceId := uuid.New()
+	now := truncateMs(time.Now().UTC())
+
+	withAttrs := makeSpan(projectId, traceId, "db.query", now, 100*time.Millisecond)
+	withAttrs.Attributes = map[string]string{
+		"db.system":     "postgresql",
+		"db.query.text": "SELECT * FROM users",
+	}
+	withoutAttrs := makeSpan(projectId, traceId, "cache.get", now.Add(10*time.Millisecond), 50*time.Millisecond)
+
+	if err := SpanRepository.InsertAsync(ctx, []models.Span{withAttrs, withoutAttrs}); err != nil {
+		t.Fatalf("InsertAsync failed: %v", err)
+	}
+
+	found, err := SpanRepository.FindByTraceId(ctx, projectId, traceId)
+	if err != nil {
+		t.Fatalf("FindByTraceId failed: %v", err)
+	}
+	if len(found) != 2 {
+		t.Fatalf("expected 2 spans, got %d", len(found))
+	}
+
+	if found[0].Attributes["db.system"] != "postgresql" {
+		t.Errorf("expected db.system 'postgresql', got %q", found[0].Attributes["db.system"])
+	}
+	if found[0].Attributes["db.query.text"] != "SELECT * FROM users" {
+		t.Errorf("expected db.query.text 'SELECT * FROM users', got %q", found[0].Attributes["db.query.text"])
+	}
+	if len(found[1].Attributes) != 0 {
+		t.Errorf("expected no attributes, got %v", found[1].Attributes)
+	}
+}
+
 func TestSpanRepository_FindByTraceId_Empty(t *testing.T) {
 	setupTestDB(t)
 	ctx := context.Background()

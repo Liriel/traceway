@@ -230,21 +230,32 @@ func main() {
 	// Nested child spans + logs from each level. On the endpoint detail page:
 	//   - root-span logs chip as the endpoint name
 	//   - child-span logs chip as that child span's name (db.query / cache.lookup / auth.verify)
-	// Also populates parent_span_id on each non-root span.
+	// Also populates parent_span_id on each non-root span, and attributes on each
+	// child span so the span tree + attribute popover can be exercised.
 	router.GET("/api/test-spans-with-logs", func(c *gin.Context) {
 		ctx := c.Request.Context()
 		backendSvc.log(ctx, otellog.SeverityInfo, "INFO", "handler: entering /test-spans-with-logs")
 
-		authCtx, authSpan := backendSvc.tr.Start(ctx, "auth.verify")
+		authCtx, authSpan := backendSvc.tr.Start(ctx, "auth.verify", trace.WithAttributes(
+			attribute.String("auth.method", "bearer"),
+			attribute.Int("user.id", 42),
+		))
 		backendSvc.log(authCtx, otellog.SeverityInfo, "INFO", "auth: token verified")
 		time.Sleep(5 * time.Millisecond)
 		authSpan.End()
 
-		dbCtx, dbSpan := backendSvc.tr.Start(ctx, "db.query")
+		dbCtx, dbSpan := backendSvc.tr.Start(ctx, "db.query", trace.WithAttributes(
+			attribute.String("db.system", "sqlite"),
+			attribute.String("db.operation", "SELECT"),
+			attribute.String("db.collection.name", "users"),
+		))
 		backendSvc.log(dbCtx, otellog.SeverityDebug, "DEBUG", "db: executing SELECT * FROM users WHERE id = ?")
 		time.Sleep(20 * time.Millisecond)
 
-		cacheCtx, cacheSpan := backendSvc.tr.Start(dbCtx, "cache.lookup")
+		cacheCtx, cacheSpan := backendSvc.tr.Start(dbCtx, "cache.lookup", trace.WithAttributes(
+			attribute.String("cache.key", "user:42"),
+			attribute.Bool("cache.hit", true),
+		))
 		backendSvc.log(cacheCtx, otellog.SeverityInfo, "INFO", "cache: key user:42 -> hit")
 		time.Sleep(2 * time.Millisecond)
 		cacheSpan.End()
