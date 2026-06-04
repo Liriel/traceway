@@ -19,6 +19,7 @@ type ChConn interface {
 	QueryRow(ctx context.Context, query string, args ...any) driver.Row
 	PrepareBatch(ctx context.Context, query string, opts ...driver.PrepareBatchOption) (driver.Batch, error)
 	Exec(ctx context.Context, query string, args ...any) error
+	Stats() driver.Stats
 }
 
 var Conn ChConn

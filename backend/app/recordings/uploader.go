@@ -237,6 +237,8 @@ func (p *pool) batcher(ctx context.Context) {
 func (p *pool) metricsLoop(ctx context.Context) {
 	defer traceway.Recover()
 
+	var prevUploaded, prevDropped, prevFailed uint64
+
 	ticker := time.NewTicker(metricsTickInterval)
 	defer ticker.Stop()
 	for {
@@ -244,13 +246,19 @@ func (p *pool) metricsLoop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			curUploaded := p.uploaded.Load()
+			curDropped := p.dropped.Load()
+			curFailed := p.failed.Load()
 			monitoring.RecordRecordingUploader(
 				len(p.jobs),
 				int(p.inFlight.Load()),
-				p.uploaded.Load(),
-				p.dropped.Load(),
-				p.failed.Load(),
+				curUploaded-prevUploaded,
+				curDropped-prevDropped,
+				curFailed-prevFailed,
 			)
+			prevUploaded = curUploaded
+			prevDropped = curDropped
+			prevFailed = curFailed
 		}
 	}
 }

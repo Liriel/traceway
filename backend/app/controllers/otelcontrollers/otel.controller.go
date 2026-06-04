@@ -26,6 +26,9 @@ type otelController struct{}
 var OtelController = otelController{}
 
 func (o otelController) ExportTraces(c *gin.Context) {
+	monitoring.IngestStarted()
+	defer monitoring.IngestFinished()
+
 	projectId, err := middleware.GetProjectId(c)
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("UseClientAuth middleware must be applied: %w", err))
@@ -43,7 +46,7 @@ func (o otelController) ExportTraces(c *gin.Context) {
 			}
 		}
 	}
-	req, err := decodeTraceRequest(c)
+	req, bodyBytes, err := decodeTraceRequest(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -101,7 +104,7 @@ func (o otelController) ExportTraces(c *gin.Context) {
 
 	insertMs := msSince(insertStart)
 	totalSize := len(endpoints) + len(tasks) + len(spans) + len(exceptions) + len(aiTraces)
-	monitoring.RecordIngestBatch(monitoring.SignalTraces, "traces", convertMs, insertMs, totalSize)
+	monitoring.RecordIngestBatch(monitoring.SignalTraces, "traces", convertMs, insertMs, totalSize, bodyBytes)
 
 	var exceptionHashes []string
 	for _, ex := range exceptions {
@@ -125,6 +128,9 @@ func (o otelController) ExportTraces(c *gin.Context) {
 }
 
 func (o otelController) ExportMetrics(c *gin.Context) {
+	monitoring.IngestStarted()
+	defer monitoring.IngestFinished()
+
 	projectId, err := middleware.GetProjectId(c)
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("UseClientAuth middleware must be applied: %w", err))
@@ -144,7 +150,7 @@ func (o otelController) ExportMetrics(c *gin.Context) {
 		}
 	}
 
-	req, err := decodeMetricsRequest(c)
+	req, bodyBytes, err := decodeMetricsRequest(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -168,12 +174,15 @@ func (o otelController) ExportMetrics(c *gin.Context) {
 		}
 	}
 
-	monitoring.RecordIngestBatch(monitoring.SignalMetrics, "metric_points", convertMs, insertMs, len(result.Points))
+	monitoring.RecordIngestBatch(monitoring.SignalMetrics, "metric_points", convertMs, insertMs, len(result.Points), bodyBytes)
 
 	writeMetricsResponse(c)
 }
 
 func (o otelController) ExportLogs(c *gin.Context) {
+	monitoring.IngestStarted()
+	defer monitoring.IngestFinished()
+
 	projectId, err := middleware.GetProjectId(c)
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("UseClientAuth middleware must be applied: %w", err))
@@ -193,7 +202,7 @@ func (o otelController) ExportLogs(c *gin.Context) {
 		}
 	}
 
-	req, err := decodeLogsRequest(c)
+	req, bodyBytes, err := decodeLogsRequest(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -213,7 +222,7 @@ func (o otelController) ExportLogs(c *gin.Context) {
 		insertMs = msSince(insertStart)
 	}
 
-	monitoring.RecordIngestBatch(monitoring.SignalLogs, "log_records", convertMs, insertMs, len(records))
+	monitoring.RecordIngestBatch(monitoring.SignalLogs, "log_records", convertMs, insertMs, len(records), bodyBytes)
 
 	writeLogsResponse(c)
 }

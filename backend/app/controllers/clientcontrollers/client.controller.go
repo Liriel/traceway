@@ -49,6 +49,9 @@ type ReportRequest struct {
 }
 
 func (e clientController) Report(c *gin.Context) {
+	monitoring.IngestStarted()
+	defer monitoring.IngestFinished()
+
 	projectId, err := middleware.GetProjectId(c)
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("UseClientAuth middleware must be applied: %w", err))
@@ -73,6 +76,13 @@ func (e clientController) Report(c *gin.Context) {
 		return
 	}
 	parseSpan.End()
+
+	bodyBytes := 0
+	if cb, ok := c.Get(gin.BodyBytesKey); ok {
+		if b, ok := cb.([]byte); ok {
+			bodyBytes = len(b)
+		}
+	}
 
 	convertStart := time.Now()
 
@@ -298,7 +308,7 @@ func (e clientController) Report(c *gin.Context) {
 
 	insertMs := float64(time.Since(insertStart).Microseconds()) / 1000.0
 	totalSize := len(endpointsToInsert) + len(tasksToInsert) + len(spansToInsert) + len(exceptionStackTraceToInsert) + len(metricPointsToInsert)
-	monitoring.RecordIngestBatch(monitoring.SignalNative, "report", convertMs, insertMs, totalSize)
+	monitoring.RecordIngestBatch(monitoring.SignalNative, "report", convertMs, insertMs, totalSize, bodyBytes)
 
 	var exceptionHashes []string
 	for _, est := range exceptionStackTraceToInsert {
