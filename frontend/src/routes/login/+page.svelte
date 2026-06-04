@@ -19,16 +19,9 @@
         invite_required: 'This server is invite-only. Ask an admin to invite you.',
     };
 
-    let email = $state(page.url.searchParams.get('email') ?? '');
-    let password = $state(page.url.searchParams.get('password') ?? '');
+    let email = $state('');
+    let password = $state('');
     const initialError = page.url.searchParams.get('error');
-
-    if (page.url.searchParams.has('email') || page.url.searchParams.has('password')) {
-        const cleanUrl = new URL(window.location.href);
-        cleanUrl.searchParams.delete('email');
-        cleanUrl.searchParams.delete('password');
-        window.history.replaceState({}, '', cleanUrl.pathname + cleanUrl.search);
-    }
 
     let error = $state(initialError ? (ERROR_MESSAGES[initialError] ?? 'Sign-in failed. Please try again.') : '');
     let loading = $state(false);

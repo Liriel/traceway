@@ -105,10 +105,6 @@ export default function LogsPage() {
         }
         description="Logs are included on every plan, from Starter to Enterprise."
         primary={{ label: "Read the Logs docs", href: "https://docs.tracewayapp.com/learn/logs" }}
-        secondary={{
-          label: "Try Live Demo",
-          href: "https://cloud.tracewayapp.com/login?email=demo@tracewayapp.com&password=demoaccount!",
-        }}
       />
 
       <section className="wrap pt-10 pb-24">
