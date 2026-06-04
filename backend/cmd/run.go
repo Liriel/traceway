@@ -1,6 +1,15 @@
 package cmd
 
 import (
+	"context"
+	"fmt"
+	"io/fs"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/tracewayapp/traceway/backend/app/cache"
 	"github.com/tracewayapp/traceway/backend/app/chdb"
 	"github.com/tracewayapp/traceway/backend/app/config"
@@ -16,13 +25,6 @@ import (
 	"github.com/tracewayapp/traceway/backend/app/services"
 	"github.com/tracewayapp/traceway/backend/app/storage"
 	"github.com/tracewayapp/traceway/backend/static"
-	"context"
-	"fmt"
-	"io/fs"
-	"net/http"
-	"os"
-	"strings"
-	"time"
 
 	"github.com/coreos/go-systemd/v22/daemon"
 	"github.com/gin-gonic/gin"
@@ -107,7 +109,11 @@ func Run(opts ...Option) {
 	if err := cache.ProjectCache.Init(ctx); err != nil {
 		panic(fmt.Errorf("projects cache could not be initialized: %w", err))
 	}
-	cache.InitSourceMapCache(200, 500*1024*1024)
+	cache.InitSourceMapCache(
+		parsePositiveInt(cfg.SourceMapCacheMaxEntries, 200),
+		int64(parsePositiveInt(cfg.SourceMapCacheMaxBytesMB, 500))*1024*1024,
+	)
+	services.InitParsedSourceMapCache(parsePositiveInt(cfg.SourceMapParsedCacheMax, 5))
 
 	middleware.InitUseClientAuth()
 	middleware.InitUseAppAuth()
@@ -142,6 +148,7 @@ func Run(opts ...Option) {
 			tracewaygin.WithOnErrorRecording(tracewaygin.RecordingQuery|tracewaygin.RecordingBody|tracewaygin.RecordingHeader|tracewaygin.RecordingUrl),
 		))
 		monitoring.StartClickHouseReporter(ctx)
+		monitoring.StartBackendReporter(ctx)
 	}
 
 	router.GET("/health", func(c *gin.Context) {
@@ -241,6 +248,18 @@ func applyOAuthEnvOverrides(cfg *config.Cfg) {
 			*m.dest = v
 		}
 	}
+}
+
+func parsePositiveInt(s string, def int) int {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return def
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v < 1 {
+		return def
+	}
+	return v
 }
 
 func notifySystemd() {

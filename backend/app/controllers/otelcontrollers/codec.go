@@ -35,40 +35,40 @@ func isProtobuf(c *gin.Context) bool {
 	return strings.Contains(ct, "application/x-protobuf") || strings.Contains(ct, "application/protobuf")
 }
 
-func decodeTraceRequest(c *gin.Context) (*coltracepb.ExportTraceServiceRequest, error) {
+func decodeTraceRequest(c *gin.Context) (*coltracepb.ExportTraceServiceRequest, int, error) {
 	body, err := readBody(c)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	req := &coltracepb.ExportTraceServiceRequest{}
 	if isProtobuf(c) {
 		if err := proto.Unmarshal(body, req); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal protobuf: %w", err)
+			return nil, 0, fmt.Errorf("failed to unmarshal protobuf: %w", err)
 		}
 	} else {
 		if err := protojson.Unmarshal(body, req); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
+			return nil, 0, fmt.Errorf("failed to unmarshal JSON: %w", err)
 		}
 	}
-	return req, nil
+	return req, len(body), nil
 }
 
-func decodeMetricsRequest(c *gin.Context) (*colmetricspb.ExportMetricsServiceRequest, error) {
+func decodeMetricsRequest(c *gin.Context) (*colmetricspb.ExportMetricsServiceRequest, int, error) {
 	body, err := readBody(c)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	req := &colmetricspb.ExportMetricsServiceRequest{}
 	if isProtobuf(c) {
 		if err := proto.Unmarshal(body, req); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal protobuf: %w", err)
+			return nil, 0, fmt.Errorf("failed to unmarshal protobuf: %w", err)
 		}
 	} else {
 		if err := protojson.Unmarshal(body, req); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
+			return nil, 0, fmt.Errorf("failed to unmarshal JSON: %w", err)
 		}
 	}
-	return req, nil
+	return req, len(body), nil
 }
 
 func writeTraceResponse(c *gin.Context) {
@@ -93,22 +93,22 @@ func writeMetricsResponse(c *gin.Context) {
 	}
 }
 
-func decodeLogsRequest(c *gin.Context) (*collogspb.ExportLogsServiceRequest, error) {
+func decodeLogsRequest(c *gin.Context) (*collogspb.ExportLogsServiceRequest, int, error) {
 	body, err := readBody(c)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	req := &collogspb.ExportLogsServiceRequest{}
 	if isProtobuf(c) {
 		if err := proto.Unmarshal(body, req); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal protobuf: %w", err)
+			return nil, 0, fmt.Errorf("failed to unmarshal protobuf: %w", err)
 		}
 	} else {
 		if err := protojson.Unmarshal(body, req); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
+			return nil, 0, fmt.Errorf("failed to unmarshal JSON: %w", err)
 		}
 	}
-	return req, nil
+	return req, len(body), nil
 }
 
 func writeLogsResponse(c *gin.Context) {

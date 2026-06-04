@@ -147,3 +147,9 @@ func (c *projectCache) LastRefresh() time.Time {
 	defer c.mu.RUnlock()
 	return c.lastRefresh
 }
+
+func (c *projectCache) Entries() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return len(c.projectsById)
+}

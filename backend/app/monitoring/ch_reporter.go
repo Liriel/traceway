@@ -24,6 +24,14 @@ var telemetryTables = []string{
 	"tasks",
 }
 
+type chBaselines struct {
+	insertedRows    uint64
+	failedInserts   uint64
+	delayedInserts  uint64
+	rejectedInserts uint64
+	first           bool
+}
+
 func StartClickHouseReporter(ctx context.Context) {
 	go func() {
 		defer traceway.Recover()
@@ -31,32 +39,40 @@ func StartClickHouseReporter(ctx context.Context) {
 		ticker := time.NewTicker(reportInterval)
 		defer ticker.Stop()
 
-		var prevInserted uint64
-		var prevFailed uint64
-		first := true
+		baselines := &chBaselines{first: true}
 
 		// Fire once immediately so we don't wait 60s for the first data point.
-		reportOnce(ctx, &prevInserted, &prevFailed, &first)
+		reportOnce(ctx, baselines)
 
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				reportOnce(ctx, &prevInserted, &prevFailed, &first)
+				reportOnce(ctx, baselines)
 			}
 		}
 	}()
 }
 
-func reportOnce(ctx context.Context, prevInserted, prevFailed *uint64, first *bool) {
+func reportOnce(ctx context.Context, b *chBaselines) {
 	// Bound each tick so a stuck CH doesn't wedge the reporter forever.
 	qCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
+	reportPoolStats()
 	reportPartsByTable(qCtx)
+	reportMaxPartsPerPartition(qCtx)
 	reportMergesRunning(qCtx)
-	reportEventDeltas(qCtx, prevInserted, prevFailed, first)
+	reportEventDeltas(qCtx, b)
+	reportDiskUsage(qCtx)
+	reportServerMemory(qCtx)
+}
+
+func reportPoolStats() {
+	stats := chdb.Conn.Stats()
+	traceway.CaptureMetric("traceway.ch.pool.open", float64(stats.Open))
+	traceway.CaptureMetric("traceway.ch.pool.idle", float64(stats.Idle))
 }
 
 func reportPartsByTable(ctx context.Context) {
@@ -78,6 +94,31 @@ func reportPartsByTable(ctx context.Context) {
 	}
 }
 
+func reportMaxPartsPerPartition(ctx context.Context) {
+	rows, err := chdb.Conn.Query(
+		ctx,
+		"SELECT table, max(parts) FROM (SELECT table, partition, count() AS parts FROM system.parts WHERE database = currentDatabase() AND active GROUP BY table, partition) GROUP BY table",
+	)
+	if err != nil {
+		traceway.CaptureException(fmt.Errorf("monitoring: system.parts per-partition query failed: %w", err))
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var table string
+		var maxParts uint64
+		if err := rows.Scan(&table, &maxParts); err != nil {
+			traceway.CaptureException(fmt.Errorf("monitoring: system.parts per-partition scan failed: %w", err))
+			return
+		}
+		traceway.CaptureMetricWithTags("traceway.ch.parts.max_per_partition", float64(maxParts), map[string]string{"table": table})
+	}
+	if err := rows.Err(); err != nil {
+		traceway.CaptureException(fmt.Errorf("monitoring: system.parts per-partition rows failed: %w", err))
+	}
+}
+
 func reportMergesRunning(ctx context.Context) {
 	var merges uint64
 	err := chdb.Conn.QueryRow(
@@ -91,7 +132,7 @@ func reportMergesRunning(ctx context.Context) {
 	traceway.CaptureMetric("traceway.ch.merges.running", float64(merges))
 }
 
-func reportEventDeltas(ctx context.Context, prevInserted, prevFailed *uint64, first *bool) {
+func reportEventDeltas(ctx context.Context, b *chBaselines) {
 	curInserted, err := scanEventValue(ctx, "InsertedRows")
 	if err != nil {
 		traceway.CaptureException(fmt.Errorf("monitoring: system.events InsertedRows failed: %w", err))
@@ -102,17 +143,29 @@ func reportEventDeltas(ctx context.Context, prevInserted, prevFailed *uint64, fi
 		traceway.CaptureException(fmt.Errorf("monitoring: system.events FailedInsertQuery failed: %w", err))
 		return
 	}
+	curDelayed, err := scanEventValue(ctx, "DelayedInserts")
+	if err != nil {
+		traceway.CaptureException(fmt.Errorf("monitoring: system.events DelayedInserts failed: %w", err))
+		return
+	}
+	curRejected, err := scanEventValue(ctx, "RejectedInserts")
+	if err != nil {
+		traceway.CaptureException(fmt.Errorf("monitoring: system.events RejectedInserts failed: %w", err))
+		return
+	}
 
 	// First tick has no baseline — the "delta" would be the lifetime counter.
-	if !*first {
-		inserted := safeDelta(*prevInserted, curInserted)
-		failed := safeDelta(*prevFailed, curFailed)
-		traceway.CaptureMetric("traceway.ch.inserted_rows.delta", float64(inserted))
-		traceway.CaptureMetric("traceway.ch.failed_inserts.delta", float64(failed))
+	if !b.first {
+		traceway.CaptureMetric("traceway.ch.inserted_rows.delta", float64(safeDelta(b.insertedRows, curInserted)))
+		traceway.CaptureMetric("traceway.ch.failed_inserts.delta", float64(safeDelta(b.failedInserts, curFailed)))
+		traceway.CaptureMetric("traceway.ch.delayed_inserts.delta", float64(safeDelta(b.delayedInserts, curDelayed)))
+		traceway.CaptureMetric("traceway.ch.rejected_inserts.delta", float64(safeDelta(b.rejectedInserts, curRejected)))
 	}
-	*prevInserted = curInserted
-	*prevFailed = curFailed
-	*first = false
+	b.insertedRows = curInserted
+	b.failedInserts = curFailed
+	b.delayedInserts = curDelayed
+	b.rejectedInserts = curRejected
+	b.first = false
 }
 
 func scanEventValue(ctx context.Context, event string) (uint64, error) {
@@ -125,11 +178,56 @@ func scanEventValue(ctx context.Context, event string) (uint64, error) {
 	return value, err
 }
 
-// Guards against counter resets across process/CH restart producing a huge
-// uint64 underflow.
-func safeDelta(prev, cur uint64) uint64 {
-	if cur < prev {
-		return cur
+func reportDiskUsage(ctx context.Context) {
+	rows, err := chdb.Conn.Query(ctx, "SELECT name, free_space, total_space FROM system.disks")
+	if err != nil {
+		traceway.CaptureException(fmt.Errorf("monitoring: system.disks query failed: %w", err))
+		return
 	}
-	return cur - prev
+	defer rows.Close()
+
+	for rows.Next() {
+		var name string
+		var free, total uint64
+		if err := rows.Scan(&name, &free, &total); err != nil {
+			traceway.CaptureException(fmt.Errorf("monitoring: system.disks scan failed: %w", err))
+			return
+		}
+		if total == 0 {
+			continue
+		}
+		tags := map[string]string{"disk": name}
+		traceway.CaptureMetricWithTags("traceway.ch.disk.free_bytes", float64(free), tags)
+		traceway.CaptureMetricWithTags("traceway.ch.disk.total_bytes", float64(total), tags)
+		traceway.CaptureMetricWithTags("traceway.ch.disk.used_pcnt", float64(total-free)/float64(total)*100, tags)
+	}
+	if err := rows.Err(); err != nil {
+		traceway.CaptureException(fmt.Errorf("monitoring: system.disks rows failed: %w", err))
+	}
+}
+
+func reportServerMemory(ctx context.Context) {
+	var tracking int64
+	err := chdb.Conn.QueryRow(
+		ctx,
+		"SELECT coalesce(sum(value), 0) FROM system.metrics WHERE metric = 'MemoryTracking'",
+	).Scan(&tracking)
+	if err != nil {
+		traceway.CaptureException(fmt.Errorf("monitoring: system.metrics MemoryTracking failed: %w", err))
+	} else {
+		traceway.CaptureMetric("traceway.ch.memory.tracking_bytes", float64(tracking))
+	}
+
+	var available float64
+	err = chdb.Conn.QueryRow(
+		ctx,
+		"SELECT coalesce(sum(value), 0) FROM system.asynchronous_metrics WHERE metric = 'OSMemoryAvailable'",
+	).Scan(&available)
+	if err != nil {
+		traceway.CaptureException(fmt.Errorf("monitoring: system.asynchronous_metrics OSMemoryAvailable failed: %w", err))
+		return
+	}
+	if available > 0 {
+		traceway.CaptureMetric("traceway.ch.memory.os_available_bytes", available)
+	}
 }

@@ -149,4 +149,13 @@ func defaultUnit(name string) string {
 	}
 }
 
+func (r *metricRegistryRepository) KnownCount() int {
+	count := 0
+	r.knownMetrics.Range(func(_, _ any) bool {
+		count++
+		return true
+	})
+	return count
+}
+
 var MetricRegistryRepository = metricRegistryRepository{}
