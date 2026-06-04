@@ -133,10 +133,6 @@ export default function AiTracingPage() {
           label: "Read the AI Tracing docs",
           href: "https://docs.tracewayapp.com/client/openrouter",
         }}
-        secondary={{
-          label: "Try Live Demo",
-          href: "https://cloud.tracewayapp.com/login?email=demo@tracewayapp.com&password=demoaccount!",
-        }}
       />
 
       <section className="wrap pt-10 pb-24">
