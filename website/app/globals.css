@@ -247,6 +247,7 @@
     color: color-mix(in oklab, var(--a2) 60%, var(--fg-1));
     padding: 2px 6px;
     border-radius: 4px;
+    overflow-wrap: break-word;
   }
 }
 
