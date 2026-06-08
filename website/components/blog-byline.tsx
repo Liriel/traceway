@@ -2,7 +2,7 @@ import Image from "next/image";
 
 const AUTHOR = {
   name: "Dusan Stanojevic",
-  url: "https://www.linkedin.com/in/dusanstanojeviccs",
+  url: "https://github.com/dusanstanojeviccs",
   avatar: "/images/dusan-stanojevic.jpg",
 };
 
