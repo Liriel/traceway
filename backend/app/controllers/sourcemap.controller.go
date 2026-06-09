@@ -1,23 +1,28 @@
 package controllers
 
 import (
-	"github.com/tracewayapp/traceway/backend/app/middleware"
-	"github.com/tracewayapp/traceway/backend/app/models"
-	"github.com/tracewayapp/traceway/backend/app/db"
-	"github.com/tracewayapp/traceway/backend/app/repositories"
-	"github.com/tracewayapp/traceway/backend/app/storage"
-	"database/sql"
 	"fmt"
+	"github.com/tracewayapp/traceway/backend/app/middleware"
+	"github.com/tracewayapp/traceway/backend/app/services"
+	"github.com/tracewayapp/traceway/backend/app/storage"
 	"io"
 	"net/http"
-	"strings"
-	"time"
+	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 	traceway "go.tracewayapp.com"
 )
 
 type sourceMapController struct{}
+
+func isSourceArtifact(name string) bool {
+	switch filepath.Ext(name) {
+	case ".map", ".js", ".cjs", ".mjs":
+		return true
+	default:
+		return false
+	}
+}
 
 func (s sourceMapController) Upload(c *gin.Context) {
 	projectId, err := middleware.GetProjectId(c)
@@ -31,11 +36,6 @@ func (s sourceMapController) Upload(c *gin.Context) {
 		return
 	}
 
-	version := c.Request.FormValue("version")
-	if version == "" {
-		version = "unversioned"
-	}
-
 	files := c.Request.MultipartForm.File["files"]
 	if len(files) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No files uploaded"})
@@ -44,7 +44,7 @@ func (s sourceMapController) Upload(c *gin.Context) {
 
 	uploaded := 0
 	for _, fileHeader := range files {
-		if !strings.HasSuffix(fileHeader.Filename, ".map") {
+		if !isSourceArtifact(fileHeader.Filename) {
 			continue
 		}
 
@@ -66,36 +66,12 @@ func (s sourceMapController) Upload(c *gin.Context) {
 			return
 		}
 
-		storageKey := fmt.Sprintf("sourcemaps/%s/%s/%s", projectId, version, fileHeader.Filename)
-
+		storageKey := fmt.Sprintf("sourcemaps/%s/%s", projectId, fileHeader.Filename)
 		if err := storage.Store.Write(c, storageKey, data); err != nil {
 			c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to write source map to storage: %w", err))
 			return
 		}
-
-		_, err = db.ExecuteTransaction(func(tx *sql.Tx) (*models.SourceMap, error) {
-			existing, err := repositories.SourceMapRepository.FindByProjectVersionAndFileName(tx, projectId, version, fileHeader.Filename)
-			if err != nil {
-				return nil, err
-			}
-			if existing != nil {
-				existing.StorageKey = storageKey
-				existing.FileSize = fileHeader.Size
-				existing.UploadedAt = time.Now().UTC()
-				return existing, repositories.SourceMapRepository.Update(tx, existing)
-			}
-			return repositories.SourceMapRepository.Create(tx, &models.SourceMap{
-				ProjectId:  projectId,
-				Version:    version,
-				FileName:   fileHeader.Filename,
-				StorageKey: storageKey,
-				FileSize:   fileHeader.Size,
-			})
-		})
-		if err != nil {
-			c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to upsert source map metadata: %w", err))
-			return
-		}
+		services.InvalidateSourceMap(projectId, fileHeader.Filename)
 
 		uploaded++
 	}

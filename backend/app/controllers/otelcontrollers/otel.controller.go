@@ -57,8 +57,15 @@ func (o otelController) ExportTraces(c *gin.Context) {
 		return
 	}
 
+	symbolicate := func(ctx context.Context, stackTrace, language string) string {
+		if !isJsLanguage(language) {
+			return stackTrace
+		}
+		return services.ResolveStackTrace(ctx, projectId, stackTrace)
+	}
+
 	convertStart := time.Now()
-	endpoints, tasks, spans, exceptions, aiTraces, aiConversations := convertTraces(projectId, req)
+	endpoints, tasks, spans, exceptions, aiTraces, aiConversations := convertTraces(c, projectId, req, symbolicate)
 
 	var droppedHealthchecks int
 	endpoints, spans, droppedHealthchecks = services.FilterHealthchecks(project, endpoints, spans, exceptions)
