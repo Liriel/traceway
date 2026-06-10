@@ -25,6 +25,7 @@ import (
 	"github.com/tracewayapp/traceway/backend/app/services"
 	"github.com/tracewayapp/traceway/backend/app/sourcemapbackfill"
 	"github.com/tracewayapp/traceway/backend/app/storage"
+	"github.com/tracewayapp/traceway/backend/app/symbolicator/scopes"
 	"github.com/tracewayapp/traceway/backend/static"
 
 	"github.com/coreos/go-systemd/v22/daemon"
@@ -114,6 +115,25 @@ func Run(opts ...Option) {
 		parsePositiveInt(cfg.SourceMapCacheMaxEntries, 200),
 		int64(parsePositiveInt(cfg.SourceMapCacheMaxBytesMB, 500))*1024*1024,
 	)
+	switch cfg.SourceMapCacheType {
+	case "", "memory":
+	case "disk":
+		dir := cfg.SourceMapDiskCachePath
+		if dir == "" {
+			dir = "./twcache"
+		}
+		maxBytes := int64(parsePositiveInt(cfg.SourceMapDiskCacheMaxMB, 2048)) * 1024 * 1024
+		if err := services.EnableSourceMapDiskCache(dir, maxBytes); err != nil {
+			panic(fmt.Errorf("source map disk cache init failed: %w", err))
+		}
+	default:
+		panic(fmt.Errorf("unknown SOURCEMAP_CACHE_TYPE: %s", cfg.SourceMapCacheType))
+	}
+	if cfg.SymbolicatorParser != "" {
+		if err := scopes.SetParser(cfg.SymbolicatorParser); err != nil {
+			panic(fmt.Errorf("symbolicator parser init failed: %w", err))
+		}
+	}
 
 	middleware.InitUseClientAuth()
 	middleware.InitUseAppAuth()

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/tracewayapp/traceway/backend/app/hooks"
 	"github.com/tracewayapp/traceway/backend/app/middleware"
 	"github.com/tracewayapp/traceway/backend/app/models"
@@ -14,11 +15,20 @@ import (
 	"github.com/tracewayapp/traceway/backend/app/repositories"
 	"github.com/tracewayapp/traceway/backend/app/services"
 	"github.com/tracewayapp/traceway/backend/app/storage"
+	"github.com/tracewayapp/traceway/backend/app/symbolicator/jsstack"
 	traceway "go.tracewayapp.com"
 )
 
 func msSince(t time.Time) float64 {
 	return float64(time.Since(t).Microseconds()) / 1000.0
+}
+
+func otelSymbolicateJs(projectId uuid.UUID, ctx context.Context, stackTrace, language, scopeName string) string {
+	if !isJsTelemetry(language, scopeName) {
+		return stackTrace
+	}
+	canonical, _ := jsstack.Canonicalize(stackTrace)
+	return services.ResolveStackTrace(ctx, projectId, canonical, nil)
 }
 
 type otelController struct{}
@@ -57,15 +67,8 @@ func (o otelController) ExportTraces(c *gin.Context) {
 		return
 	}
 
-	symbolicate := func(ctx context.Context, stackTrace, language string) string {
-		if !isJsLanguage(language) {
-			return stackTrace
-		}
-		return services.ResolveStackTrace(ctx, projectId, stackTrace)
-	}
-
 	convertStart := time.Now()
-	endpoints, tasks, spans, exceptions, aiTraces, aiConversations := convertTraces(c, projectId, req, symbolicate)
+	endpoints, tasks, spans, exceptions, aiTraces, aiConversations := convertTraces(c, projectId, req)
 
 	var droppedHealthchecks int
 	endpoints, spans, droppedHealthchecks = services.FilterHealthchecks(project, endpoints, spans, exceptions)
@@ -226,7 +229,7 @@ func (o otelController) ExportLogs(c *gin.Context) {
 	}
 
 	convertStart := time.Now()
-	records := convertLogs(projectId, req)
+	records := convertLogs(c, projectId, req)
 	convertMs := msSince(convertStart)
 
 	insertMs := 0.0

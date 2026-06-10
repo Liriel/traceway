@@ -4,26 +4,22 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/tracewayapp/traceway/backend/app/symbolicator/scopes"
 )
 
-func fixtureRoot(t *testing.T) string {
+func fixture(t testing.TB, parts ...string) string {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", "..", "..", "..", "symbolic"))
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		if _, statErr := os.Stat(root); statErr == nil {
+			return filepath.Join(append([]string{root, "symbolic-testutils", "fixtures"}, parts...)...)
+		}
 	}
-	if _, err := os.Stat(root); err != nil {
-		t.Skipf("symbolic fixture checkout not found at %s", root)
-	}
-	return root
+	return filepath.Join(append([]string{"..", "services", "testdata"}, parts...)...)
 }
 
-func fixture(t *testing.T, parts ...string) string {
-	t.Helper()
-	return filepath.Join(append([]string{fixtureRoot(t), "symbolic-testutils", "fixtures"}, parts...)...)
-}
-
-func mustRead(t *testing.T, path string) []byte {
+func mustRead(t testing.TB, path string) []byte {
 	t.Helper()
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -32,7 +28,7 @@ func mustRead(t *testing.T, path string) []byte {
 	return data
 }
 
-func readIfSet(t *testing.T, parts []string) []byte {
+func readIfSet(t testing.TB, parts []string) []byte {
 	if parts == nil {
 		return nil
 	}
@@ -125,6 +121,20 @@ var parityCases = []parityCase{
 }
 
 func TestSymbolicParity(t *testing.T) {
+	original := scopes.ActiveParser()
+	defer func() { _ = scopes.SetParser(original) }()
+
+	for _, parserName := range scopes.AvailableParsers() {
+		t.Run(parserName, func(t *testing.T) {
+			if err := scopes.SetParser(parserName); err != nil {
+				t.Fatalf("SetParser(%q): %v", parserName, err)
+			}
+			runParityCases(t)
+		})
+	}
+}
+
+func runParityCases(t *testing.T) {
 	for _, tc := range parityCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mapBytes := mustRead(t, fixture(t, tc.mapPath...))

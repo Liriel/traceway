@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"fmt"
 	"github.com/tracewayapp/traceway/backend/app/middleware"
 	"github.com/tracewayapp/traceway/backend/app/services"
@@ -8,21 +9,13 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	traceway "go.tracewayapp.com"
 )
 
 type sourceMapController struct{}
-
-func isSourceArtifact(name string) bool {
-	switch filepath.Ext(name) {
-	case ".map", ".js", ".cjs", ".mjs":
-		return true
-	default:
-		return false
-	}
-}
 
 func (s sourceMapController) Upload(c *gin.Context) {
 	projectId, err := middleware.GetProjectId(c)
@@ -43,8 +36,21 @@ func (s sourceMapController) Upload(c *gin.Context) {
 	}
 
 	uploaded := 0
+	var storedNames []string
+	defer func() {
+		if len(storedNames) == 0 {
+			return
+		}
+		genCtx := context.WithoutCancel(c.Request.Context())
+		go func() {
+			defer traceway.Recover()
+			services.GenerateTWArtifacts(genCtx, projectId, storedNames)
+		}()
+	}()
 	for _, fileHeader := range files {
-		if !isSourceArtifact(fileHeader.Filename) {
+		switch filepath.Ext(fileHeader.Filename) {
+		case ".map", ".js", ".cjs", ".mjs":
+		default:
 			continue
 		}
 
@@ -66,12 +72,27 @@ func (s sourceMapController) Upload(c *gin.Context) {
 			return
 		}
 
-		storageKey := fmt.Sprintf("sourcemaps/%s/%s", projectId, fileHeader.Filename)
+		storageKey := services.SourceMapStorageKey(projectId, fileHeader.Filename)
 		if err := storage.Store.Write(c, storageKey, data); err != nil {
 			c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to write source map to storage: %w", err))
 			return
 		}
 		services.InvalidateSourceMap(projectId, fileHeader.Filename)
+		storedNames = append(storedNames, fileHeader.Filename)
+
+		if debugId := services.ExtractDebugId(fileHeader.Filename, data); debugId != "" {
+			aliasName := services.DebugIdBundleName(debugId)
+			if strings.HasSuffix(fileHeader.Filename, ".map") {
+				aliasName = services.DebugIdMapName(debugId)
+			}
+			aliasKey := services.SourceMapStorageKey(projectId, aliasName)
+			if err := storage.Store.Write(c, aliasKey, data); err != nil {
+				c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to write debug id artifact to storage: %w", err))
+				return
+			}
+			services.InvalidateSourceMap(projectId, aliasName)
+			storedNames = append(storedNames, aliasName)
+		}
 
 		uploaded++
 	}
