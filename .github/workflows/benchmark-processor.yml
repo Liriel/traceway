@@ -35,6 +35,10 @@ on:
         description: 'Hetzner server type for the collector under test'
         required: true
         default: 'ccx33'
+      ldg_type:
+        description: 'Hetzner server type for the load generator (shared vCPU)'
+        required: true
+        default: 'cpx42'
       connections:
         description: 'Loadgen concurrency ramp'
         required: true
@@ -54,6 +58,9 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: hetzner-bench-processor
 
 jobs:
   build:
@@ -113,6 +120,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         impl: [honeycomb, traceway-oxc-mem, traceway-oxc-disk, traceway-goja-mem, traceway-goja-disk]
     steps:
@@ -131,6 +139,7 @@ jobs:
           HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
           SCENARIOS: ${{ inputs.scenarios }}
           SUT_TYPE: ${{ inputs.sut_type }}
+          LDG_TYPE: ${{ inputs.ldg_type }}
           CONNECTIONS: ${{ inputs.connections }}
           STEP_DURATION: ${{ inputs.step_duration }}
           CHURN_ENTRIES: ${{ inputs.churn_entries }}
@@ -142,6 +151,14 @@ jobs:
           OOM_DURATION: ${{ inputs.oom_duration }}
           OOM_SUT_TYPE: ${{ inputs.oom_sut_type }}
         run: bash run-hetzner.sh ${{ matrix.impl }}
+      - name: Cleanup hetzner
+        if: always()
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+        run: |
+          hcloud server delete "bench-sut-${{ github.run_id }}-${{ matrix.impl }}" 2>/dev/null || true
+          hcloud server delete "bench-ldg-${{ github.run_id }}-${{ matrix.impl }}" 2>/dev/null || true
+          hcloud ssh-key delete "bench-key-${{ github.run_id }}-${{ matrix.impl }}" 2>/dev/null || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
