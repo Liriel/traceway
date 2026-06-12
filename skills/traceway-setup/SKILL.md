@@ -239,13 +239,13 @@ Frontend and mobile projects do NOT use OTel; they use the Traceway SDKs reporti
 2. **Bundler plugin**: `npm install -D @tracewayapp/bundler-plugin`, then add `tracewayDebugIds()` from `@tracewayapp/bundler-plugin/vite` (or `/rollup`, or `TracewayDebugIdsWebpackPlugin` from `/webpack`) to the bundler config, with source maps enabled (`build.sourcemap: true` / `devtool: "source-map"`).
 3. **Source map upload**: `npm install -D @tracewayapp/sourcemap-upload`, then run `traceway-sourcemaps --url <instance> --token <source-map-upload-token> --directory ./dist` as a postbuild or CI step (env vars: `TRACEWAY_URL`, `TRACEWAY_SOURCEMAP_TOKEN`). The upload token comes from Step 0 and is a CI secret, never committed.
 
-Full docs: https://docs.tracewayapp.com/client/react (or `vue`, `svelte`, `jquery`, `js-sdk`).
+For the per-framework init code (plain JS, React, Vue, Svelte/SvelteKit, jQuery), the shared SDK options, error filtering, custom attributes, distributed tracing, and the full debug-ID + source map pipeline, read `frontend-js.md` in this skill directory. Online docs: https://docs.tracewayapp.com/client/react (or `vue`, `svelte`, `jquery`, `js-sdk`).
 
 **Full-stack JS** (Next.js, SvelteKit, Remix): both sides. Server side follows Step 2 (verify `http.route` grouping; set it manually in a server hook where the auto-instrumentation does not know the router). Browser side follows the three pieces above.
 
 **Mobile**, always the platform SDK, never OTel:
 
-- **Flutter**: `flutter pub add traceway`, then `Traceway.run(connectionString: '<token>@https://<instance>/api/report', child: MyApp())`. Docs: https://docs.tracewayapp.com/client/flutter
+- **Flutter**: `flutter pub add traceway`, then `Traceway.run(connectionString: '<token>@https://<instance>/api/report', child: MyApp())`. For options, platform permissions, the navigator observer, screen recording, privacy masking, and the Flutter web caveat, read `flutter.md` in this skill directory. Docs: https://docs.tracewayapp.com/client/flutter
 - **React Native**: `npm install @tracewayapp/react-native`, wrap the app in `TracewayProvider`. Docs: https://docs.tracewayapp.com/client/react-native
 - **Android**: `implementation("com.tracewayapp:traceway:<version>")`, call `Traceway.init(...)` at startup. Docs: https://docs.tracewayapp.com/client/android
 
