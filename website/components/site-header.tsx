@@ -14,6 +14,8 @@ import {
   Workflow,
   Activity,
   Smartphone,
+  Bot,
+  Braces,
 } from "lucide-react";
 import { MobileNav } from "@/components/mobile-nav";
 import { DiscordIcon } from "@/components/discord-icon";
@@ -62,6 +64,12 @@ const PILLARS: NavItem[] = [
 
 const SPECIALIZED: NavItem[] = [
   {
+    title: "Agent Skills",
+    description: "Your AI agent debugs with Traceway.",
+    href: "/product/agent-skills",
+    icon: Bot,
+  },
+  {
     title: "AI Tracing",
     description: "LLM cost, tokens, latency, conversations.",
     href: "/product/ai-tracing",
@@ -78,6 +86,12 @@ const SPECIALIZED: NavItem[] = [
     description: "Open-source mobile replay, 10s before every exception.",
     href: "/product/flutter-session-replay",
     icon: Smartphone,
+  },
+  {
+    title: "JavaScript Symbolication",
+    description: "Minified stack traces, resolved to your source.",
+    href: "/product/javascript-symbolication",
+    icon: Braces,
   },
 ];
 
