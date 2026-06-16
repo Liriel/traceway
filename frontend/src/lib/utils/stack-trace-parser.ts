@@ -24,6 +24,7 @@ function isLibraryLocation(location: string): boolean {
 		/^node:/.test(location) ||
 		/^dart:/.test(location) ||
 		/^third_party\//.test(location) ||
+		/^lib\/ui\//.test(location) ||
 		/^package:(flutter(\/|_)|collection\/)/.test(location) ||
 		/SnapshotInstructions\+0x/.test(location)
 	);
@@ -40,6 +41,7 @@ function extractPackageName(location: string): string {
 	if (dartMatch) return dartMatch[1];
 
 	if (/^third_party\//.test(location)) return 'dart sdk';
+	if (/^lib\/ui\//.test(location)) return 'dart:ui';
 	if (/SnapshotInstructions\+0x/.test(location)) return 'unresolved';
 
 	return 'library';
