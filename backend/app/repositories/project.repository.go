@@ -125,6 +125,11 @@ func (p *projectRepository) CreateWithOrganization(tx *sql.Tx, name string, fram
 		DropHealthyHealthchecks: true,
 	}
 
+	if frameworkRequiresSymbolUpload(framework) {
+		token := generateSecureToken()
+		project.SourceMapToken = &token
+	}
+
 	err := lit.InsertExistingUuid(tx, project)
 	if err != nil {
 		return nil, err
@@ -240,6 +245,15 @@ func (p *projectRepository) FindBySourceMapToken(tx *sql.Tx, token string) (*mod
 func generateSecureToken() string {
 	id := uuid.New()
 	return strings.ReplaceAll(id.String(), "-", "")
+}
+
+func frameworkRequiresSymbolUpload(framework string) bool {
+	switch framework {
+	case "ios":
+		return true
+	default:
+		return false
+	}
 }
 
 var ProjectRepository = projectRepository{}
