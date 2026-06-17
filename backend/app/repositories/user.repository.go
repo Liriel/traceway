@@ -120,17 +120,20 @@ func (r *userRepository) EmailExists(tx *sql.Tx, email string) (bool, error) {
 }
 
 func (r *userRepository) SetPasswordResetToken(tx *sql.Tx, userId int, token string, expiresAt time.Time) error {
-	now := time.Now()
-	return lit.UpdateNamed[models.User](
-		tx,
-		&models.User{
-			PasswordResetToken:       &token,
-			PasswordResetExpiresAt:   &expiresAt,
-			PasswordResetRequestedAt: &now,
+	q, a, err := lit.ParseNamedQuery(
+		db.Driver,
+		"UPDATE users SET password_reset_token = :token, password_reset_expires_at = :expires, password_reset_requested_at = :now WHERE id = :id",
+		lit.P{
+			"token":   token,
+			"expires": expiresAt,
+			"now":     time.Now(),
+			"id":      userId,
 		},
-		"id = :id",
-		lit.P{"id": userId},
 	)
+	if err != nil {
+		return err
+	}
+	return lit.UpdateNative(tx, q, a...)
 }
 
 func (r *userRepository) ClearPasswordResetToken(tx *sql.Tx, userId int) error {
@@ -151,12 +154,18 @@ func (r *userRepository) FindByPasswordResetToken(tx *sql.Tx, token string) (*mo
 }
 
 func (r *userRepository) UpdatePassword(tx *sql.Tx, userId int, hashedPassword string) error {
-	return lit.UpdateNamed[models.User](
-		tx,
-		&models.User{Password: hashedPassword},
-		"id = :id",
-		lit.P{"id": userId},
+	q, a, err := lit.ParseNamedQuery(
+		db.Driver,
+		"UPDATE users SET password = :password WHERE id = :id",
+		lit.P{
+			"password": hashedPassword,
+			"id":       userId,
+		},
 	)
+	if err != nil {
+		return err
+	}
+	return lit.UpdateNative(tx, q, a...)
 }
 
 var UserRepository = userRepository{}
