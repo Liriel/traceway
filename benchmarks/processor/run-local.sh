@@ -40,16 +40,18 @@ build_all() {
   (cd loadgen && go mod tidy >/dev/null 2>&1; go build -o loadgen .)
   (cd corpusgen && go build -o corpusgen .)
 
-  if echo "$IMPLS" | grep -qE 'honeycomb|oxc|goja' && [ ! -f ../../testing/symbolication/node-app/dist/app.mjs ]; then
+  if echo "$IMPLS" | grep -qE 'oxc|goja|(^| )honeycomb( |$)' && [ ! -f ../../testing/symbolication/node-app/dist/app.mjs ]; then
     (cd ../../testing/symbolication/node-app && npm install && npm run build)
   fi
 }
 
 scenario_params() {
+  local oom_cache="$OOM_ENTRIES"
+  case "$2" in ios|honeycomb-ios) oom_cache="${OOM_CACHE:-128}" ;; esac
   case "$1" in
     hot)   echo "1 $PAD_KB 0:0 128 $CONNECTIONS $STEP_DURATION" ;;
     churn) echo "$CHURN_ENTRIES $PAD_KB 0:0 128 $CONNECTIONS $STEP_DURATION" ;;
-    oom)   echo "$OOM_ENTRIES $OOM_PAD_KB $OOM_MAP_PAD_KB:$OOM_MAPPINGS_PAD_KB $OOM_ENTRIES $OOM_CONNECTIONS $OOM_DURATION" ;;
+    oom)   echo "$OOM_ENTRIES $OOM_PAD_KB $OOM_MAP_PAD_KB:$OOM_MAPPINGS_PAD_KB $oom_cache $OOM_CONNECTIONS $OOM_DURATION" ;;
   esac
 }
 
@@ -59,6 +61,10 @@ gen_corpus() {
   if [ ! -f "$dir/corpus.json" ]; then
     if [ "$lang" = dart ]; then
       ./corpusgen/corpusgen --language dart --entries "$entries" --out "$dir" >&2
+    elif [ "$lang" = ios ]; then
+      ./corpusgen/corpusgen --language ios --entries "$entries" --dsym seeds/ios/app.dsym --trace seeds/ios/trace.txt --out "$dir" >&2
+    elif [ "$lang" = honeycomb-ios ]; then
+      ./corpusgen/corpusgen --language honeycomb-ios --entries "$entries" --dsym seeds/ios/app.dsym --trace seeds/ios/trace.txt --binary sample --out "$dir" >&2
     else
       ./corpusgen/corpusgen --entries "$entries" --pad-kb "$pad" --map-pad-kb "${mappad%%:*}" --mappings-pad-kb "${mappad##*:}" --out "$dir" >&2
     fi
@@ -75,6 +81,9 @@ impl_env() {
     traceway-goja-disk) echo "BIN=./build-traceway/otelcol-bench-traceway CFG=config-traceway.yaml PARSER=goja DISK=1 LANG=js" ;;
     traceway-dart-mem)  echo "BIN=./build-traceway/otelcol-bench-traceway CFG=config-traceway.yaml PARSER= DISK= LANG=dart" ;;
     traceway-dart-disk) echo "BIN=./build-traceway/otelcol-bench-traceway CFG=config-traceway.yaml PARSER= DISK=1 LANG=dart" ;;
+    traceway-ios-mem)   echo "BIN=./build-traceway/otelcol-bench-traceway CFG=config-traceway.yaml PARSER= DISK= LANG=ios" ;;
+    traceway-ios-disk)  echo "BIN=./build-traceway/otelcol-bench-traceway CFG=config-traceway.yaml PARSER= DISK=1 LANG=ios" ;;
+    honeycomb-ios)      echo "BIN=./build-honeycomb/otelcol-bench-honeycomb CFG=config-honeycomb-ios.yaml PARSER= DISK= LANG=honeycomb-ios SIGNAL=logs" ;;
     *) echo "unknown impl $1" >&2; return 1 ;;
   esac
 }
@@ -82,15 +91,16 @@ impl_env() {
 drain_markers() {
   case "$1" in
     dart) echo "OK_MARKER=crash.dart FAIL_MARKER=_kDartIsolateSnapshotInstructions" ;;
+    ios|honeycomb-ios) echo "OK_MARKER=sample.c FAIL_MARKER=sample+0x" ;;
     *)    echo "OK_MARKER=../src/inventory.js FAIL_MARKER=.mjs:1:" ;;
   esac
 }
 
 run_one() {
   local impl="$1" scenario="$2"
-  read -r entries pad mappad cachesize conns dur <<< "$(scenario_params "$scenario")"
-  local BIN CFG PARSER DISK LANG
+  local BIN CFG PARSER DISK LANG SIGNAL=traces
   eval "$(impl_env "$impl")"
+  read -r entries pad mappad cachesize conns dur <<< "$(scenario_params "$scenario" "$LANG")"
   local store
   store=$(gen_corpus "$LANG" "$scenario" "$entries" "$pad" "$mappad")
   local OK_MARKER FAIL_MARKER
@@ -129,7 +139,7 @@ run_one() {
   local t0
   t0=$(date +%s)
 
-  ./loadgen/loadgen --target http://127.0.0.1:4318/v1/traces --corpus "$store/corpus.json" \
+  ./loadgen/loadgen --target "http://127.0.0.1:4318/v1/$SIGNAL" --corpus "$store/corpus.json" \
     --connections "$conns" --step-duration "$dur" \
     --spans-per-request "$SPANS_PER_REQUEST" --out "$outdir/loadgen.json" || true
 

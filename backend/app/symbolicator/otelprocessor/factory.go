@@ -49,6 +49,9 @@ func createDefaultConfig() component.Config {
 
 		BuildUUIDAttributeKey: "app.debug.source_map_uuid",
 
+		IOSBuildUUIDAttributeKey:  "app.debug.build_uuid",
+		AppExecutableAttributeKey: "app.bundle.executable",
+
 		SourceMapStoreKey: fileStoreKey,
 		LocalSourceMaps:   LocalSourceMapsConfig{Path: "."},
 
@@ -57,6 +60,8 @@ func createDefaultConfig() component.Config {
 		SourceMapCacheSize: 128,
 
 		CacheMaxMB: 2048,
+
+		IOSDefaultArch: "arm64",
 
 		LanguageAttributeKey: "telemetry.sdk.language",
 	}
