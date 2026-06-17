@@ -57,10 +57,19 @@ scenario_params() {
   esac
 }
 
+dur_to_sec() {
+  case "$1" in
+    *h) echo $(( ${1%h} * 3600 )) ;;
+    *m) echo $(( ${1%m} * 60 )) ;;
+    *s) echo "${1%s}" ;;
+    *)  echo "$1" ;;
+  esac
+}
+
 KEY_FILE=$(mktemp -u)
 ssh-keygen -t ed25519 -N '' -f "$KEY_FILE" -q
-SSH="ssh -i $KEY_FILE -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10"
-SCP="scp -i $KEY_FILE -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+SSH="ssh -i $KEY_FILE -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
+SCP="scp -i $KEY_FILE -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
 
 cleanup() {
   hcloud server delete "bench-sut-$RUN_ID" 2>/dev/null || true
@@ -121,7 +130,12 @@ for scenario in $SCENARIOS; do
   T0=$($SSH "root@$SUT_IP" "date +%s")
   $SSH "root@$SUT_IP" "cd /opt/bench || exit 1; nohup bash rss-sampler.sh \$(cat collector.pid) rss.csv > /dev/null 2>&1 &"
 
-  $SSH "root@$LDG_IP" "rm -f /opt/bench/loadgen-$scenario.json; cd /opt/bench && ./loadgen --target http://$SUT_IP:4318/v1/$SIGNAL --corpus corpus-$scenario/corpus.json --connections $conns --step-duration $dur --spans-per-request $SPANS_PER_REQUEST --out loadgen-$scenario.json" || true
+  $SSH "root@$LDG_IP" "cd /opt/bench && rm -f loadgen-$scenario.json loadgen-$scenario.done && nohup sh -c './loadgen --target http://$SUT_IP:4318/v1/$SIGNAL --corpus corpus-$scenario/corpus.json --connections $conns --step-duration $dur --spans-per-request $SPANS_PER_REQUEST --out loadgen-$scenario.json > loadgen-$scenario.log 2>&1; echo \$? > loadgen-$scenario.done' > /dev/null 2>&1 &" || true
+  loadgen_timeout=$(( $(dur_to_sec "$dur") * $(echo "$conns" | awk -F, '{print NF}') + 180 ))
+  for i in $(seq 1 $(( (loadgen_timeout + 9) / 10 ))); do
+    $SSH "root@$LDG_IP" "[ -f /opt/bench/loadgen-$scenario.done ]" 2>/dev/null && break
+    sleep 10
+  done
 
   if ! $SSH "root@$SUT_IP" "kill -0 \$(cat /opt/bench/collector.pid) 2>/dev/null"; then
     TDEAD=$($SSH "root@$SUT_IP" "tail -1 /opt/bench/rss.csv | cut -d, -f1")
