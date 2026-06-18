@@ -222,17 +222,23 @@ func (e *taskRepository) FindByTaskName(ctx context.Context, projectId uuid.UUID
 }
 
 // FindById returns a single task by ID
-func (e *taskRepository) FindById(ctx context.Context, projectId, taskId uuid.UUID) (*models.Task, error) {
+func (e *taskRepository) FindById(ctx context.Context, projectId, taskId uuid.UUID, recordedAt *time.Time) (*models.Task, error) {
 	query := `SELECT id, project_id, task_name, duration, recorded_at, client_ip, attributes, app_version, server_name, distributed_trace_id, span_id, is_root
 		FROM tasks
-		WHERE project_id = ? AND id = ?
-		LIMIT 1`
+		WHERE project_id = ? AND id = ?`
+	args := []any{projectId, taskId}
+	if recordedAt != nil {
+		from, to := traceWindowBounds(*recordedAt)
+		query += ` AND recorded_at >= ? AND recorded_at <= ?`
+		args = append(args, from, to)
+	}
+	query += ` LIMIT 1`
 
 	var t models.Task
 	var attributesJSON string
 	var isRoot uint8
 
-	err := chdb.Conn.QueryRow(ctx, query, projectId, taskId).Scan(
+	err := chdb.Conn.QueryRow(ctx, query, args...).Scan(
 		&t.Id, &t.ProjectId, &t.TaskName, &t.Duration, &t.RecordedAt,
 		&t.ClientIP, &attributesJSON, &t.AppVersion, &t.ServerName, &t.DistributedTraceId, &t.SpanId, &isRoot)
 	t.IsRoot = isRoot == 1
@@ -440,13 +446,19 @@ func (e *taskRepository) GetTaskStats(ctx context.Context, projectId uuid.UUID, 
 	return &stats, nil
 }
 
-func (e *taskRepository) FindByDistributedTraceId(ctx context.Context, distributedTraceId uuid.UUID, projectIds []uuid.UUID) ([]models.Task, error) {
+func (e *taskRepository) FindByDistributedTraceId(ctx context.Context, distributedTraceId uuid.UUID, projectIds []uuid.UUID, recordedAt *time.Time) ([]models.Task, error) {
 	query := `SELECT id, project_id, task_name, duration, recorded_at, client_ip, attributes, app_version, server_name, distributed_trace_id
 		FROM tasks
-		WHERE distributed_trace_id = ? AND project_id IN (?)
-		ORDER BY recorded_at ASC`
+		WHERE distributed_trace_id = ? AND project_id IN (?)`
+	args := []any{distributedTraceId, projectIds}
+	if recordedAt != nil {
+		from, to := distributedTraceWindowBounds(*recordedAt)
+		query += ` AND recorded_at >= ? AND recorded_at <= ?`
+		args = append(args, from, to)
+	}
+	query += ` ORDER BY recorded_at ASC`
 
-	rows, err := chdb.Conn.Query(ctx, query, distributedTraceId, projectIds)
+	rows, err := chdb.Conn.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

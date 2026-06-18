@@ -67,7 +67,7 @@
 		try {
 			const result = await api.post(
 				`/tasks/${data.taskId}`,
-				{},
+				data.recordedAt ? { recordedAt: data.recordedAt } : {},
 				{ projectId: projectsState.currentProjectId ?? undefined }
 			);
 			response = result;
@@ -281,7 +281,10 @@
 		/>
 
 		{#if response.task.distributedTraceId}
-			<DistributedTraceCard distributedTraceId={response.task.distributedTraceId} />
+			<DistributedTraceCard
+				distributedTraceId={response.task.distributedTraceId}
+				recordedAt={response.task.recordedAt}
+			/>
 		{/if}
 	{/if}
 </div>

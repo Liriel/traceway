@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/tracewayapp/traceway/backend/app/middleware"
 	"github.com/tracewayapp/traceway/backend/app/models"
@@ -13,6 +14,10 @@ import (
 )
 
 type taskDetailController struct{}
+
+type taskDetailRequest struct {
+	RecordedAt *time.Time `json:"recordedAt"`
+}
 
 type TaskExceptionInfo struct {
 	ExceptionHash string `json:"exceptionHash"`
@@ -49,18 +54,26 @@ func (t taskDetailController) GetTaskDetail(c *gin.Context) {
 		return
 	}
 
+	var request taskDetailRequest
+	_ = c.ShouldBindJSON(&request)
+
 	// Get task
 	span := traceway.StartSpan(c, "loading task")
-	task, err := repositories.TaskRepository.FindById(c, projectId, taskId)
+	task, err := repositories.TaskRepository.FindById(c, projectId, taskId, request.RecordedAt)
+	if task == nil && err == nil && request.RecordedAt != nil {
+		task, err = repositories.TaskRepository.FindById(c, projectId, taskId, nil)
+	}
 	span.End()
-	if err != nil {
+	if err != nil || task == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}
 
+	recordedAt := task.RecordedAt
+
 	// Get spans (flat list ordered by start_time)
 	span = traceway.StartSpan(c, "loading spans")
-	spans, err := repositories.SpanRepository.FindByTraceId(c, projectId, taskId)
+	spans, err := repositories.SpanRepository.FindByTraceId(c, projectId, taskId, &recordedAt)
 	span.End()
 	if err != nil {
 		c.AbortWithError(500, traceway.NewStackTraceErrorf("error loading spans: %w", err))
@@ -72,7 +85,7 @@ func (t taskDetailController) GetTaskDetail(c *gin.Context) {
 	var messages []TaskMessageInfo
 
 	span = traceway.StartSpan(c, "loading exceptions")
-	allExceptions, err := repositories.ExceptionStackTraceRepository.FindAllByTraceId(c, projectId, taskId)
+	allExceptions, err := repositories.ExceptionStackTraceRepository.FindAllByTraceId(c, projectId, taskId, &recordedAt)
 	span.End()
 	if err != nil {
 		c.AbortWithError(500, traceway.NewStackTraceErrorf("error loading allExceptions: %w", err))
