@@ -444,7 +444,7 @@
                 {#each sessions as session}
                     <Table.Row
                         class="cursor-pointer hover:bg-muted/50"
-                        onclick={createRowClickHandler(resolve(`/sessions/${session.id}`), 'preset', 'from', 'to')}
+                        onclick={createRowClickHandler(`${resolve(`/sessions/${session.id}`)}?t=${encodeURIComponent(session.startedAt)}`, 'preset', 'from', 'to')}
                     >
                         <Table.Cell class="font-mono text-sm">{shortId(session.id)}</Table.Cell>
                         <Table.Cell class="text-sm">{formatRelativeTime(session.startedAt, timezone)}</Table.Cell>

@@ -91,15 +91,21 @@ func (r *sessionRepository) FindAll(ctx context.Context, projectId uuid.UUID, fr
 	return sessions, int64(count), nil
 }
 
-func (r *sessionRepository) FindById(ctx context.Context, projectId, sessionId uuid.UUID) (*models.Session, error) {
+func (r *sessionRepository) FindById(ctx context.Context, projectId, sessionId uuid.UUID, startedAt *time.Time) (*models.Session, error) {
 	var s models.Session
 
-	err := chdb.Conn.QueryRow(ctx,
-		`SELECT id, project_id, started_at, ended_at, duration, client_ip, attributes, app_version, server_name, distributed_trace_id
-			FROM sessions FINAL
-			WHERE project_id = ? AND id = ?
-			LIMIT 1`,
-		projectId, sessionId).Scan(
+	query := `SELECT id, project_id, started_at, ended_at, duration, client_ip, attributes, app_version, server_name, distributed_trace_id
+		FROM sessions FINAL
+		WHERE project_id = ? AND id = ?`
+	args := []any{projectId, sessionId}
+	if startedAt != nil {
+		from, to := traceWindowBounds(*startedAt)
+		query += ` AND started_at >= ? AND started_at <= ?`
+		args = append(args, from, to)
+	}
+	query += ` LIMIT 1`
+
+	err := chdb.Conn.QueryRow(ctx, query, args...).Scan(
 		&s.Id, &s.ProjectId, &s.StartedAt, &s.EndedAt, &s.Duration, &s.ClientIP, &s.Attributes, &s.AppVersion, &s.ServerName, &s.DistributedTraceId,
 	)
 	if err != nil {

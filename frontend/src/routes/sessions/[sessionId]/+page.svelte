@@ -82,7 +82,8 @@
         notFound = false;
 
         try {
-            const detail = await api.post(`/sessions/${sessionId}`, {}, {
+            const startedAt = pageState.url.searchParams.get('t');
+            const detail = await api.post(`/sessions/${sessionId}`, startedAt ? { startedAt } : {}, {
                 projectId: projectsState.currentProjectId ?? undefined
             });
             session = detail.session;

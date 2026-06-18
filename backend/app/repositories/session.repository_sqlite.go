@@ -235,10 +235,18 @@ func buildSessionFilterClauseSQLite(search string, filters []SessionAttributeFil
 	return sb.String(), params
 }
 
-func (r *sessionRepository) FindById(ctx context.Context, projectId, sessionId uuid.UUID) (*models.Session, error) {
-	row, err := lit.SelectSingleNamed[sessionRow](db.TelemetryDB,
-		"SELECT id, project_id, started_at, ended_at, duration, client_ip, attributes, app_version, server_name, distributed_trace_id FROM sessions WHERE project_id = :project_id AND id = :id LIMIT 1",
-		lit.P{"project_id": projectId, "id": sessionId})
+func (r *sessionRepository) FindById(ctx context.Context, projectId, sessionId uuid.UUID, startedAt *time.Time) (*models.Session, error) {
+	query := "SELECT id, project_id, started_at, ended_at, duration, client_ip, attributes, app_version, server_name, distributed_trace_id FROM sessions WHERE project_id = :project_id AND id = :id"
+	params := lit.P{"project_id": projectId, "id": sessionId}
+	if startedAt != nil {
+		from, to := traceWindowBounds(*startedAt)
+		query += " AND started_at >= :from AND started_at <= :to"
+		params["from"] = NewSQLiteTime(from)
+		params["to"] = NewSQLiteTime(to)
+	}
+	query += " LIMIT 1"
+
+	row, err := lit.SelectSingleNamed[sessionRow](db.TelemetryDB, query, params)
 	if err != nil {
 		return nil, err
 	}

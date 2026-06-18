@@ -64,7 +64,11 @@ func (t taskDetailController) GetTaskDetail(c *gin.Context) {
 		task, err = repositories.TaskRepository.FindById(c, projectId, taskId, nil)
 	}
 	span.End()
-	if err != nil || task == nil {
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("error loading task: %w", err))
+		return
+	}
+	if task == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
 		return
 	}

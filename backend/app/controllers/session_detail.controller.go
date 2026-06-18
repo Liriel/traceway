@@ -18,6 +18,10 @@ import (
 
 type sessionDetailController struct{}
 
+type sessionDetailRequest struct {
+	StartedAt *time.Time `json:"startedAt"`
+}
+
 type SessionExceptionInfo struct {
 	Id            uuid.UUID `json:"id"`
 	ExceptionHash string    `json:"exceptionHash"`
@@ -56,8 +60,14 @@ func (s sessionDetailController) GetSessionDetail(c *gin.Context) {
 		return
 	}
 
+	var request sessionDetailRequest
+	_ = c.ShouldBindJSON(&request)
+
 	span := traceway.StartSpan(c, "loading session")
-	session, err := repositories.SessionRepository.FindById(c, projectId, sessionId)
+	session, err := repositories.SessionRepository.FindById(c, projectId, sessionId, request.StartedAt)
+	if session == nil && err == nil && request.StartedAt != nil {
+		session, err = repositories.SessionRepository.FindById(c, projectId, sessionId, nil)
+	}
 	span.End()
 	if err != nil {
 		c.AbortWithError(500, traceway.NewStackTraceErrorf("error loading session: %w", err))
