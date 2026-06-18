@@ -88,7 +88,7 @@
 				<Tooltip.Trigger class="flex-1 h-full flex items-end justify-center">
 					<div
 						class="w-full max-w-[4px] rounded-[1px] transition-colors {hasEvents ? 'hover:opacity-80' : ''}"
-						style="height: {Math.max(2, heightPct)}%;{hasEvents ? ' background-color: var(--sidebar-accent);' : ''}"
+						style="height: {Math.max(2, heightPct)}%;{hasEvents ? ' background-color: var(--trend-bar);' : ''}"
 					></div>
 				</Tooltip.Trigger>
 				<Tooltip.Content side="top" class="py-2 px-3 !animate-none !transition-none">
