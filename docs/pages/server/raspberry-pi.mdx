@@ -1,0 +1,79 @@
+# Raspberry Pi
+
+Run Traceway on a Raspberry Pi 4 (or any arm64 single-board computer) using the SQLite image. No external Postgres or ClickHouse required — everything runs in a single container.
+
+## Requirements
+
+- Raspberry Pi 4 (or later) running a **64-bit OS** (`uname -m` must return `aarch64`)
+- Docker installed on the Pi
+- At least 512 MB free RAM
+
+The pre-built image on GHCR is amd64-only. You need to build from source on the Pi itself.
+
+## Build the Image
+
+Clone the repo on the Pi and build natively — Go will automatically target arm64:
+
+```bash
+git clone https://github.com/tracewayapp/traceway.git
+cd traceway
+
+docker build --no-cache -f Dockerfile.sqlite -t traceway:arm64 .
+```
+
+Building natively on the Pi (instead of cross-compiling) avoids architecture mismatches. Expect the build to take 5–10 minutes on a Pi 4.
+
+## Run with Docker Compose
+
+Create a `docker-compose.yml` on the Pi:
+
+```yaml
+services:
+  traceway:
+    image: traceway:arm64
+    ports:
+      - "8001:80"
+    environment:
+      JWT_SECRET: "change-this-to-a-secure-secret-at-least-32-chars"
+      # APP_BASE_URL: "http://<pi-ip>:8001"
+    volumes:
+      - traceway-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+
+volumes:
+  traceway-data:
+```
+
+Then start it:
+
+```bash
+docker compose up -d
+```
+
+Open `http://<pi-ip>:8001/register` to create your first account.
+
+## Updating
+
+Rebuild the image from the updated source and recreate the container:
+
+```bash
+git pull
+docker build --no-cache -f Dockerfile.sqlite -t traceway:arm64 .
+docker compose down && docker compose up -d
+```
+
+Data persists in the `traceway-data` named volume across rebuilds.
+
+## Troubleshooting
+
+**`exec format error`** — the binary inside the image was built for the wrong architecture. This happens if you built the image on an x86 machine and copied it to the Pi. Always build directly on the Pi.
+
+**32-bit OS** — Traceway requires a 64-bit kernel. Run `uname -m`; if it returns `armv7l` instead of `aarch64`, you need to reinstall with a 64-bit OS (e.g. Raspberry Pi OS 64-bit).
+
+For other configuration options (S3 storage, retention, SSO) see the [SQLite deployment guide](/server/sqlite).
